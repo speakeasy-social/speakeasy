@@ -25,6 +25,7 @@ interface FeedSectionProps {
   scrollElRef: ListRef
   ignoreFilterFor?: string
   setScrollViewTag: (tag: number | null) => void
+  mediaGrid?: boolean
 }
 export const ProfileFeedSection = React.forwardRef<
   SectionRef,
@@ -37,6 +38,7 @@ export const ProfileFeedSection = React.forwardRef<
     scrollElRef,
     ignoreFilterFor,
     setScrollViewTag,
+    mediaGrid,
   },
   ref,
 ) {
@@ -89,6 +91,7 @@ export const ProfileFeedSection = React.forwardRef<
         initialNumToRender={
           shouldUseAdjustedNumToRender ? adjustedInitialNumToRender : undefined
         }
+        mediaGrid={mediaGrid}
       />
       {(isScrolledDown || hasNew) && (
         <LoadLatestBtn
