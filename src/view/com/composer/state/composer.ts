@@ -59,11 +59,13 @@ export type PostDraft = {
   labels: SelfLabel[]
   embed: EmbedDraft
   shortenedGraphemeLength: number
+  audience: 'public' | 'trusted'
 }
 
 export type PostAction =
   | {type: 'update_richtext'; richtext: RichText}
   | {type: 'update_labels'; labels: SelfLabel[]}
+  | {type: 'update_audience'; audience: 'public' | 'trusted'}
   | {type: 'embed_add_images'; images: ComposerImage[]}
   | {type: 'embed_update_image'; image: ComposerImage}
   | {type: 'embed_remove_image'; image: ComposerImage}
@@ -171,6 +173,7 @@ export function composerReducer(
           media: undefined,
           link: undefined,
         },
+        audience: 'public',
       })
       return {
         ...state,
@@ -235,6 +238,12 @@ function postReducer(state: PostDraft, action: PostAction): PostDraft {
       return {
         ...state,
         labels: action.labels,
+      }
+    }
+    case 'update_audience': {
+      return {
+        ...state,
+        audience: action.audience,
       }
     }
     case 'embed_add_images': {
@@ -589,6 +598,7 @@ export function createComposerState({
             media,
             link,
           },
+          audience: 'public',
         },
       ],
       postgate: createPostgateRecord({post: ''}),

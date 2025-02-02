@@ -117,9 +117,12 @@ import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {atoms as a, native, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import {useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {VerifyEmailDialog} from '#/components/dialogs/VerifyEmailDialog'
 import {CircleInfo_Stroke2_Corner0_Rounded as CircleInfo} from '#/components/icons/CircleInfo'
 import {EmojiArc_Stroke2_Corner0_Rounded as EmojiSmile} from '#/components/icons/Emoji'
+import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
+import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {TimesLarge_Stroke2_Corner0_Rounded as X} from '#/components/icons/Times'
 import * as Prompt from '#/components/Prompt'
 import {Text as NewText} from '#/components/Typography'
@@ -644,7 +647,12 @@ export const ComposePost = ({
               }
             />
           </ComposerTopBar>
-
+          <AudienceBar
+            post={activePost}
+            thread={thread}
+            dispatch={composerDispatch}
+            isReply={!!replyTo}
+          />
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
@@ -1087,8 +1095,6 @@ function ComposerEmbeds({
 }
 
 function ComposerPills({
-  isReply,
-  thread,
   post,
   dispatch,
   bottomBarAnimatedStyle,
@@ -1105,7 +1111,7 @@ function ComposerPills({
   const hasLink = !!post.embed.link
 
   // Don't render anything if no pills are going to be displayed
-  if (isReply && !hasMedia && !hasLink) {
+  if (!hasMedia && !hasLink) {
     return null
   }
 
@@ -1117,22 +1123,6 @@ function ComposerPills({
         horizontal={true}
         bounces={false}
         showsHorizontalScrollIndicator={false}>
-        {isReply ? null : (
-          <ThreadgateBtn
-            postgate={thread.postgate}
-            onChangePostgate={nextPostgate => {
-              dispatch({type: 'update_postgate', postgate: nextPostgate})
-            }}
-            threadgateAllowUISettings={thread.threadgate}
-            onChangeThreadgateAllowUISettings={nextThreadgate => {
-              dispatch({
-                type: 'update_threadgate',
-                threadgate: nextThreadgate,
-              })
-            }}
-            style={bottomBarAnimatedStyle}
-          />
-        )}
         {hasMedia || hasLink ? (
           <LabelsBtn
             labels={post.labels}
@@ -1515,6 +1505,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginBottom: 4,
   },
+  audienceBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
 })
 
 function ErrorBanner({
@@ -1674,5 +1672,93 @@ function VideoUploadToolbar({state}: {state: VideoState}) {
       </Animated.View>
       <NewText style={[a.font_bold, a.ml_sm]}>{text}</NewText>
     </ToolbarWrapper>
+  )
+}
+
+function AudienceBar({
+  post,
+  thread,
+  dispatch,
+  isReply,
+}: {
+  post: PostDraft
+  thread: ThreadDraft
+  dispatch: (action: ComposerAction) => void
+  isReply: boolean
+}) {
+  const {_} = useLingui()
+  const t = useTheme()
+  const groupsDialogControl = useDialogControl()
+
+  const onToggleAudience = useCallback(() => {
+    if (post.audience === 'public') {
+      groupsDialogControl.open()
+    } else {
+      dispatch({
+        type: 'update_post',
+        postId: post.id,
+        postAction: {
+          type: 'update_audience',
+          audience: 'public',
+        },
+      })
+    }
+  }, [dispatch, post.id, post.audience, groupsDialogControl])
+
+  const label = post.audience === 'public' ? _('Public') : _('Trusted')
+
+  return (
+    <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureDescription={_(
+          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
+        )}
+        featureName={_(msg`Private Post to Trusted Communities`)}
+        utmParams={{
+          source: 'composer',
+          medium: 'trusted_toggle',
+          campaign: 'groups_beta',
+        }}
+      />
+      <View style={[styles.audienceBar, t.atoms.border_contrast_medium]}>
+        <Button
+          variant="solid"
+          color="secondary"
+          onPress={onToggleAudience}
+          style={[
+            {borderRadius: 6},
+            a.py_sm,
+            {paddingLeft: 12, paddingRight: 12},
+          ]}
+          accessibilityHint={_(
+            msg`Choose to make the post visible publicly or only to trusted community`,
+          )}
+          accessibilityLabel={
+            post.audience === 'public' ? _('Public') : _('Trusted')
+          }
+          label={label}>
+          <ButtonIcon
+            icon={post.audience === 'public' ? Globe : Lock}
+            size="sm"
+          />
+          <ButtonText style={[a.ml_xs]}>{label}</ButtonText>
+        </Button>
+        <ThreadgateBtn
+          postgate={thread.postgate}
+          onChangePostgate={nextPostgate => {
+            dispatch({type: 'update_postgate', postgate: nextPostgate})
+          }}
+          threadgateAllowUISettings={thread.threadgate}
+          onChangeThreadgateAllowUISettings={nextThreadgate => {
+            dispatch({
+              type: 'update_threadgate',
+              threadgate: nextThreadgate,
+            })
+          }}
+          isReply={isReply}
+        />
+      </View>
+    </>
   )
 }
