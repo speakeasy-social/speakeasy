@@ -32,7 +32,7 @@ import {Embed as StarterPackCard} from '#/components/StarterPack/StarterPackCard
 import {ContentHider} from '../../../../components/moderation/ContentHider'
 import {Dimensions} from '../../lightbox/ImageViewing/@types'
 import {AutoSizedImage} from '../images/AutoSizedImage'
-import {ImageLayoutGrid} from '../images/ImageLayoutGrid'
+import {ImageCarousel} from '../images/ImageCarousel'
 import {ExternalLinkEmbed} from './ExternalLinkEmbed'
 import {MaybeQuoteEmbed} from './QuoteEmbed'
 import {PostEmbedViewContext, QuoteEmbedViewContext} from './types'
@@ -175,7 +175,6 @@ export function PostEmbeds({
       }
 
       if (images.length === 1) {
-        const image = images[0]
         return (
           <ContentHider modui={moderation?.ui('contentMedia')}>
             <View style={[a.mt_sm, style]}>
@@ -188,7 +187,7 @@ export function PostEmbeds({
                     ? 'square'
                     : 'constrained'
                 }
-                image={image}
+                image={images[0]}
                 onPress={(containerRef, dims) =>
                   onPress(0, [containerRef], [dims])
                 }
@@ -205,7 +204,7 @@ export function PostEmbeds({
       return (
         <ContentHider modui={moderation?.ui('contentMedia')}>
           <View style={[a.mt_sm, style]}>
-            <ImageLayoutGrid
+            <ImageCarousel
               images={embed.images}
               onPress={onPress}
               onPressIn={onPressIn}

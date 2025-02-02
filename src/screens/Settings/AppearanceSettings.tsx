@@ -12,9 +12,14 @@ import {IS_INTERNAL} from '#/lib/app-info'
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useGate} from '#/lib/statsig/statsig'
 import {isNative} from '#/platform/detection'
+import {
+  useSetShowInteractionNumbers,
+  useShowInteractionNumbers,
+} from '#/state/preferences/show-interaction-numbers'
 import {useSetThemePrefs, useThemePrefs} from '#/state/shell'
 import {SettingsListItem as AppIconSettingsListItem} from '#/screens/Settings/AppIconSettings/SettingsListItem'
 import {atoms as a, native, useAlf, useTheme} from '#/alf'
+import * as Toggle from '#/components/forms/Toggle'
 import * as ToggleButton from '#/components/forms/ToggleButton'
 import {Props as SVGIconProps} from '#/components/icons/common'
 import {Moon_Stroke2_Corner0_Rounded as MoonIcon} from '#/components/icons/Moon'
@@ -33,6 +38,8 @@ export function AppearanceSettingsScreen({}: Props) {
 
   const {colorMode, darkTheme} = useThemePrefs()
   const {setColorMode, setDarkTheme} = useSetThemePrefs()
+  const showInteractionNumbers = useShowInteractionNumbers()
+  const setShowInteractionNumbers = useSetShowInteractionNumbers()
 
   const onChangeAppearance = useCallback(
     (keys: string[]) => {
@@ -176,6 +183,22 @@ export function AppearanceSettingsScreen({}: Props) {
                 values={[fonts.scale]}
                 onChange={onChangeFontScale}
               />
+
+              <SettingsList.Divider />
+
+              <Toggle.Item
+                type="checkbox"
+                name="show-interaction-numbers"
+                label={_(msg`Display interaction numbers`)}
+                value={showInteractionNumbers}
+                onChange={value => setShowInteractionNumbers(value)}>
+                <SettingsList.Item>
+                  <SettingsList.ItemText>
+                    <Trans>Display interaction numbers</Trans>
+                  </SettingsList.ItemText>
+                  <Toggle.Platform />
+                </SettingsList.Item>
+              </Toggle.Item>
 
               {isNative && IS_INTERNAL && gate('debug_subscriptions') && (
                 <>

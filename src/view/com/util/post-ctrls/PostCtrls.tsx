@@ -28,6 +28,7 @@ import {useGate} from '#/lib/statsig/statsig'
 import {toShareUrl} from '#/lib/strings/url-helpers'
 import {Shadow} from '#/state/cache/types'
 import {useFeedFeedbackContext} from '#/state/feed-feedback'
+import {useShowInteractionNumbers} from '#/state/preferences/show-interaction-numbers'
 import {
   usePostLikeMutationQueue,
   usePostRepostMutationQueue,
@@ -87,6 +88,7 @@ let PostCtrls = ({
   const {captureAction} = useProgressGuideControls()
   const playHaptic = useHaptics()
   const gate = useGate()
+  const showInteractionNumbers = useShowInteractionNumbers()
   const isDiscoverDebugUser = IS_INTERNAL || gate('debug_show_feedcontext')
   const isBlocked = Boolean(
     post.author.viewer?.blocking ||
@@ -259,25 +261,25 @@ let PostCtrls = ({
             }
           }}
           accessibilityRole="button"
-          accessibilityLabel={_(
-            msg`Reply (${plural(post.replyCount || 0, {
-              one: '# reply',
-              other: '# replies',
-            })})`,
-          )}
+          accessibilityLabel={
+            post.viewer?.replyDisabled
+              ? _(msg`Replies disabled`)
+              : _(
+                  msg`Reply (${plural(post.replyCount || 0, {
+                    one: '# reply',
+                    other: '# replies',
+                  })})`,
+                )
+          }
           accessibilityHint=""
           hitSlop={POST_CTRL_HITSLOP}>
-          <Bubble
-            style={[defaultCtrlColor, {pointerEvents: 'none'}]}
-            width={big ? 22 : 18}
-          />
-          {typeof post.replyCount !== 'undefined' && post.replyCount > 0 ? (
+          <Bubble style={defaultCtrlColor} width={big ? 22 : 18} />
+          {showInteractionNumbers &&
+          typeof post.replyCount !== 'undefined' &&
+          post.replyCount > 0 ? (
             <Text
-              style={[
-                defaultCtrlColor,
-                big ? a.text_md : {fontSize: 15},
-                a.user_select_none,
-              ]}>
+              testID="replyCount"
+              style={[defaultCtrlColor, big ? a.text_md : {fontSize: 15}]}>
               {formatCount(i18n, post.replyCount)}
             </Text>
           ) : undefined}
@@ -286,7 +288,11 @@ let PostCtrls = ({
       <View style={big ? a.align_center : [a.flex_1, a.align_start]}>
         <RepostButton
           isReposted={!!post.viewer?.repost}
-          repostCount={(post.repostCount ?? 0) + (post.quoteCount ?? 0)}
+          repostCount={
+            showInteractionNumbers
+              ? (post.repostCount ?? 0) + (post.quoteCount ?? 0)
+              : undefined
+          }
           onRepost={onRepost}
           onQuote={onQuote}
           big={big}
@@ -321,12 +327,14 @@ let PostCtrls = ({
             big={big}
             hasBeenToggled={hasLikeIconBeenToggled}
           />
-          <CountWheel
-            likeCount={post.likeCount ?? 0}
-            big={big}
-            isLiked={Boolean(post.viewer?.like)}
-            hasBeenToggled={hasLikeIconBeenToggled}
-          />
+          {showInteractionNumbers && (
+            <CountWheel
+              likeCount={post.likeCount ?? 0}
+              big={big}
+              isLiked={Boolean(post.viewer?.like)}
+              hasBeenToggled={hasLikeIconBeenToggled}
+            />
+          )}
         </Pressable>
       </View>
       {big && (
