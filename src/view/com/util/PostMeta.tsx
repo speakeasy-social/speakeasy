@@ -7,9 +7,7 @@ import {useQueryClient} from '@tanstack/react-query'
 
 import {makeProfileLink} from '#/lib/routes/links'
 import {forceLTR} from '#/lib/strings/bidi'
-import {NON_BREAKING_SPACE} from '#/lib/strings/constants'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
-import {sanitizeHandle} from '#/lib/strings/handles'
 import {niceDate} from '#/lib/strings/time'
 import {isAndroid} from '#/platform/detection'
 import {precacheProfile} from '#/state/queries/profile'
@@ -36,7 +34,6 @@ let PostMeta = (opts: PostMetaOpts): React.ReactNode => {
   const {i18n, _} = useLingui()
 
   const displayName = opts.author.displayName || opts.author.handle
-  const handle = opts.author.handle
   const profileLink = makeProfileLink(opts.author)
   const queryClient = useQueryClient()
   const onOpenAuthor = opts.onOpenAuthor
@@ -86,19 +83,6 @@ let PostMeta = (opts: PostMetaOpts): React.ReactNode => {
                   opts.moderation?.ui('displayName'),
                 ),
               )}
-            </Text>
-          </WebOnlyInlineLinkText>
-          <WebOnlyInlineLinkText
-            to={profileLink}
-            label={_(msg`View profile`)}
-            disableMismatchWarning
-            disableUnderline
-            onPress={onBeforePressAuthor}
-            style={[a.text_md, t.atoms.text_contrast_medium, a.leading_snug]}>
-            <Text
-              emoji
-              style={[a.text_md, t.atoms.text_contrast_medium, a.leading_snug]}>
-              {NON_BREAKING_SPACE + sanitizeHandle(handle, '@')}
             </Text>
           </WebOnlyInlineLinkText>
         </Text>
