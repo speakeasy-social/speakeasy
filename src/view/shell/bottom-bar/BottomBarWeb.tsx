@@ -21,10 +21,13 @@ import {Logo} from '#/view/icons/Logo'
 import {Logotype} from '#/view/icons/Logotype'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
+import {useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {
   Bell_Filled_Corner0_Rounded as BellFilled,
   Bell_Stroke2_Corner0_Rounded as Bell,
 } from '#/components/icons/Bell'
+import {Group3_Stroke2_Corner0_Rounded as Group} from '#/components/icons/Group'
 import {
   HomeOpen_Filled_Corner0_Rounded as HomeFilled,
   HomeOpen_Stoke2_Corner0_Rounded as Home,
@@ -55,6 +58,7 @@ export function BottomBarWeb() {
   const notificationCountStr = useUnreadNotifications()
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
+  const groupsDialogControl = useDialogControl()
 
   const showSignIn = React.useCallback(() => {
     closeAllActiveElements()
@@ -68,160 +72,190 @@ export function BottomBarWeb() {
   }, [requestSwitchToAccount, closeAllActiveElements])
 
   return (
-    <Animated.View
-      role="navigation"
-      style={[
-        styles.bottomBar,
-        styles.bottomBarWeb,
-        t.atoms.bg,
-        t.atoms.border_contrast_low,
-        footerMinimalShellTransform,
-      ]}>
-      {hasSession ? (
-        <>
-          <NavItem
-            routeName="Home"
-            href="/"
-            hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
-            {({isActive}) => {
-              const Icon = isActive ? HomeFilled : Home
-              return (
-                <Icon
+    <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureName={_(msg`Groups`)}
+        featureDescription={_(
+          msg`We're trialing a new feature to support private discussion groups.`,
+        )}
+        utmParams={{
+          source: 'bottombar',
+          medium: 'groups_button',
+          campaign: 'groups_beta',
+        }}
+      />
+      <Animated.View
+        role="navigation"
+        style={[
+          styles.bottomBar,
+          styles.bottomBarWeb,
+          t.atoms.bg,
+          t.atoms.border_contrast_low,
+          footerMinimalShellTransform,
+        ]}>
+        {hasSession ? (
+          <>
+            <NavItem
+              routeName="Home"
+              href="/"
+              hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
+              {({isActive}) => {
+                const Icon = isActive ? HomeFilled : Home
+                return (
+                  <Icon
+                    aria-hidden={true}
+                    width={iconWidth + 1}
+                    style={[styles.ctrlIcon, t.atoms.text, styles.homeIcon]}
+                  />
+                )
+              }}
+            </NavItem>
+            <NavItem routeName="Search" href="/search">
+              {({isActive}) => {
+                const Icon = isActive ? MagnifyingGlassFilled : MagnifyingGlass
+                return (
+                  <Icon
+                    aria-hidden={true}
+                    width={iconWidth + 2}
+                    style={[styles.ctrlIcon, t.atoms.text, styles.searchIcon]}
+                  />
+                )
+              }}
+            </NavItem>
+            <NavItem
+              routeName="Groups"
+              href="#"
+              onClick={e => {
+                e.preventDefault()
+                groupsDialogControl.open()
+              }}>
+              {() => (
+                <Group
                   aria-hidden={true}
-                  width={iconWidth + 1}
-                  style={[styles.ctrlIcon, t.atoms.text, styles.homeIcon]}
+                  width={iconWidth}
+                  style={[styles.ctrlIcon, t.atoms.text]}
                 />
-              )
-            }}
-          </NavItem>
-          <NavItem routeName="Search" href="/search">
-            {({isActive}) => {
-              const Icon = isActive ? MagnifyingGlassFilled : MagnifyingGlass
-              return (
-                <Icon
-                  aria-hidden={true}
-                  width={iconWidth + 2}
-                  style={[styles.ctrlIcon, t.atoms.text, styles.searchIcon]}
-                />
-              )
-            }}
-          </NavItem>
+              )}
+            </NavItem>
 
-          {hasSession && (
-            <>
-              <NavItem
-                routeName="Messages"
-                href="/messages"
-                notificationCount={
-                  unreadMessageCount.count > 0
-                    ? unreadMessageCount.numUnread
-                    : undefined
-                }>
-                {({isActive}) => {
-                  const Icon = isActive ? MessageFilled : Message
-                  return (
-                    <Icon
-                      aria-hidden={true}
-                      width={iconWidth - 1}
-                      style={[
-                        styles.ctrlIcon,
-                        t.atoms.text,
-                        styles.messagesIcon,
-                      ]}
-                    />
-                  )
-                }}
-              </NavItem>
-              <NavItem
-                routeName="Notifications"
-                href="/notifications"
-                notificationCount={notificationCountStr}>
-                {({isActive}) => {
-                  const Icon = isActive ? BellFilled : Bell
-                  return (
-                    <Icon
-                      aria-hidden={true}
-                      width={iconWidth}
-                      style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
-                    />
-                  )
-                }}
-              </NavItem>
-              <NavItem
-                routeName="Profile"
-                href={
-                  currentAccount
-                    ? makeProfileLink({
-                        did: currentAccount.did,
-                        handle: currentAccount.handle,
-                      })
-                    : '/'
-                }>
-                {({isActive}) => {
-                  const Icon = isActive ? UserCircleFilled : UserCircle
-                  return (
-                    <Icon
-                      aria-hidden={true}
-                      width={iconWidth}
-                      style={[
-                        styles.ctrlIcon,
-                        t.atoms.text,
-                        styles.profileIcon,
-                      ]}
-                    />
-                  )
-                }}
-              </NavItem>
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <View
-            style={{
-              width: '100%',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: 14,
-              paddingBottom: 14,
-              paddingLeft: 14,
-              paddingRight: 6,
-              gap: 8,
-            }}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
-              <Logo width={32} />
-              <View style={{paddingTop: 4}}>
-                <Logotype width={80} fill={t.atoms.text.color} />
+            {hasSession && (
+              <>
+                <NavItem
+                  routeName="Messages"
+                  href="/messages"
+                  notificationCount={
+                    unreadMessageCount.count > 0
+                      ? unreadMessageCount.numUnread
+                      : undefined
+                  }>
+                  {({isActive}) => {
+                    const Icon = isActive ? MessageFilled : Message
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth - 1}
+                        style={[
+                          styles.ctrlIcon,
+                          t.atoms.text,
+                          styles.messagesIcon,
+                        ]}
+                      />
+                    )
+                  }}
+                </NavItem>
+                <NavItem
+                  routeName="Notifications"
+                  href="/notifications"
+                  notificationCount={notificationCountStr}>
+                  {({isActive}) => {
+                    const Icon = isActive ? BellFilled : Bell
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth}
+                        style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
+                      />
+                    )
+                  }}
+                </NavItem>
+                <NavItem
+                  routeName="Profile"
+                  href={
+                    currentAccount
+                      ? makeProfileLink({
+                          did: currentAccount.did,
+                          handle: currentAccount.handle,
+                        })
+                      : '/'
+                  }>
+                  {({isActive}) => {
+                    const Icon = isActive ? UserCircleFilled : UserCircle
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth}
+                        style={[
+                          styles.ctrlIcon,
+                          t.atoms.text,
+                          styles.profileIcon,
+                        ]}
+                      />
+                    )
+                  }}
+                </NavItem>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <View
+              style={{
+                width: '100%',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: 14,
+                paddingBottom: 14,
+                paddingLeft: 14,
+                paddingRight: 6,
+                gap: 8,
+              }}>
+              <View
+                style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+                <Logo width={32} />
+                <View style={{paddingTop: 4}}>
+                  <Logotype width={80} fill={t.atoms.text.color} />
+                </View>
+              </View>
+
+              <View style={[a.flex_row, a.flex_wrap, a.gap_sm]}>
+                <Button
+                  onPress={showCreateAccount}
+                  label={_(msg`Create account`)}
+                  size="small"
+                  variant="solid"
+                  color="primary">
+                  <ButtonText>
+                    <Trans>Create account</Trans>
+                  </ButtonText>
+                </Button>
+                <Button
+                  onPress={showSignIn}
+                  label={_(msg`Sign in`)}
+                  size="small"
+                  variant="solid"
+                  color="secondary">
+                  <ButtonText>
+                    <Trans>Sign in</Trans>
+                  </ButtonText>
+                </Button>
               </View>
             </View>
-
-            <View style={[a.flex_row, a.flex_wrap, a.gap_sm]}>
-              <Button
-                onPress={showCreateAccount}
-                label={_(msg`Create account`)}
-                size="small"
-                variant="solid"
-                color="primary">
-                <ButtonText>
-                  <Trans>Create account</Trans>
-                </ButtonText>
-              </Button>
-              <Button
-                onPress={showSignIn}
-                label={_(msg`Sign in`)}
-                size="small"
-                variant="solid"
-                color="secondary">
-                <ButtonText>
-                  <Trans>Sign in</Trans>
-                </ButtonText>
-              </Button>
-            </View>
-          </View>
-        </>
-      )}
-    </Animated.View>
+          </>
+        )}
+      </Animated.View>
+    </>
   )
 }
 
@@ -231,7 +265,8 @@ const NavItem: React.FC<{
   routeName: string
   hasNew?: boolean
   notificationCount?: string
-}> = ({children, href, routeName, hasNew, notificationCount}) => {
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+}> = ({children, href, routeName, hasNew, notificationCount, onClick}) => {
   const {_} = useLingui()
   const {currentAccount} = useSession()
   const currentRoute = useNavigationState(state => {
@@ -254,7 +289,8 @@ const NavItem: React.FC<{
       navigationAction="navigate"
       aria-role="link"
       aria-label={routeName}
-      accessible={true}>
+      accessible={true}
+      onPress={onClick}>
       {children({isActive})}
       {notificationCount ? (
         <View

@@ -32,11 +32,13 @@ import {Logotype} from '#/view/icons/Logotype'
 import {atoms as a} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import {useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {SwitchAccountDialog} from '#/components/dialogs/SwitchAccount'
 import {
   Bell_Filled_Corner0_Rounded as BellFilled,
   Bell_Stroke2_Corner0_Rounded as Bell,
 } from '#/components/icons/Bell'
+import {Group3_Stroke2_Corner0_Rounded as Group} from '#/components/icons/Group'
 import {
   HomeOpen_Filled_Corner0_Rounded as HomeFilled,
   HomeOpen_Stoke2_Corner0_Rounded as Home,
@@ -56,6 +58,7 @@ type TabOptions =
   | 'MyProfile'
   | 'Feeds'
   | 'Messages'
+  | 'Groups'
 
 export function BottomBar({navigation}: BottomTabBarProps) {
   const {hasSession, currentAccount} = useSession()
@@ -77,6 +80,7 @@ export function BottomBar({navigation}: BottomTabBarProps) {
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
   const iconWidth = 28
+  const groupsDialogControl = useDialogControl()
 
   const showSignIn = React.useCallback(() => {
     closeAllActiveElements()
@@ -126,6 +130,18 @@ export function BottomBar({navigation}: BottomTabBarProps) {
 
   return (
     <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureName={_(msg`Groups`)}
+        featureDescription={_(
+          msg`We're trialing a new feature to support private discussion groups.`,
+        )}
+        utmParams={{
+          source: 'bottombar',
+          medium: 'groups_button',
+          campaign: 'groups_beta',
+        }}
+      />
       <SwitchAccountDialog control={accountSwitchControl} />
 
       <Animated.View
@@ -180,6 +196,16 @@ export function BottomBar({navigation}: BottomTabBarProps) {
               onPress={onPressSearch}
               accessibilityRole="search"
               accessibilityLabel={_(msg`Search`)}
+              accessibilityHint=""
+            />
+            <Btn
+              testID="bottomBarGroupsBtn"
+              icon={
+                <Group width={iconWidth} style={[styles.ctrlIcon, pal.text]} />
+              }
+              onPress={() => groupsDialogControl.open()}
+              accessibilityRole="button"
+              accessibilityLabel={_(msg`Groups`)}
               accessibilityHint=""
             />
             <Btn

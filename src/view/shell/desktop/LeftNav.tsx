@@ -35,7 +35,8 @@ import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {NavSignupCard} from '#/view/shell/NavSignupCard'
 import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
-import {DialogControlProps} from '#/components/Dialog'
+import {DialogControlProps, useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {ArrowBoxLeft_Stroke2_Corner0_Rounded as LeaveIcon} from '#/components/icons/ArrowBoxLeft'
 import {
   Bell_Filled_Corner0_Rounded as BellFilled,
@@ -47,6 +48,10 @@ import {
 } from '#/components/icons/BulletList'
 import {DotGrid_Stroke2_Corner0_Rounded as EllipsisIcon} from '#/components/icons/DotGrid'
 import {EditBig_Stroke2_Corner0_Rounded as EditBig} from '#/components/icons/EditBig'
+import {
+  Group3_Stroke2_Corner0_Rounded as Group,
+  Group3_Stroke2_Corner0_Rounded as GroupFilled,
+} from '#/components/icons/Group'
 import {
   Hashtag_Filled_Corner0_Rounded as HashtagFilled,
   Hashtag_Stroke2_Corner0_Rounded as Hashtag,
@@ -302,8 +307,18 @@ interface NavItemProps {
   icon: JSX.Element
   iconFilled: JSX.Element
   label: string
+  onPress?: () => void
 }
-function NavItem({count, hasNew, href, icon, iconFilled, label}: NavItemProps) {
+
+function NavItem({
+  count,
+  hasNew,
+  href,
+  icon,
+  iconFilled,
+  label,
+  onPress,
+}: NavItemProps) {
   const t = useTheme()
   const {_} = useLingui()
   const {currentAccount} = useSession()
@@ -322,20 +337,22 @@ function NavItem({count, hasNew, href, icon, iconFilled, label}: NavItemProps) {
         (currentRouteInfo.params as CommonNavigatorParams['Profile']).name ===
           currentAccount?.handle
       : isTab(currentRouteInfo.name, pathName)
-  const {onPress} = useLinkProps({to: href})
+  const {onPress: linkOnPress} = useLinkProps({to: href})
   const onPressWrapped = React.useCallback(
     (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
       if (e.ctrlKey || e.metaKey || e.altKey) {
         return
       }
       e.preventDefault()
-      if (isCurrent) {
+      if (onPress) {
+        onPress()
+      } else if (isCurrent) {
         emitSoftReset()
       } else {
-        onPress()
+        linkOnPress()
       }
     },
-    [onPress, isCurrent],
+    [linkOnPress, isCurrent, onPress],
   )
 
   return (
@@ -350,9 +367,7 @@ function NavItem({count, hasNew, href, icon, iconFilled, label}: NavItemProps) {
         a.transition_color,
       ]}
       hoverStyle={t.atoms.bg_contrast_25}
-      // @ts-ignore the function signature differs on web -prf
       onPress={onPressWrapped}
-      // @ts-ignore web only -prf
       href={href}
       dataSet={{noUnderline: 1}}
       role="link"
@@ -540,164 +555,198 @@ export function DesktopLeftNav() {
   const numUnreadNotifications = useUnreadNotifications()
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
+  const groupsDialogControl = useDialogControl()
 
   if (!hasSession && !isDesktop) {
     return null
   }
 
   return (
-    <View
-      role="navigation"
-      style={[
-        a.px_xl,
-        styles.leftNav,
-        isTablet && styles.leftNavTablet,
-        pal.border,
-      ]}>
-      {hasSession ? (
-        <ProfileCard />
-      ) : isDesktop ? (
-        <View style={[a.pt_xl]}>
-          <NavSignupCard />
-        </View>
-      ) : null}
+    <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureName={_(msg`Groups`)}
+        featureDescription={_(
+          msg`We're trialing a new feature to support private discussion groups.`,
+        )}
+        utmParams={{
+          source: 'leftnav',
+          medium: 'groups_button',
+          campaign: 'groups_beta',
+        }}
+      />
+      <View
+        role="navigation"
+        style={[
+          a.px_xl,
+          styles.leftNav,
+          isTablet && styles.leftNavTablet,
+          pal.border,
+        ]}>
+        {hasSession ? (
+          <ProfileCard />
+        ) : isDesktop ? (
+          <View style={[a.pt_xl]}>
+            <NavSignupCard />
+          </View>
+        ) : null}
 
-      {hasSession && (
-        <>
-          <NavItem
-            href="/"
-            hasNew={hasHomeBadge && gate('remove_show_latest_button')}
-            icon={
-              <Home
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            iconFilled={
-              <HomeFilled
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            label={_(msg`Home`)}
-          />
-          <NavItem
-            href="/search"
-            icon={
-              <MagnifyingGlass
-                style={pal.text}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            iconFilled={
-              <MagnifyingGlassFilled
-                style={pal.text}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            label={_(msg`Search`)}
-          />
-          <NavItem
-            href="/notifications"
-            count={numUnreadNotifications}
-            icon={
-              <Bell
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            iconFilled={
-              <BellFilled
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            label={_(msg`Notifications`)}
-          />
-          <ChatNavItem />
-          <NavItem
-            href="/feeds"
-            icon={
-              <Hashtag
-                style={pal.text as FontAwesomeIconStyle}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            iconFilled={
-              <HashtagFilled
-                style={pal.text as FontAwesomeIconStyle}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            label={_(msg`Feeds`)}
-          />
-          <NavItem
-            href="/lists"
-            icon={
-              <List
-                style={pal.text}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            iconFilled={
-              <ListFilled
-                style={pal.text}
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-              />
-            }
-            label={_(msg`Lists`)}
-          />
-          <NavItem
-            href={currentAccount ? makeProfileLink(currentAccount) : '/'}
-            icon={
-              <UserCircle
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            iconFilled={
-              <UserCircleFilled
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            label={_(msg`Profile`)}
-          />
-          <NavItem
-            href="/settings"
-            icon={
-              <Settings
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            iconFilled={
-              <SettingsFilled
-                aria-hidden={true}
-                width={NAV_ICON_WIDTH}
-                style={pal.text}
-              />
-            }
-            label={_(msg`Settings`)}
-          />
+        {hasSession && (
+          <>
+            <NavItem
+              href="/"
+              hasNew={hasHomeBadge && gate('remove_show_latest_button')}
+              icon={
+                <Home
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <HomeFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Home`)}
+            />
+            <NavItem
+              href="/search"
+              icon={
+                <MagnifyingGlass
+                  style={pal.text}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              iconFilled={
+                <MagnifyingGlassFilled
+                  style={pal.text}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              label={_(msg`Search`)}
+            />
+            <NavItem
+              href="/notifications"
+              count={numUnreadNotifications}
+              icon={
+                <Bell
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <BellFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Notifications`)}
+            />
+            <ChatNavItem />
+            <NavItem
+              href="/groups"
+              icon={
+                <Group
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <GroupFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Groups`)}
+              onPress={() => groupsDialogControl.open()}
+            />
+            <NavItem
+              href="/feeds"
+              icon={
+                <Hashtag
+                  style={pal.text as FontAwesomeIconStyle}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              iconFilled={
+                <HashtagFilled
+                  style={pal.text as FontAwesomeIconStyle}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              label={_(msg`Feeds`)}
+            />
+            <NavItem
+              href="/lists"
+              icon={
+                <List
+                  style={pal.text}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              iconFilled={
+                <ListFilled
+                  style={pal.text}
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                />
+              }
+              label={_(msg`Lists`)}
+            />
+            <NavItem
+              href={currentAccount ? makeProfileLink(currentAccount) : '/'}
+              icon={
+                <UserCircle
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <UserCircleFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Profile`)}
+            />
+            <NavItem
+              href="/settings"
+              icon={
+                <Settings
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <SettingsFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Settings`)}
+            />
 
-          <ComposeBtn />
-        </>
-      )}
-    </View>
+            <ComposeBtn />
+          </>
+        )}
+      </View>
+    </>
   )
 }
 
