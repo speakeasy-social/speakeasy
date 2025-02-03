@@ -3,6 +3,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {useOpenLink} from '#/lib/hooks/useOpenLink'
+import {useProfileQuery} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {atoms as a, useBreakpoints, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
@@ -31,15 +32,18 @@ export function LimitedBetaModal({
   const t = useTheme()
   const openLink = useOpenLink()
   const {currentAccount} = useSession()
+  const {data: profile} = useProfileQuery({did: currentAccount?.did})
 
   const handleLearnMore = () => {
-    const baseUrl = 'https://bsky.app/blog/beta-features'
+    const baseUrl = 'https://bsky.local/blog/beta-features'
     const params = new URLSearchParams({
       utm_source: utmParams?.source || 'app',
       utm_medium: utmParams?.medium || 'modal',
       utm_campaign: utmParams?.campaign || 'beta_features',
       feature: featureName,
       bluesky_handle: currentAccount?.handle || '',
+      email: currentAccount?.email || '',
+      name: (profile?.displayName || '').split(' ')[0],
     })
 
     const url = `${baseUrl}?${params.toString()}`
