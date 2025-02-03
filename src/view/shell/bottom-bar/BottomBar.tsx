@@ -221,6 +221,7 @@ export function BottomBar({navigation}: BottomTabBarProps) {
                 setSelectedFeature('mutual-aid')
                 groupsDialogControl.open()
               }}
+              notificationCount="1"
               accessibilityRole="button"
               accessibilityLabel={_(msg`Mutual Aid`)}
               accessibilityHint=""

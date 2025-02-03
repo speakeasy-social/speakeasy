@@ -151,6 +151,7 @@ export function BottomBarWeb() {
             <NavItem
               routeName="MutualAid"
               href="#"
+              notificationCount="1"
               onClick={e => {
                 e.preventDefault()
                 setSelectedFeature('mutual-aid')

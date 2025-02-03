@@ -691,6 +691,7 @@ export function DesktopLeftNav() {
             />
             <NavItem
               href="/mutual"
+              count="1"
               icon={
                 <Heart
                   aria-hidden={true}
