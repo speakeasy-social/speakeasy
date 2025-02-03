@@ -57,6 +57,10 @@ import {
   Hashtag_Stroke2_Corner0_Rounded as Hashtag,
 } from '#/components/icons/Hashtag'
 import {
+  Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
+  Heart2_Stroke2_Corner0_Rounded as Heart,
+} from '#/components/icons/Heart2'
+import {
   HomeOpen_Filled_Corner0_Rounded as HomeFilled,
   HomeOpen_Stoke2_Corner0_Rounded as Home,
 } from '#/components/icons/HomeOpen'
@@ -556,6 +560,9 @@ export function DesktopLeftNav() {
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
   const groupsDialogControl = useDialogControl()
+  const [selectedFeature, setSelectedFeature] = React.useState<
+    'groups' | 'mutual-aid'
+  >('groups')
 
   if (!hasSession && !isDesktop) {
     return null
@@ -565,14 +572,24 @@ export function DesktopLeftNav() {
     <>
       <LimitedBetaModal
         control={groupsDialogControl}
-        featureName={_(msg`Groups`)}
-        featureDescription={_(
-          msg`We're trialing a new feature to support private discussion groups.`,
-        )}
+        featureName={
+          selectedFeature === 'groups' ? _(msg`Groups`) : _(msg`Mutual Aid`)
+        }
+        featureDescription={
+          selectedFeature === 'groups'
+            ? _(
+                msg`We're trialing a new feature to support private discussion groups.`,
+              )
+            : _(msg`We're working on a new feature to support mutual aid.`)
+        }
         utmParams={{
           source: 'leftnav',
-          medium: 'groups_button',
-          campaign: 'groups_beta',
+          medium:
+            selectedFeature === 'groups'
+              ? 'groups_button'
+              : 'mutual_aid_button',
+          campaign:
+            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
         }}
       />
       <View
@@ -667,7 +684,32 @@ export function DesktopLeftNav() {
                 />
               }
               label={_(msg`Groups`)}
-              onPress={() => groupsDialogControl.open()}
+              onPress={() => {
+                setSelectedFeature('groups')
+                groupsDialogControl.open()
+              }}
+            />
+            <NavItem
+              href="/mutual"
+              icon={
+                <Heart
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <HeartFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Mutual Aid`)}
+              onPress={() => {
+                setSelectedFeature('mutual-aid')
+                groupsDialogControl.open()
+              }}
             />
             <NavItem
               href="/feeds"

@@ -7,7 +7,6 @@ import {useNavigationState} from '@react-navigation/native'
 
 import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransform'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
-import {makeProfileLink} from '#/lib/routes/links'
 import {CommonNavigatorParams} from '#/lib/routes/types'
 import {useGate} from '#/lib/statsig/statsig'
 import {useHomeBadge} from '#/state/home-badge'
@@ -28,6 +27,7 @@ import {
   Bell_Stroke2_Corner0_Rounded as Bell,
 } from '#/components/icons/Bell'
 import {Group3_Stroke2_Corner0_Rounded as Group} from '#/components/icons/Group'
+import {Heart2_Stroke2_Corner0_Rounded as Heart} from '#/components/icons/Heart2'
 import {
   HomeOpen_Filled_Corner0_Rounded as HomeFilled,
   HomeOpen_Stoke2_Corner0_Rounded as Home,
@@ -38,16 +38,12 @@ import {
   Message_Stroke2_Corner0_Rounded as Message,
   Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
 } from '#/components/icons/Message'
-import {
-  UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
-  UserCircle_Stroke2_Corner0_Rounded as UserCircle,
-} from '#/components/icons/UserCircle'
 import {Text} from '#/components/Typography'
 import {styles} from './BottomBarStyles'
 
 export function BottomBarWeb() {
   const {_} = useLingui()
-  const {hasSession, currentAccount} = useSession()
+  const {hasSession} = useSession()
   const t = useTheme()
   const footerMinimalShellTransform = useMinimalShellFooterTransform()
   const {requestSwitchToAccount} = useLoggedOutViewControls()
@@ -59,6 +55,9 @@ export function BottomBarWeb() {
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
   const groupsDialogControl = useDialogControl()
+  const [selectedFeature, setSelectedFeature] = React.useState<
+    'groups' | 'mutual-aid'
+  >('groups')
 
   const showSignIn = React.useCallback(() => {
     closeAllActiveElements()
@@ -75,14 +74,24 @@ export function BottomBarWeb() {
     <>
       <LimitedBetaModal
         control={groupsDialogControl}
-        featureName={_(msg`Groups`)}
-        featureDescription={_(
-          msg`We're trialing a new feature to support private discussion groups.`,
-        )}
+        featureName={
+          selectedFeature === 'groups' ? _(msg`Groups`) : _(msg`Mutual Aid`)
+        }
+        featureDescription={
+          selectedFeature === 'groups'
+            ? _(
+                msg`We're trialing a new feature to support private discussion groups.`,
+              )
+            : _(msg`We're working on a new feature to support mutual aid.`)
+        }
         utmParams={{
           source: 'bottombar',
-          medium: 'groups_button',
-          campaign: 'groups_beta',
+          medium:
+            selectedFeature === 'groups'
+              ? 'groups_button'
+              : 'mutual_aid_button',
+          campaign:
+            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
         }}
       />
       <Animated.View
@@ -128,6 +137,7 @@ export function BottomBarWeb() {
               href="#"
               onClick={e => {
                 e.preventDefault()
+                setSelectedFeature('groups')
                 groupsDialogControl.open()
               }}>
               {() => (
@@ -138,7 +148,22 @@ export function BottomBarWeb() {
                 />
               )}
             </NavItem>
-
+            <NavItem
+              routeName="MutualAid"
+              href="#"
+              onClick={e => {
+                e.preventDefault()
+                setSelectedFeature('mutual-aid')
+                groupsDialogControl.open()
+              }}>
+              {() => (
+                <Heart
+                  aria-hidden={true}
+                  width={iconWidth}
+                  style={[styles.ctrlIcon, t.atoms.text]}
+                />
+              )}
+            </NavItem>
             {hasSession && (
               <>
                 <NavItem
@@ -175,31 +200,6 @@ export function BottomBarWeb() {
                         aria-hidden={true}
                         width={iconWidth}
                         style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
-                      />
-                    )
-                  }}
-                </NavItem>
-                <NavItem
-                  routeName="Profile"
-                  href={
-                    currentAccount
-                      ? makeProfileLink({
-                          did: currentAccount.did,
-                          handle: currentAccount.handle,
-                        })
-                      : '/'
-                  }>
-                  {({isActive}) => {
-                    const Icon = isActive ? UserCircleFilled : UserCircle
-                    return (
-                      <Icon
-                        aria-hidden={true}
-                        width={iconWidth}
-                        style={[
-                          styles.ctrlIcon,
-                          t.atoms.text,
-                          styles.profileIcon,
-                        ]}
                       />
                     )
                   }}

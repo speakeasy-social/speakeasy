@@ -8,7 +8,6 @@ import {BottomTabBarProps} from '@react-navigation/bottom-tabs'
 import {StackActions} from '@react-navigation/native'
 
 import {PressableScale} from '#/lib/custom-animations/PressableScale'
-import {useHaptics} from '#/lib/haptics'
 import {useDedupe} from '#/lib/hooks/useDedupe'
 import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransform'
 import {useNavigationTabState} from '#/lib/hooks/useNavigationTabState'
@@ -20,13 +19,11 @@ import {emitSoftReset} from '#/state/events'
 import {useHomeBadge} from '#/state/home-badge'
 import {useUnreadMessageCount} from '#/state/queries/messages/list-conversations'
 import {useUnreadNotifications} from '#/state/queries/notifications/unread'
-import {useProfileQuery} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {useLoggedOutViewControls} from '#/state/shell/logged-out'
 import {useShellLayout} from '#/state/shell/shell-layout'
 import {useCloseAllActiveElements} from '#/state/util'
 import {Text} from '#/view/com/util/text/Text'
-import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {Logo} from '#/view/icons/Logo'
 import {Logotype} from '#/view/icons/Logotype'
 import {atoms as a} from '#/alf'
@@ -39,6 +36,7 @@ import {
   Bell_Stroke2_Corner0_Rounded as Bell,
 } from '#/components/icons/Bell'
 import {Group3_Stroke2_Corner0_Rounded as Group} from '#/components/icons/Group'
+import {Heart2_Stroke2_Corner0_Rounded as Heart} from '#/components/icons/Heart2'
 import {
   HomeOpen_Filled_Corner0_Rounded as HomeFilled,
   HomeOpen_Stoke2_Corner0_Rounded as Home,
@@ -61,26 +59,27 @@ type TabOptions =
   | 'Groups'
 
 export function BottomBar({navigation}: BottomTabBarProps) {
-  const {hasSession, currentAccount} = useSession()
+  const {hasSession} = useSession()
   const pal = usePalette('default')
   const {_} = useLingui()
   const safeAreaInsets = useSafeAreaInsets()
   const {footerHeight} = useShellLayout()
-  const {isAtHome, isAtSearch, isAtNotifications, isAtMyProfile, isAtMessages} =
+  const {isAtHome, isAtSearch, isAtNotifications, isAtMessages} =
     useNavigationTabState()
   const numUnreadNotifications = useUnreadNotifications()
   const numUnreadMessages = useUnreadMessageCount()
   const footerMinimalShellTransform = useMinimalShellFooterTransform()
-  const {data: profile} = useProfileQuery({did: currentAccount?.did})
   const {requestSwitchToAccount} = useLoggedOutViewControls()
   const closeAllActiveElements = useCloseAllActiveElements()
   const dedupe = useDedupe()
   const accountSwitchControl = useDialogControl()
-  const playHaptic = useHaptics()
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
   const iconWidth = 28
   const groupsDialogControl = useDialogControl()
+  const [selectedFeature, setSelectedFeature] = React.useState<
+    'groups' | 'mutual-aid'
+  >('groups')
 
   const showSignIn = React.useCallback(() => {
     closeAllActiveElements()
@@ -116,30 +115,32 @@ export function BottomBar({navigation}: BottomTabBarProps) {
     () => onPressTab('Notifications'),
     [onPressTab],
   )
-  const onPressProfile = React.useCallback(() => {
-    onPressTab('MyProfile')
-  }, [onPressTab])
   const onPressMessages = React.useCallback(() => {
     onPressTab('Messages')
   }, [onPressTab])
-
-  const onLongPressProfile = React.useCallback(() => {
-    playHaptic()
-    accountSwitchControl.open()
-  }, [accountSwitchControl, playHaptic])
 
   return (
     <>
       <LimitedBetaModal
         control={groupsDialogControl}
-        featureName={_(msg`Groups`)}
-        featureDescription={_(
-          msg`We're trialing a new feature to support private discussion groups.`,
-        )}
+        featureName={
+          selectedFeature === 'groups' ? _(msg`Groups`) : _(msg`Mutual Aid`)
+        }
+        featureDescription={
+          selectedFeature === 'groups'
+            ? _(
+                msg`We're trialing a new feature to support private discussion groups.`,
+              )
+            : _(msg`We're working on a new feature to support mutual aid.`)
+        }
         utmParams={{
           source: 'bottombar',
-          medium: 'groups_button',
-          campaign: 'groups_beta',
+          medium:
+            selectedFeature === 'groups'
+              ? 'groups_button'
+              : 'mutual_aid_button',
+          campaign:
+            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
         }}
       />
       <SwitchAccountDialog control={accountSwitchControl} />
@@ -203,9 +204,25 @@ export function BottomBar({navigation}: BottomTabBarProps) {
               icon={
                 <Group width={iconWidth} style={[styles.ctrlIcon, pal.text]} />
               }
-              onPress={() => groupsDialogControl.open()}
+              onPress={() => {
+                setSelectedFeature('groups')
+                groupsDialogControl.open()
+              }}
               accessibilityRole="button"
               accessibilityLabel={_(msg`Groups`)}
+              accessibilityHint=""
+            />
+            <Btn
+              testID="bottomBarMutualAidBtn"
+              icon={
+                <Heart width={iconWidth} style={[styles.ctrlIcon, pal.text]} />
+              }
+              onPress={() => {
+                setSelectedFeature('mutual-aid')
+                groupsDialogControl.open()
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={_(msg`Mutual Aid`)}
               accessibilityHint=""
             />
             <Btn
@@ -259,47 +276,6 @@ export function BottomBar({navigation}: BottomTabBarProps) {
                   ? ''
                   : _(msg`${numUnreadNotifications} unread items`)
               }
-            />
-            <Btn
-              testID="bottomBarProfileBtn"
-              icon={
-                <View style={styles.ctrlIconSizingWrapper}>
-                  {isAtMyProfile ? (
-                    <View
-                      style={[
-                        styles.ctrlIcon,
-                        pal.text,
-                        styles.profileIcon,
-                        styles.onProfile,
-                        {borderColor: pal.text.color},
-                      ]}>
-                      <UserAvatar
-                        avatar={profile?.avatar}
-                        size={iconWidth - 3}
-                        // See https://github.com/bluesky-social/social-app/pull/1801:
-                        usePlainRNImage={true}
-                        type={profile?.associated?.labeler ? 'labeler' : 'user'}
-                      />
-                    </View>
-                  ) : (
-                    <View
-                      style={[styles.ctrlIcon, pal.text, styles.profileIcon]}>
-                      <UserAvatar
-                        avatar={profile?.avatar}
-                        size={iconWidth - 3}
-                        // See https://github.com/bluesky-social/social-app/pull/1801:
-                        usePlainRNImage={true}
-                        type={profile?.associated?.labeler ? 'labeler' : 'user'}
-                      />
-                    </View>
-                  )}
-                </View>
-              }
-              onPress={onPressProfile}
-              onLongPress={onLongPressProfile}
-              accessibilityRole="tab"
-              accessibilityLabel={_(msg`Profile`)}
-              accessibilityHint=""
             />
           </>
         ) : (
