@@ -242,6 +242,20 @@ function HomeScreenReady({
                 feedInfo={feedInfo}
               />
             )
+          } else if (feed === 'friends-pics') {
+            return (
+              <FeedPage
+                key={feed}
+                testID="friendsPicsFeedPage"
+                isPageFocused={maybeSelectedFeed === feed}
+                isPageAdjacent={Math.abs(selectedIndex - index) === 1}
+                feed={feed}
+                feedParams={homeFeedParams}
+                renderEmptyState={renderFollowingEmptyState}
+                renderEndOfFeed={FollowingEndOfFeed}
+                feedInfo={feedInfo}
+              />
+            )
           }
           const savedFeedConfig = feedInfo.savedFeed
           return (

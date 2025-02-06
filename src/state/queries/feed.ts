@@ -258,7 +258,7 @@ export function useGetPopularFeedsQuery(options?: GetPopularFeedsOptions) {
         const {
           savedFeeds,
           hasSession: hasSessionInner,
-          moderationOpts,
+          moderationOpts: moderationOptsInSelect,
         } = selectArgs
         return {
           ...data,
@@ -277,7 +277,10 @@ export function useGetPopularFeedsQuery(options?: GetPopularFeedsOptions) {
                     return f.value === feed.uri
                   }),
                 )
-                const decision = moderateFeedGenerator(feed, moderationOpts!)
+                const decision = moderateFeedGenerator(
+                  feed,
+                  moderationOptsInSelect!,
+                )
                 return !alreadySaved && !decision.ui('contentList').filter
               }),
             }
@@ -472,6 +475,33 @@ export function usePinnedFeedsInfos() {
             savedFeed: pinnedItem,
           })
         } else if (pinnedItem.type === 'timeline') {
+          // Inject the "Friends Pics" feed
+          result.push({
+            type: 'feed',
+            displayName: 'Friends Pics',
+            uri: 'friends-pics',
+            feedDescriptor: 'friends-pics',
+            route: {
+              href: '/friends-pics',
+              name: 'Home',
+              params: {},
+            },
+            cid: '',
+            avatar: '',
+            description: new RichText({text: ''}),
+            creatorDid: '',
+            creatorHandle: '',
+            likeCount: 0,
+            likeUri: '',
+            savedFeed: {
+              id: 'friends-pics',
+              type: 'timeline',
+              value: 'friends-pics',
+              pinned: true,
+            },
+            contentMode: 'posts_with_media',
+          })
+
           result.push({
             type: 'feed',
             displayName: 'Following',
@@ -494,6 +524,7 @@ export function usePinnedFeedsInfos() {
           })
         }
       }
+
       return result
     },
   })

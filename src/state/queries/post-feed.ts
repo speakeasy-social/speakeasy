@@ -54,6 +54,7 @@ type ListUri = string
 
 export type FeedDescriptor =
   | 'following'
+  | 'friends-pics'
   | `author|${ActorDid}|${AuthorFilter}`
   | `feedgen|${FeedUri}`
   | `likes|${ActorDid}`
@@ -172,11 +173,20 @@ export function usePostFeedQuery(
     queryKey: RQKEY(feedDesc, params),
     async queryFn({pageParam}: {pageParam: RQPageParam}) {
       logger.debug('usePostFeedQuery', {feedDesc, cursor: pageParam?.cursor})
+
+      // Check if the feedDesc is 'friends-pics' and treat it like 'following'
+      const effectiveFeedDesc =
+        feedDesc === 'friends-pics' ? 'following' : feedDesc
+
+      logger.debug('usePostFeedQuery', {
+        effectiveFeedDesc,
+        cursor: pageParam?.cursor,
+      })
       const {api, cursor} = pageParam
         ? pageParam
         : {
             api: createApi({
-              feedDesc,
+              feedDesc: effectiveFeedDesc,
               feedParams: params || {},
               feedTuners,
               agent,
@@ -236,10 +246,14 @@ export function usePostFeedQuery(
       (data: InfiniteData<FeedPageUnselected, RQPageParam>) => {
         // If the selection depends on some data, that data should
         // be included in the selectArgs object and read here.
-        const {feedTuners, moderationOpts, ignoreFilterFor, isDiscover} =
-          selectArgs
+        const {
+          feedTuners: feedTunersInSelect,
+          moderationOpts: moderationOptsInSelect,
+          ignoreFilterFor,
+          isDiscover: isDiscoverInSelect,
+        } = selectArgs
 
-        const tuner = new FeedTuner(feedTuners)
+        const tuner = new FeedTuner(feedTunersInSelect)
 
         // Keep track of the last run and whether we can reuse
         // some already selected pages from there.
@@ -287,7 +301,7 @@ export function usePostFeedQuery(
                 .tune(page.feed)
                 .map(slice => {
                   const moderations = slice.items.map(item =>
-                    moderatePost(item.post, moderationOpts!),
+                    moderatePost(item.post, moderationOptsInSelect!),
                   )
 
                   // apply moderation filter
@@ -308,7 +322,7 @@ export function usePostFeedQuery(
                     }
                   }
 
-                  if (isDiscover) {
+                  if (isDiscoverInSelect) {
                     userActionHistory.seen(
                       slice.items.map(item => ({
                         feedContext: slice.feedContext,

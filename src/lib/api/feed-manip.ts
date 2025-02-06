@@ -1,7 +1,9 @@
 import {
   AppBskyActorDefs,
+  AppBskyEmbedImages,
   AppBskyEmbedRecord,
   AppBskyEmbedRecordWithMedia,
+  AppBskyEmbedVideo,
   AppBskyFeedDefs,
   AppBskyFeedPost,
 } from '@atproto/api'
@@ -390,6 +392,31 @@ export class FeedTuner {
       }
       return slices
     }
+  }
+
+  static mediaOnly(
+    tuner: FeedTuner,
+    slices: FeedViewPostsSlice[],
+  ): FeedViewPostsSlice[] {
+    return slices
+      .map(slice => {
+        const filteredItems = slice.items.filter(item => {
+          // Check if the post has media by examining the embed property
+          const embed = item.post.embed
+          const hasMedia =
+            AppBskyEmbedImages.isView(embed) ||
+            AppBskyEmbedVideo.isView(embed) ||
+            AppBskyEmbedRecordWithMedia.isView(embed)
+
+          return hasMedia
+        })
+        // Ensure the slice structure is maintained and return the correct type
+        return {
+          ...slice,
+          items: filteredItems,
+        } as FeedViewPostsSlice
+      })
+      .filter(slice => slice.items.length > 0)
   }
 
   /**

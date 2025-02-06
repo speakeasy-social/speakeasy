@@ -21,7 +21,11 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
     if (feedDesc.startsWith('feedgen')) {
       return [FeedTuner.preferredLangOnly(langPrefs.contentLanguages)]
     }
-    if (feedDesc === 'following' || feedDesc.startsWith('list')) {
+    if (
+      feedDesc === 'following' ||
+      feedDesc.startsWith('list') ||
+      feedDesc === 'friends-pics'
+    ) {
       const feedTuners = [FeedTuner.removeOrphans]
 
       if (preferences?.feedViewPrefs.hideReposts) {
@@ -40,6 +44,10 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
         feedTuners.push(FeedTuner.removeQuotePosts)
       }
       feedTuners.push(FeedTuner.dedupThreads)
+
+      if (feedDesc === 'friends-pics') {
+        feedTuners.push(FeedTuner.mediaOnly)
+      }
 
       return feedTuners
     }
