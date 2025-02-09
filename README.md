@@ -1,12 +1,52 @@
-# Bluesky Social App
+# Speakeasy
 
-Welcome friends! This is the codebase for the Bluesky Social app.
+Speakeasy is a co-operatively owned social media platform with a mission to help people be the best version of themselves, so we can get to work contributing to the best version of society.
 
-Get the app itself:
+Everything we need for a kind and loving society is controlled by billionaires who ruin the systems that underpin our lives for their own profit and power.
 
-- **Web: [bsky.app](https://bsky.app)**
-- **iOS: [App Store](https://apps.apple.com/us/app/bluesky-social/id6444370199)**
-- **Android: [Play Store](https://play.google.com/store/apps/details?id=xyz.blueskyweb.app)**
+These systems can and should be run by us, for us. The algorithm could be designed to inform and inspire. Instead of artificially generated influencers selling things we don’t need, we could have a system that helps us genuinely connect and achieve our goals, whatever they may be.
+
+We are done waiting for governments to fix things. We know that governments will never regulate away the profit incentives of billionaire owners to hijack more and more of our attention for advertising profits.
+
+We need to start building alternative infrastructure that serves humanity outside the destructive forces that seek return on investment. Everything from our education, to our supermarkets, to our information systems is too important to be owned and shaped by rich people looking for their next big payday.
+
+We’re starting with social media, because it’s now the core of our information infrastructure and shapes how we perceive the world.
+
+- **Get the app [spkeasy.social](https://spkeasy.social)**
+
+# What could social media do if it served us?
+
+* [Promote a positive body image for teenage girls](https://www.wsj.com/articles/facebook-knows-instagram-is-toxic-for-teen-girls-company-documents-show-11631620739)
+* [Connect communities and reduce division](https://www.nytimes.com/2018/11/06/technology/myanmar-facebook.html)
+* [Help voters to be informed](https://www.bbc.com/news/technology-51034641)
+* [Promote kind and calm online engagement](https://www.washingtonpost.com/technology/2021/10/26/facebook-angry-emoji-algorithm/)
+* [Help us find love and support when we need it most](https://www.forbes.com/sites/alicegwalton/2015/04/08/new-study-links-facebook-to-depression-but-now-we-actually-understand-why/)
+
+We know now that billionaire owned social media hasn't just failed to do this, they are making these problems worse. All of these failures were choices, and we can make better choices if we control the algorithm.
+
+# Get Involved
+
+Join us in building a new kind of social media platform that serves humanity.
+
+Speakeasy is an open source, proof of concept client for Bluesky's open source AT protocol. With support we can expand into running our own servers and feeds that truly serve the community.
+
+## What can you do?
+
+* Use the app
+* Help us build the app and the infrastructure
+* Help us raise funds
+* Help us find more people who can do any of these things
+
+## Quick Start
+
+You'll need nvm installed to run the app.
+
+```
+nvm install 20
+
+yarn
+yarn web:dev
+```
 
 ## Development Resources
 
