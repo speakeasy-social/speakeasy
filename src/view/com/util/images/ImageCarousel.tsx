@@ -13,7 +13,6 @@ import {useLingui} from '@lingui/react'
 
 import {HandleRef, useHandleRef} from '#/lib/hooks/useHandleRef'
 import {PostEmbedViewContext} from '#/view/com/util/post-embeds/types'
-import {Text} from '#/view/com/util/text/Text'
 import {atoms as a, useTheme} from '#/alf'
 import {Dimensions} from '../../lightbox/ImageViewing/@types'
 import {GalleryItem} from './Gallery'
@@ -153,23 +152,35 @@ export function ImageCarousel({style, ...props}: ImageCarouselProps) {
         </Pressable>
       )}
 
-      {/* Image Counter */}
+      {/* Dot Count */}
       <View
         style={[
           a.absolute,
+          a.flex_row,
+          a.justify_center,
           {
-            bottom: 8,
-            right: 8,
+            bottom: 16,
+            left: 0,
+            right: 0,
             zIndex: 10,
-            borderRadius: 4,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            backgroundColor: theme.palette.white,
+            height: 20,
           },
         ]}>
-        <Text style={[{color: theme.palette.black}]}>
-          {currentIndex + 1}/{props.images.length}
-        </Text>
+        {props.images.map((_image, index) => (
+          <View
+            key={index}
+            style={{
+              width: 8,
+              height: 8,
+              marginHorizontal: 4,
+              borderRadius: 4,
+              backgroundColor:
+                index === currentIndex
+                  ? theme.palette.black
+                  : theme.palette.contrast_700,
+            }}
+          />
+        ))}
       </View>
     </View>
   )
