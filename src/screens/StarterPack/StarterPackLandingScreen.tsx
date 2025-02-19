@@ -387,7 +387,7 @@ export function AppClipOverlay({
         <View style={[a.gap_md, {zIndex: 2}]}>
           <Text
             style={[a.font_bold, a.text_4xl, {lineHeight: 40, color: 'white'}]}>
-            Download Bluesky to get started!
+            Download Speakeasy to get started!
           </Text>
           <Text style={[a.text_lg, {color: 'white'}]}>
             We'll remember the starter pack you chose and use it when you create

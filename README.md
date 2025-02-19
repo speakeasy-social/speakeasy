@@ -48,7 +48,7 @@ yarn
 yarn web:dev
 ```
 
-## Development Resources
+## BlueskyDevelopment Resources
 
 This is a [React Native](https://reactnative.dev/) application, written in the TypeScript programming language. It builds on the `atproto` TypeScript packages (like [`@atproto/api`](https://www.npmjs.com/package/@atproto/api)), code for which is also open source, but in [a different git repository](https://github.com/bluesky-social/atproto).
 

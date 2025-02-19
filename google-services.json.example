@@ -1,6 +1,6 @@
 {
   "project_info": {
-    "project_id": "blueskyweb-example",
+    "project_id": "speakeasyweb-example",
     "project_number": "100000000000",
     "firebase_url": "https://blueskyweb-example.firebaseio.com"
   },
@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:123456789000:android:f1bf012572b04063",
         "android_client_info": {
-          "package_name": "xyz.blueskyweb.app"
+          "package_name": "xyz.speakeasyweb.app"
         }
       },
       "oauth_client": [

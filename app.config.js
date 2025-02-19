@@ -43,10 +43,10 @@ module.exports = function (config) {
   return {
     expo: {
       version: VERSION,
-      name: 'Bluesky',
-      slug: 'bluesky',
-      scheme: 'bluesky',
-      owner: 'blueskysocial',
+      name: 'Speakeasy',
+      slug: 'speakeasy',
+      scheme: 'speakeasy',
+      owner: 'speakeasy-social',
       runtimeVersion: {
         policy: 'appVersion',
       },
@@ -55,7 +55,7 @@ module.exports = function (config) {
       primaryColor: '#1083fe',
       ios: {
         supportsTablet: false,
-        bundleIdentifier: 'xyz.blueskyweb.app',
+        bundleIdentifier: 'xyz.speakeasy.app',
         config: {
           usesNonExemptEncryption: false,
         },
@@ -152,7 +152,7 @@ module.exports = function (config) {
           backgroundColor: '#1185FE',
         },
         googleServicesFile: './google-services.json',
-        package: 'xyz.blueskyweb.app',
+        package: 'xyz.speakeasy.app',
         intentFilters: [
           {
             action: 'VIEW',
@@ -196,7 +196,7 @@ module.exports = function (config) {
         USE_SENTRY && [
           '@sentry/react-native/expo',
           {
-            organization: 'blueskyweb',
+            organization: 'speakeasyweb',
             project: 'react-native',
             release: VERSION,
             dist: SENTRY_DIST,
@@ -298,7 +298,7 @@ module.exports = function (config) {
             },
 
             /**
-             * Bluesky+ core set
+             * Speakeasy+ core set
              */
             core_aurora: {
               ios: './assets/app-icons/ios_icon_core_aurora.png',
@@ -352,10 +352,10 @@ module.exports = function (config) {
           'react-native-vision-camera',
           {
             enableLocation: false,
-            cameraPermissionText: 'Bluesky needs access to your camera.',
+            cameraPermissionText: 'Speakeasy needs access to your camera.',
             enableMicrophonePermission: true,
             microphonePermissionText:
-              'Bluesky needs access to your microphone.',
+              'Speakeasy needs access to your microphone.',
           },
         ],
       ].filter(Boolean),
@@ -366,8 +366,8 @@ module.exports = function (config) {
               ios: {
                 appExtensions: [
                   {
-                    targetName: 'Share-with-Bluesky',
-                    bundleIdentifier: 'xyz.blueskyweb.app.Share-with-Bluesky',
+                    targetName: 'Share-with-Speakeasy',
+                    bundleIdentifier: 'xyz.speakeasy.app.Share-with-Speakeasy',
                     entitlements: {
                       'com.apple.security.application-groups': [
                         'group.app.bsky',
@@ -375,8 +375,8 @@ module.exports = function (config) {
                     },
                   },
                   {
-                    targetName: 'BlueskyNSE',
-                    bundleIdentifier: 'xyz.blueskyweb.app.BlueskyNSE',
+                    targetName: 'SpeakeasyNSE',
+                    bundleIdentifier: 'xyz.speakeasyweb.app.SpeakeasyNSE',
                     entitlements: {
                       'com.apple.security.application-groups': [
                         'group.app.bsky',
@@ -384,8 +384,8 @@ module.exports = function (config) {
                     },
                   },
                   {
-                    targetName: 'BlueskyClip',
-                    bundleIdentifier: 'xyz.blueskyweb.app.AppClip',
+                    targetName: 'SpeakeasyClip',
+                    bundleIdentifier: 'xyz.speakeasyweb.app.AppClip',
                   },
                 ],
               },
@@ -402,7 +402,7 @@ module.exports = function (config) {
           {
             file: './postHooks/uploadSentrySourcemapsPostHook',
             config: {
-              organization: 'blueskyweb',
+              organization: 'speakeasyweb',
               project: 'react-native',
               release: VERSION,
               dist: SENTRY_DIST,
