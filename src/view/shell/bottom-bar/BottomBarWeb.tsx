@@ -106,7 +106,7 @@ export function BottomBarWeb() {
         {hasSession ? (
           <>
             <NavItem
-              routeName="Home"
+              routeName="Intent"
               href="/"
               hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
               {({isActive}) => {

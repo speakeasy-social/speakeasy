@@ -1,7 +1,8 @@
 import {Router} from '#/lib/routes/router'
 
 export const router = new Router({
-  Home: '/',
+  Intent: '/',
+  Feed: '/feed',
   Search: '/search',
   Feeds: '/feeds',
   Notifications: '/notifications',

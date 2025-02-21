@@ -1,7 +1,6 @@
 import React from 'react'
 import {StyleSheet, View} from 'react-native'
 import {AppBskyActorDefs} from '@atproto/api'
-import {FontAwesomeIconStyle} from '@fortawesome/react-native-fontawesome'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {
@@ -53,10 +52,6 @@ import {
   Group3_Stroke2_Corner0_Rounded as GroupFilled,
 } from '#/components/icons/Group'
 import {
-  Hashtag_Filled_Corner0_Rounded as HashtagFilled,
-  Hashtag_Stroke2_Corner0_Rounded as Hashtag,
-} from '#/components/icons/Hashtag'
-import {
   Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
   Heart2_Stroke2_Corner0_Rounded as Heart,
 } from '#/components/icons/Heart2'
@@ -70,6 +65,7 @@ import {
   Message_Stroke2_Corner0_Rounded as Message,
   Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
 } from '#/components/icons/Message'
+import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
 import {PlusLarge_Stroke2_Corner0_Rounded as PlusIcon} from '#/components/icons/Plus'
 import {
   SettingsGear2_Filled_Corner0_Rounded as SettingsFilled,
@@ -79,6 +75,7 @@ import {
   UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
   UserCircle_Stroke2_Corner0_Rounded as UserCircle,
 } from '#/components/icons/UserCircle'
+import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 import * as Menu from '#/components/Menu'
 import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
@@ -331,7 +328,7 @@ function NavItem({
   const [pathName] = React.useMemo(() => router.matchPath(href), [href])
   const currentRouteInfo = useNavigationState(state => {
     if (!state) {
-      return {name: 'Home'}
+      return {name: 'Intent'}
     }
     return getCurrentRoute(state)
   })
@@ -630,6 +627,25 @@ export function DesktopLeftNav() {
               label={_(msg`Home`)}
             />
             <NavItem
+              href="/feed"
+              hasNew={hasHomeBadge && gate('remove_show_latest_button')}
+              icon={
+                <News
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <News
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Feed`)}
+            />
+            <NavItem
               href="/search"
               icon={
                 <MagnifyingGlass
@@ -691,7 +707,8 @@ export function DesktopLeftNav() {
             />
             <NavItem
               href="/mutual"
-              count="1"
+              // count="1"
+              hasNew={true}
               icon={
                 <Heart
                   aria-hidden={true}
@@ -713,22 +730,27 @@ export function DesktopLeftNav() {
               }}
             />
             <NavItem
-              href="/feeds"
+              href="/reels"
+              count="1"
               icon={
-                <Hashtag
-                  style={pal.text as FontAwesomeIconStyle}
+                <VideoClipIcon
                   aria-hidden={true}
                   width={NAV_ICON_WIDTH}
+                  style={pal.text}
                 />
               }
               iconFilled={
-                <HashtagFilled
-                  style={pal.text as FontAwesomeIconStyle}
+                <VideoClipIcon
                   aria-hidden={true}
                   width={NAV_ICON_WIDTH}
+                  style={pal.text}
                 />
               }
-              label={_(msg`Feeds`)}
+              label={_(msg`Reels`)}
+              onPress={() => {
+                setSelectedFeature('mutual-aid')
+                groupsDialogControl.open()
+              }}
             />
             <NavItem
               href="/lists"
