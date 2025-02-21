@@ -1,6 +1,7 @@
 import {StyleSheet, Text, View} from 'react-native'
 
 import {usePalette} from '#/lib/hooks/usePalette'
+import {useComposerControls} from '#/state/shell/composer'
 import {PressableWithHover} from '#/view/com/util/PressableWithHover'
 import {atoms as a, useTheme} from '#/alf'
 import {Bell_Stroke2_Corner0_Rounded as Bell} from '#/components/icons/Bell'
@@ -16,7 +17,7 @@ import {UserCircle_Stroke2_Corner0_Rounded as UserCircle} from '#/components/ico
 import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 import {navigate} from '../Navigation'
 
-const NAV_ICON_WIDTH = 75
+const NAV_ICON_WIDTH = 50
 
 const ActionItem = ({icon, label, onPress}) => {
   const theme = useTheme()
@@ -64,6 +65,8 @@ const ActionItem = ({icon, label, onPress}) => {
 }
 
 const IntentScreen = () => {
+  const {openComposer} = useComposerControls()
+
   return (
     <View style={[a.px_xl, styles.container]} role="navigation">
       <Text style={styles.title}>What do you want to do?</Text>
@@ -76,7 +79,7 @@ const IntentScreen = () => {
         <ActionItem
           icon={<VideoClipIcon width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Reels"
-          onPress={() => navigate('Reels')}
+          onPress={() => navigate('VideoFeed')}
         />
         <ActionItem
           icon={<MagnifyingGlass width={NAV_ICON_WIDTH} aria-hidden={true} />}
@@ -101,7 +104,7 @@ const IntentScreen = () => {
         <ActionItem
           icon={<EditBig width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Post"
-          onPress={() => navigate('Profile')}
+          onPress={() => openComposer()}
         />
         <ActionItem
           icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
@@ -116,7 +119,7 @@ const IntentScreen = () => {
         <ActionItem
           icon={<UserCircle width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Profile"
-          onPress={() => navigate('Profile')}
+          onPress={() => navigate('MyProfileTab')}
         />
         <ActionItem
           icon={<Settings width={NAV_ICON_WIDTH} aria-hidden={true} />}
