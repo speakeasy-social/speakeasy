@@ -15,6 +15,7 @@ import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
 import {SettingsGear2_Stroke2_Corner0_Rounded as Settings} from '#/components/icons/SettingsGear2'
 import {UserCircle_Stroke2_Corner0_Rounded as UserCircle} from '#/components/icons/UserCircle'
 import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
+import {TitleText} from '#/components/Layout/Header'
 import {navigate} from '../Navigation'
 
 const NAV_ICON_WIDTH = 50
@@ -69,7 +70,7 @@ const IntentScreen = () => {
 
   return (
     <View style={[a.px_xl, styles.container]} role="navigation">
-      <Text style={styles.title}>What do you want to do?</Text>
+      <TitleText style={styles.title}>What do you want to do?</TitleText>
       <View style={styles.grid}>
         <ActionItem
           icon={<News width={NAV_ICON_WIDTH} aria-hidden={true} />}
@@ -139,8 +140,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    fontSize: 24,
-    marginBottom: 16,
+    // Add any additional styles if needed
   },
   grid: {
     flexDirection: 'row',
