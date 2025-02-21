@@ -11,7 +11,10 @@ import {Heart2_Stroke2_Corner0_Rounded as Heart} from '#/components/icons/Heart2
 import {MagnifyingGlass2_Stroke2_Corner0_Rounded as MagnifyingGlass} from '#/components/icons/MagnifyingGlass2'
 import {Message_Stroke2_Corner0_Rounded as Message} from '#/components/icons/Message'
 import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
+import {SettingsGear2_Stroke2_Corner0_Rounded as Settings} from '#/components/icons/SettingsGear2'
+import {UserCircle_Stroke2_Corner0_Rounded as UserCircle} from '#/components/icons/UserCircle'
 import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
+import {navigate} from '../Navigation'
 
 const NAV_ICON_WIDTH = 75
 
@@ -46,11 +49,16 @@ const ActionItem = ({icon, label, onPress}) => {
           },
         ]}>
         {icon}
-        <Text
-          style={[a.text_xl, a.font_normal, a.mt_md, {color: pal.text.color}]}>
-          {label}
-        </Text>
       </View>
+      <Text
+        style={[
+          a.text_xl,
+          a.font_normal,
+          a.mt_md,
+          {color: pal.text.color, textAlign: 'center'},
+        ]}>
+        {label}
+      </Text>
     </PressableWithHover>
   )
 }
@@ -63,47 +71,57 @@ const IntentScreen = () => {
         <ActionItem
           icon={<News width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Feed"
-          onPress={() => console.log('Navigating to Home')}
+          onPress={() => navigate('Feed')}
         />
         <ActionItem
           icon={<VideoClipIcon width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Reels"
-          onPress={() => console.log('Navigating to Feed')}
+          onPress={() => navigate('Reels')}
         />
         <ActionItem
           icon={<MagnifyingGlass width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Search"
-          onPress={() => console.log('Navigating to Search')}
+          onPress={() => navigate('Search')}
         />
         <ActionItem
           icon={<Group width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Groups"
-          onPress={() => console.log('Navigating to Notifications')}
+          onPress={() => navigate('Groups')}
         />
         <ActionItem
           icon={<Explosion width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Everything"
-          onPress={() => console.log('Navigating to Home')}
+          onPress={() => navigate('Home')}
         />
         <ActionItem
           icon={<Bell width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Notifications"
-          onPress={() => console.log('Navigating to Notifications')}
+          onPress={() => navigate('Notifications')}
         />
         <ActionItem
           icon={<EditBig width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Post"
-          onPress={() => console.log('Navigating to Profile')}
+          onPress={() => navigate('Profile')}
         />
         <ActionItem
           icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Chat"
-          onPress={() => console.log('Navigating to Chat')}
+          onPress={() => navigate('Messages')}
         />
         <ActionItem
           icon={<Heart width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Mutual Aid"
-          onPress={() => console.log('Navigating to Profile')}
+          onPress={() => navigate('MutualAid')}
+        />
+        <ActionItem
+          icon={<UserCircle width={NAV_ICON_WIDTH} aria-hidden={true} />}
+          label="Profile"
+          onPress={() => navigate('Profile')}
+        />
+        <ActionItem
+          icon={<Settings width={NAV_ICON_WIDTH} aria-hidden={true} />}
+          label="Settings"
+          onPress={() => navigate('Settings')}
         />
       </View>
     </View>
