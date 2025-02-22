@@ -20,7 +20,15 @@ import {navigate} from '../Navigation'
 
 const NAV_ICON_WIDTH = 50
 
-const ActionItem = ({icon, label, onPress}) => {
+const ActionItem = ({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ReactNode
+  label: string
+  onPress: () => void
+}) => {
   const theme = useTheme()
   const pal = usePalette('default')
 
@@ -105,7 +113,7 @@ const IntentScreen = () => {
         <ActionItem
           icon={<EditBig width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Post"
-          onPress={() => openComposer()}
+          onPress={() => openComposer('default')}
         />
         <ActionItem
           icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
@@ -139,9 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  title: {
-    // Add any additional styles if needed
-  },
+  title: {},
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
