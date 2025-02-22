@@ -1,9 +1,13 @@
+import React from 'react'
 import {StyleSheet, Text, View} from 'react-native'
 
+import {useIntention} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useComposerControls} from '#/state/shell/composer'
 import {PressableWithHover} from '#/view/com/util/PressableWithHover'
 import {atoms as a, useTheme} from '#/alf'
+import {useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {Bell_Stroke2_Corner0_Rounded as Bell} from '#/components/icons/Bell'
 import {EditBig_Stroke2_Corner0_Rounded as EditBig} from '#/components/icons/EditBig'
 import {Explosion_Stroke2_Corner0_Rounded as Explosion} from '#/components/icons/Explosion'
@@ -75,6 +79,22 @@ const ActionItem = ({
 
 const IntentScreen = () => {
   const {openComposer} = useComposerControls()
+  const groupsDialogControl = useDialogControl()
+  const [selectedFeature, setSelectedFeature] = React.useState<
+    'groups' | 'mutual-aid'
+  >('groups')
+  const {setIntention} = useIntention()
+
+  const handleFeatureSelect = (feature: 'groups' | 'mutual-aid') => {
+    setSelectedFeature(feature)
+    setIntention(feature)
+    groupsDialogControl.open()
+  }
+
+  const onIntentionPress = (feature: string, intent?: string) => {
+    setIntention(intent || feature)
+    navigate(feature)
+  }
 
   return (
     <View style={[a.px_xl, styles.container]} role="navigation">
@@ -83,32 +103,32 @@ const IntentScreen = () => {
         <ActionItem
           icon={<News width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Feed"
-          onPress={() => navigate('Feed')}
+          onPress={() => onIntentionPress('Feed')}
         />
         <ActionItem
           icon={<VideoClipIcon width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Reels"
-          onPress={() => navigate('VideoFeed')}
+          onPress={() => onIntentionPress('VideoFeed')}
         />
         <ActionItem
           icon={<MagnifyingGlass width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Search"
-          onPress={() => navigate('Search')}
+          onPress={() => onIntentionPress('Search')}
         />
         <ActionItem
           icon={<Group width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Groups"
-          onPress={() => navigate('Groups')}
+          onPress={() => handleFeatureSelect('groups')}
         />
         <ActionItem
           icon={<Explosion width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Everything"
-          onPress={() => navigate('Home')}
+          onPress={() => onIntentionPress('Home', 'Everything')}
         />
         <ActionItem
           icon={<Bell width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Notifications"
-          onPress={() => navigate('Notifications')}
+          onPress={() => onIntentionPress('Notifications')}
         />
         <ActionItem
           icon={<EditBig width={NAV_ICON_WIDTH} aria-hidden={true} />}
@@ -118,24 +138,42 @@ const IntentScreen = () => {
         <ActionItem
           icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Chat"
-          onPress={() => navigate('Messages')}
+          onPress={() => onIntentionPress('Messages')}
         />
         <ActionItem
           icon={<Heart width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Mutual Aid"
-          onPress={() => navigate('MutualAid')}
+          onPress={() => handleFeatureSelect('mutual-aid')}
         />
         <ActionItem
           icon={<UserCircle width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Profile"
-          onPress={() => navigate('MyProfileTab')}
+          onPress={() => onIntentionPress('Profile')}
         />
         <ActionItem
           icon={<Settings width={NAV_ICON_WIDTH} aria-hidden={true} />}
           label="Settings"
-          onPress={() => navigate('Settings')}
+          onPress={() => onIntentionPress('Settings')}
         />
       </View>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureName={selectedFeature === 'groups' ? 'Groups' : 'Mutual Aid'}
+        featureDescription={
+          selectedFeature === 'groups'
+            ? "We're trialing a new feature to support private discussion groups."
+            : "We're working on a new feature to support mutual aid."
+        }
+        utmParams={{
+          source: 'intent-screen',
+          medium:
+            selectedFeature === 'groups'
+              ? 'groups_button'
+              : 'mutual_aid_button',
+          campaign:
+            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
+        }}
+      />
     </View>
   )
 }
