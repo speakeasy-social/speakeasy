@@ -1,5 +1,6 @@
 import React from 'react'
 import {View} from 'react-native'
+import {GestureResponderEvent} from 'react-native'
 import Animated from 'react-native-reanimated'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
@@ -284,7 +285,7 @@ const NavItem: React.FC<{
   routeName: string
   hasNew?: boolean
   notificationCount?: string
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  onClick?: (e: GestureResponderEvent) => void
 }> = ({children, href, routeName, hasNew, notificationCount, onClick}) => {
   const {_} = useLingui()
   const {currentAccount} = useSession()
@@ -301,6 +302,9 @@ const NavItem: React.FC<{
           currentAccount?.handle
       : isTab(currentRoute.name, routeName)
 
+  const extra: {onPress?: (e: GestureResponderEvent) => void} = {}
+  if (onClick) extra.onPress = onClick
+
   return (
     <Link
       href={href}
@@ -309,7 +313,7 @@ const NavItem: React.FC<{
       aria-role="link"
       aria-label={routeName}
       accessible={true}
-      onPress={onClick}>
+      {...extra}>
       {children({isActive})}
       {notificationCount ? (
         <View
