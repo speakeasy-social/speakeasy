@@ -284,14 +284,14 @@ export function InlineLinkText({
       accessibilityLabel={label}
       {...rest}
       style={[
-        {color: t.palette.primary_500},
+        {color: t.palette.primary_700},
         hovered &&
           !disableUnderline && {
             ...web({
               outline: 0,
               textDecorationLine: 'underline',
               textDecorationColor:
-                flattenedStyle.color ?? t.palette.primary_500,
+                flattenedStyle.color ?? t.palette.primary_700,
             }),
           },
         flattenedStyle,

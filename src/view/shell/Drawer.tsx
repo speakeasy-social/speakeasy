@@ -129,6 +129,7 @@ let DrawerContent = ({}: React.PropsWithoutRef<{}>): React.ReactNode => {
   const navigation = useNavigation<NavigationProp>()
   const {
     isAtHome,
+    // isAtFeed,
     isAtSearch,
     isAtFeeds,
     isAtNotifications,

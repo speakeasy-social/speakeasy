@@ -8,6 +8,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {IntentionProvider} from '#/lib/hooks/useIntention'
 import {QueryProvider} from '#/lib/react-query'
 import {Provider as StatsigProvider} from '#/lib/statsig/statsig'
 import {ThemeProvider} from '#/lib/ThemeContext'
@@ -130,8 +131,10 @@ function InnerApp() {
                                             <ProgressGuideProvider>
                                               <TrendingConfigProvider>
                                                 <IntentDialogProvider>
-                                                  <Shell />
-                                                  <NuxDialogs />
+                                                  <IntentionProvider>
+                                                    <Shell />
+                                                    <NuxDialogs />
+                                                  </IntentionProvider>
                                                 </IntentDialogProvider>
                                               </TrendingConfigProvider>
                                             </ProgressGuideProvider>

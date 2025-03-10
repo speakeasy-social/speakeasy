@@ -240,12 +240,12 @@ function RichTextTag({
             web({
               cursor: 'pointer',
             }),
-            {color: t.palette.primary_500},
+            {color: t.palette.primary_700},
             (hovered || focused) && {
               ...web({
                 outline: 0,
                 textDecorationLine: 'underline',
-                textDecorationColor: t.palette.primary_500,
+                textDecorationColor: t.palette.primary_700,
               }),
             },
             style,

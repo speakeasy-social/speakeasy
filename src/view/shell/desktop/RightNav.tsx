@@ -45,9 +45,14 @@ export function DesktopRightNav({routeName}: {routeName: string}) {
   const webqueryParams = useWebQueryParams()
   const searchQuery = webqueryParams?.q
   const showTrending = !isSearchScreen || (isSearchScreen && !!searchQuery)
+  const isIntentScreen = routeName === 'Intent'
 
   const {isTablet} = useWebMediaQueries()
   if (isTablet) {
+    return null
+  }
+
+  if (hasSession && isIntentScreen) {
     return null
   }
 

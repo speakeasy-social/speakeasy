@@ -6,6 +6,7 @@ export function useNavigationTabState() {
   return useNavigationState(state => {
     const res = {
       isAtHome: getTabState(state, 'Home') !== TabState.Outside,
+      isAtFeed: getTabState(state, 'Feed') !== TabState.Outside,
       isAtSearch: getTabState(state, 'Search') !== TabState.Outside,
       // FeedsTab no longer exists, but this check works for `Feeds` screen as well
       isAtFeeds: getTabState(state, 'Feeds') !== TabState.Outside,
@@ -17,6 +18,7 @@ export function useNavigationTabState() {
 
     if (
       !res.isAtHome &&
+      !res.isAtFeed &&
       !res.isAtSearch &&
       !res.isAtFeeds &&
       !res.isAtNotifications &&

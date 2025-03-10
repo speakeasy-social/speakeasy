@@ -1,7 +1,6 @@
 import React from 'react'
 import {StyleSheet, View} from 'react-native'
 import {AppBskyActorDefs} from '@atproto/api'
-import {FontAwesomeIconStyle} from '@fortawesome/react-native-fontawesome'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {
@@ -11,6 +10,7 @@ import {
 } from '@react-navigation/native'
 
 import {useAccountSwitcher} from '#/lib/hooks/useAccountSwitcher'
+import {IntentionFilter} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
@@ -53,10 +53,6 @@ import {
   Group3_Stroke2_Corner0_Rounded as GroupFilled,
 } from '#/components/icons/Group'
 import {
-  Hashtag_Filled_Corner0_Rounded as HashtagFilled,
-  Hashtag_Stroke2_Corner0_Rounded as Hashtag,
-} from '#/components/icons/Hashtag'
-import {
   Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
   Heart2_Stroke2_Corner0_Rounded as Heart,
 } from '#/components/icons/Heart2'
@@ -70,6 +66,7 @@ import {
   Message_Stroke2_Corner0_Rounded as Message,
   Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
 } from '#/components/icons/Message'
+import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
 import {PlusLarge_Stroke2_Corner0_Rounded as PlusIcon} from '#/components/icons/Plus'
 import {
   SettingsGear2_Filled_Corner0_Rounded as SettingsFilled,
@@ -79,6 +76,7 @@ import {
   UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
   UserCircle_Stroke2_Corner0_Rounded as UserCircle,
 } from '#/components/icons/UserCircle'
+import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 import * as Menu from '#/components/Menu'
 import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
@@ -331,7 +329,7 @@ function NavItem({
   const [pathName] = React.useMemo(() => router.matchPath(href), [href])
   const currentRouteInfo = useNavigationState(state => {
     if (!state) {
-      return {name: 'Home'}
+      return {name: 'Intent'}
     }
     return getCurrentRoute(state)
   })
@@ -563,8 +561,13 @@ export function DesktopLeftNav() {
   const [selectedFeature, setSelectedFeature] = React.useState<
     'groups' | 'mutual-aid'
   >('groups')
+  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
 
-  if (!hasSession && !isDesktop) {
+  // Check if the current route is the home tab
+  const isIntentScreen = currentRouteInfo.name === 'Intent'
+
+  // Conditionally render the left nav
+  if (hasSession && isIntentScreen) {
     return null
   }
 
@@ -629,143 +632,186 @@ export function DesktopLeftNav() {
               }
               label={_(msg`Home`)}
             />
-            <NavItem
-              href="/search"
-              icon={
-                <MagnifyingGlass
-                  style={pal.text}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              iconFilled={
-                <MagnifyingGlassFilled
-                  style={pal.text}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              label={_(msg`Search`)}
-            />
-            <NavItem
-              href="/notifications"
-              count={numUnreadNotifications}
-              icon={
-                <Bell
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <BellFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Notifications`)}
-            />
-            <ChatNavItem />
-            <NavItem
-              href="/groups"
-              icon={
-                <Group
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <GroupFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Groups`)}
-              onPress={() => {
-                setSelectedFeature('groups')
-                groupsDialogControl.open()
-              }}
-            />
-            <NavItem
-              href="/mutual"
-              count="1"
-              icon={
-                <Heart
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <HeartFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Mutual Aid`)}
-              onPress={() => {
-                setSelectedFeature('mutual-aid')
-                groupsDialogControl.open()
-              }}
-            />
-            <NavItem
-              href="/feeds"
-              icon={
-                <Hashtag
-                  style={pal.text as FontAwesomeIconStyle}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              iconFilled={
-                <HashtagFilled
-                  style={pal.text as FontAwesomeIconStyle}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              label={_(msg`Feeds`)}
-            />
-            <NavItem
-              href="/lists"
-              icon={
-                <List
-                  style={pal.text}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              iconFilled={
-                <ListFilled
-                  style={pal.text}
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                />
-              }
-              label={_(msg`Lists`)}
-            />
-            <NavItem
-              href={currentAccount ? makeProfileLink(currentAccount) : '/'}
-              icon={
-                <UserCircle
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <UserCircleFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Profile`)}
-            />
+            <IntentionFilter routeName="Feed">
+              <NavItem
+                href="/feed"
+                hasNew={hasHomeBadge && gate('remove_show_latest_button')}
+                icon={
+                  <News
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <News
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Feed`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Search">
+              <NavItem
+                href="/search"
+                icon={
+                  <MagnifyingGlass
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                iconFilled={
+                  <MagnifyingGlassFilled
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                label={_(msg`Search`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Notifications">
+              <NavItem
+                href="/notifications"
+                count={numUnreadNotifications}
+                icon={
+                  <Bell
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <BellFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Notifications`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Messages">
+              <ChatNavItem />
+            </IntentionFilter>
+            <IntentionFilter routeName="Groups">
+              <NavItem
+                href="/groups"
+                icon={
+                  <Group
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <GroupFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Groups`)}
+                onPress={() => {
+                  setSelectedFeature('groups')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Mutual">
+              <NavItem
+                href="/mutual"
+                // count="1"
+                hasNew={true}
+                icon={
+                  <Heart
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <HeartFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Mutual Aid`)}
+                onPress={() => {
+                  setSelectedFeature('mutual-aid')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="VideoFeed">
+              <NavItem
+                href="/reels"
+                count="1"
+                icon={
+                  <VideoClipIcon
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <VideoClipIcon
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Reels`)}
+                onPress={() => {
+                  setSelectedFeature('mutual-aid')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Lists">
+              <NavItem
+                href="/lists"
+                icon={
+                  <List
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                iconFilled={
+                  <ListFilled
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                label={_(msg`Lists`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Profile">
+              <NavItem
+                href={currentAccount ? makeProfileLink(currentAccount) : '/'}
+                icon={
+                  <UserCircle
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <UserCircleFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Profile`)}
+              />
+            </IntentionFilter>
             <NavItem
               href="/settings"
               icon={

@@ -5,6 +5,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigationState} from '@react-navigation/native'
 
+import {IntentionFilter} from '#/lib/hooks/useIntention'
 import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransform'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
 import {CommonNavigatorParams} from '#/lib/routes/types'
@@ -70,6 +71,16 @@ export function BottomBarWeb() {
     // setShowLoggedOut(true)
   }, [requestSwitchToAccount, closeAllActiveElements])
 
+  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
+
+  // Check if the current route is the Intent route
+  const isIntentScreen = currentRouteInfo.name === 'Intent'
+
+  // Conditionally render the bottom bar
+  if (hasSession && isIntentScreen) {
+    return null
+  }
+
   return (
     <>
       <LimitedBetaModal
@@ -106,7 +117,7 @@ export function BottomBarWeb() {
         {hasSession ? (
           <>
             <NavItem
-              routeName="Home"
+              routeName="Intent"
               href="/"
               hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
               {({isActive}) => {
@@ -120,91 +131,108 @@ export function BottomBarWeb() {
                 )
               }}
             </NavItem>
-            <NavItem routeName="Search" href="/search">
-              {({isActive}) => {
-                const Icon = isActive ? MagnifyingGlassFilled : MagnifyingGlass
-                return (
-                  <Icon
+            <IntentionFilter routeName="Search">
+              <NavItem routeName="Search" href="/search">
+                {({isActive}) => {
+                  const Icon = isActive
+                    ? MagnifyingGlassFilled
+                    : MagnifyingGlass
+                  return (
+                    <Icon
+                      aria-hidden={true}
+                      width={iconWidth + 2}
+                      style={[styles.ctrlIcon, t.atoms.text, styles.searchIcon]}
+                    />
+                  )
+                }}
+              </NavItem>
+            </IntentionFilter>
+            <IntentionFilter routeName="Groups">
+              <NavItem
+                routeName="Groups"
+                href="#"
+                onClick={e => {
+                  e.preventDefault()
+                  setSelectedFeature('groups')
+                  groupsDialogControl.open()
+                }}>
+                {() => (
+                  <Group
                     aria-hidden={true}
-                    width={iconWidth + 2}
-                    style={[styles.ctrlIcon, t.atoms.text, styles.searchIcon]}
+                    width={iconWidth}
+                    style={[styles.ctrlIcon, t.atoms.text]}
                   />
-                )
-              }}
-            </NavItem>
-            <NavItem
-              routeName="Groups"
-              href="#"
-              onClick={e => {
-                e.preventDefault()
-                setSelectedFeature('groups')
-                groupsDialogControl.open()
-              }}>
-              {() => (
-                <Group
-                  aria-hidden={true}
-                  width={iconWidth}
-                  style={[styles.ctrlIcon, t.atoms.text]}
-                />
-              )}
-            </NavItem>
-            <NavItem
-              routeName="MutualAid"
-              href="#"
-              notificationCount="1"
-              onClick={e => {
-                e.preventDefault()
-                setSelectedFeature('mutual-aid')
-                groupsDialogControl.open()
-              }}>
-              {() => (
-                <Heart
-                  aria-hidden={true}
-                  width={iconWidth}
-                  style={[styles.ctrlIcon, t.atoms.text]}
-                />
-              )}
-            </NavItem>
+                )}
+              </NavItem>
+            </IntentionFilter>
+            <IntentionFilter routeName="MutualAid">
+              <NavItem
+                routeName="MutualAid"
+                href="#"
+                notificationCount="1"
+                onClick={e => {
+                  e.preventDefault()
+                  setSelectedFeature('mutual-aid')
+                  groupsDialogControl.open()
+                }}>
+                {() => (
+                  <Heart
+                    aria-hidden={true}
+                    width={iconWidth}
+                    style={[styles.ctrlIcon, t.atoms.text]}
+                  />
+                )}
+              </NavItem>
+            </IntentionFilter>
+
             {hasSession && (
               <>
-                <NavItem
-                  routeName="Messages"
-                  href="/messages"
-                  notificationCount={
-                    unreadMessageCount.count > 0
-                      ? unreadMessageCount.numUnread
-                      : undefined
-                  }>
-                  {({isActive}) => {
-                    const Icon = isActive ? MessageFilled : Message
-                    return (
-                      <Icon
-                        aria-hidden={true}
-                        width={iconWidth - 1}
-                        style={[
-                          styles.ctrlIcon,
-                          t.atoms.text,
-                          styles.messagesIcon,
-                        ]}
-                      />
-                    )
-                  }}
-                </NavItem>
-                <NavItem
-                  routeName="Notifications"
-                  href="/notifications"
-                  notificationCount={notificationCountStr}>
-                  {({isActive}) => {
-                    const Icon = isActive ? BellFilled : Bell
-                    return (
-                      <Icon
-                        aria-hidden={true}
-                        width={iconWidth}
-                        style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
-                      />
-                    )
-                  }}
-                </NavItem>
+                <IntentionFilter routeName="Messages">
+                  <NavItem
+                    routeName="Messages"
+                    href="/messages"
+                    notificationCount={
+                      unreadMessageCount.count > 0
+                        ? unreadMessageCount.numUnread
+                        : undefined
+                    }>
+                    {({isActive}) => {
+                      const Icon = isActive ? MessageFilled : Message
+                      return (
+                        <Icon
+                          aria-hidden={true}
+                          width={iconWidth - 1}
+                          style={[
+                            styles.ctrlIcon,
+                            t.atoms.text,
+                            styles.messagesIcon,
+                          ]}
+                        />
+                      )
+                    }}
+                  </NavItem>
+                </IntentionFilter>
+                <IntentionFilter routeName="Notifications">
+                  <NavItem
+                    routeName="Notifications"
+                    href="/notifications"
+                    notificationCount={notificationCountStr}>
+                    {({isActive}) => {
+                      const Icon = isActive ? BellFilled : Bell
+                      return (
+                        <Icon
+                          aria-hidden={true}
+                          width={iconWidth}
+                          style={[
+                            styles.ctrlIcon,
+                            t.atoms.text,
+                            styles.bellIcon,
+                          ]}
+                        />
+                      )
+                    }}
+                  </NavItem>
+                </IntentionFilter>
               </>
             )}
           </>
@@ -266,7 +294,7 @@ const NavItem: React.FC<{
   routeName: string
   hasNew?: boolean
   notificationCount?: string
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  onClick?: (e: GestureResponderEvent) => void
 }> = ({children, href, routeName, hasNew, notificationCount, onClick}) => {
   const {_} = useLingui()
   const {currentAccount} = useSession()
@@ -283,6 +311,9 @@ const NavItem: React.FC<{
           currentAccount?.handle
       : isTab(currentRoute.name, routeName)
 
+  const extra: {onPress?: (e: GestureResponderEvent) => void} = {}
+  if (onClick) extra.onPress = onClick
+
   return (
     <Link
       href={href}
@@ -291,7 +322,7 @@ const NavItem: React.FC<{
       aria-role="link"
       aria-label={routeName}
       accessible={true}
-      onPress={onClick}>
+      {...extra}>
       {children({isActive})}
       {notificationCount ? (
         <View

@@ -60,12 +60,12 @@ type TabOptions =
 
 export function BottomBar({navigation}: BottomTabBarProps) {
   const {hasSession} = useSession()
+  const {isAtHome} = useNavigationTabState()
   const pal = usePalette('default')
   const {_} = useLingui()
   const safeAreaInsets = useSafeAreaInsets()
   const {footerHeight} = useShellLayout()
-  const {isAtHome, isAtSearch, isAtNotifications, isAtMessages} =
-    useNavigationTabState()
+  const {isAtSearch, isAtNotifications, isAtMessages} = useNavigationTabState()
   const numUnreadNotifications = useUnreadNotifications()
   const numUnreadMessages = useUnreadMessageCount()
   const footerMinimalShellTransform = useMinimalShellFooterTransform()
@@ -118,6 +118,14 @@ export function BottomBar({navigation}: BottomTabBarProps) {
   const onPressMessages = React.useCallback(() => {
     onPressTab('Messages')
   }, [onPressTab])
+
+  // Check if the current route is the Intent route
+  const isIntentScreen = isAtHome // Adjust this logic based on actual route checking
+
+  // Conditionally render the bottom bar
+  if (hasSession && isIntentScreen) {
+    return null
+  }
 
   return (
     <>

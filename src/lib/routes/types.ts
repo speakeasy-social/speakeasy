@@ -64,6 +64,8 @@ export type CommonNavigatorParams = {
   StarterPackWizard: undefined
   StarterPackEdit: {rkey?: string}
   VideoFeed: VideoFeedSourceContext
+  FeedTab: undefined
+  Intent: undefined
 }
 
 export type BottomTabNavigatorParams = CommonNavigatorParams & {
@@ -102,6 +104,7 @@ export type FlatNavigatorParams = CommonNavigatorParams & {
   Hashtag: {tag: string; author?: string}
   Topic: {topic: string}
   Messages: {pushToConversation?: string; animation?: 'push' | 'pop'}
+  Feed: undefined
 }
 
 export type AllNavigatorParams = CommonNavigatorParams & {
@@ -122,6 +125,8 @@ export type AllNavigatorParams = CommonNavigatorParams & {
   StarterPackShort: {code: string}
   StarterPackWizard: undefined
   StarterPackEdit: {rkey?: string}
+  FeedTab: undefined
+  Intent: undefined
 }
 
 // NOTE

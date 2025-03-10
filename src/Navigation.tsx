@@ -66,6 +66,7 @@ import {BottomBar} from '#/view/shell/bottom-bar/BottomBar'
 import {createNativeStackNavigatorWithAuth} from '#/view/shell/createNativeStackNavigatorWithAuth'
 import {SharedPreferencesTesterScreen} from '#/screens/E2E/SharedPreferencesTesterScreen'
 import HashtagScreen from '#/screens/Hashtag'
+import IntentScreen from '#/screens/IntentScreen'
 import {MessagesScreen} from '#/screens/Messages/ChatList'
 import {MessagesConversationScreen} from '#/screens/Messages/Conversation'
 import {MessagesSettingsScreen} from '#/screens/Messages/Settings'
@@ -431,6 +432,13 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
           requireAuth: true,
         }}
       />
+      <Stack.Screen
+        name="Intent"
+        component={IntentScreen}
+        options={{
+          title: i18n._(msg`Intent`),
+        }}
+      />
     </>
   )
 }
@@ -454,6 +462,7 @@ function TabsNavigator() {
       screenOptions={{headerShown: false, lazy: true}}
       tabBar={tabBar}>
       <Tab.Screen name="HomeTab" getComponent={() => HomeTabNavigator} />
+      <Tab.Screen name="FeedTab" getComponent={() => FeedTabNavigator} />
       <Tab.Screen name="SearchTab" getComponent={() => SearchTabNavigator} />
       <Tab.Screen
         name="NotificationsTab"
@@ -485,6 +494,23 @@ function HomeTabNavigator() {
       }}>
       <HomeTab.Screen name="Home" getComponent={() => HomeScreen} />
       <HomeTab.Screen name="Start" getComponent={() => HomeScreen} />
+      {commonScreens(HomeTab)}
+    </HomeTab.Navigator>
+  )
+}
+
+function FeedTabNavigator() {
+  const t = useTheme()
+  return (
+    <HomeTab.Navigator
+      screenOptions={{
+        animationDuration: 285,
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true,
+        headerShown: false,
+        contentStyle: t.atoms.bg,
+      }}>
+      <HomeTab.Screen name="Home" getComponent={() => HomeScreen} />
       {commonScreens(HomeTab)}
     </HomeTab.Navigator>
   )
@@ -599,6 +625,11 @@ const FlatNavigator = () => {
       }}>
       <Flat.Screen
         name="Home"
+        getComponent={() => HomeScreen}
+        options={{title: title(msg`Home`)}}
+      />
+      <Flat.Screen
+        name="Feed"
         getComponent={() => HomeScreen}
         options={{title: title(msg`Home`)}}
       />
