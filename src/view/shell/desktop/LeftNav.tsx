@@ -561,8 +561,13 @@ export function DesktopLeftNav() {
   const [selectedFeature, setSelectedFeature] = React.useState<
     'groups' | 'mutual-aid'
   >('groups')
+  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
 
-  if (!hasSession && !isDesktop) {
+  // Check if the current route is the home tab
+  const isIntentScreen = currentRouteInfo.name === 'Intent'
+
+  // Conditionally render the left nav
+  if (hasSession && isIntentScreen) {
     return null
   }
 

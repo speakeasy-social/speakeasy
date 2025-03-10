@@ -1,6 +1,5 @@
 import React from 'react'
 import {View} from 'react-native'
-import {GestureResponderEvent} from 'react-native'
 import Animated from 'react-native-reanimated'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
@@ -71,6 +70,16 @@ export function BottomBarWeb() {
     requestSwitchToAccount({requestedAccount: 'new'})
     // setShowLoggedOut(true)
   }, [requestSwitchToAccount, closeAllActiveElements])
+
+  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
+
+  // Check if the current route is the Intent route
+  const isIntentScreen = currentRouteInfo.name === 'Intent'
+
+  // Conditionally render the bottom bar
+  if (hasSession && isIntentScreen) {
+    return null
+  }
 
   return (
     <>
