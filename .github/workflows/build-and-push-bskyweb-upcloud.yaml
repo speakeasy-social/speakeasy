@@ -6,6 +6,7 @@ on:
     branches: 
       - main
       - feature/deploy-upcloud
+      - feature/deploy-upcloud2
 
 jobs:
   deploy:
