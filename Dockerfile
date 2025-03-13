@@ -77,7 +77,7 @@ COPY --from=build-env /bskyweb /usr/bin/bskyweb
 CMD ["/usr/bin/bskyweb"]
 
 LABEL org.opencontainers.image.source=https://github.com/speakeasy-social/speakeasy
-LABEL org.opencontainers.image.description="spkeasy Web App"
+LABEL org.opencontainers.image.description="Speakeasy Web App"
 LABEL org.opencontainers.image.licenses=MIT
 
 # NOOP
