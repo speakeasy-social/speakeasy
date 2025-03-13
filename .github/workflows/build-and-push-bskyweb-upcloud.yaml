@@ -3,7 +3,9 @@ name: build-and-push-bskyweb-upcloud
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: 
+      - main
+      - feature/deploy-upcloud
 
 jobs:
   deploy:
