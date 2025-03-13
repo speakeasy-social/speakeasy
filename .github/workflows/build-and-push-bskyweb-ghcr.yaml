@@ -2,8 +2,7 @@ name: build-and-push-bskyweb-ghcr
 on:
   push:
     branches:
-      - main
-      - jake/bskyweb-additions
+      - disabled
 env:
   REGISTRY: ghcr.io
   USERNAME: ${{ github.actor }}

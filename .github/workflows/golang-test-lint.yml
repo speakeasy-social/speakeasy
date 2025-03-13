@@ -1,10 +1,9 @@
 name: golang
 
 on:
-  pull_request:
   push:
     branches:
-      - main
+      - disabled
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
