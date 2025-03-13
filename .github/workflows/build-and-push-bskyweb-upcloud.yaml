@@ -38,9 +38,9 @@ jobs:
             EXPO_PUBLIC_BUNDLE_IDENTIFIER=${{ steps.vars.outputs.sha_short }}
           tags: speakeasy-client-image:latest
 
-      - name: Gzip Docker Image
-        run: |
-          gzip -c ${{ runner.temp }}/speakeasy-client.tar > ${{ runner.temp }}/speakeasy-client.tar.gz
+      # - name: Gzip Docker Image
+      #   run: |
+      #     gzip -c ${{ runner.temp }}/speakeasy-client.tar > ${{ runner.temp }}/speakeasy-client.tar.gz
 
       - name: Copy Docker Image to UpCloud Server
         uses: appleboy/scp-action@master
@@ -48,7 +48,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: ${{ runner.temp }}/speakeasy-client.tar.gz
+          source: ${{ runner.temp }}/speakeasy-client.tar
           target: /home/speakeasy
 
       - name: Deploy and Run Docker Image on UpCloud Server
@@ -60,5 +60,5 @@ jobs:
           script: |
             docker stop speakeasy-client || true
             docker rm speakeasy-client || true
-            gunzip -c /home/speakeasy/speakeasy-client.tar.gz | docker load
+            docker load --input /home/speakeasy/speakeasy-client.tar
             docker run -d -p 80:80 --name speakeasy-client speakeasy-client-image:latest
