@@ -38,6 +38,14 @@ jobs:
             EXPO_PUBLIC_BUNDLE_IDENTIFIER=${{ steps.vars.outputs.sha_short }}
           tags: speakeasy-client-image:latest
 
+      - name: Verify Docker Image Tar
+        run: |
+          ls -lh ${{ runner.temp }}
+          if [ ! -s ${{ runner.temp }}/speakeasy-client.tar ]; then
+            echo "Error: Docker image tar file is empty or does not exist."
+            exit 1
+          fi
+
       # - name: Gzip Docker Image
       #   run: |
       #     gzip -c ${{ runner.temp }}/speakeasy-client.tar > ${{ runner.temp }}/speakeasy-client.tar.gz
