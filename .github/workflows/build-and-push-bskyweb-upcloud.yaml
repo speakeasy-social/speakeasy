@@ -42,7 +42,7 @@ jobs:
           gzip -c ${{ github.workspace }}/speakeasy-client.tar > ${{ github.workspace }}/speakeasy-client.tar.gz
 
       - name: Upload Docker Image Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: speakeasy-client-tar-gz
           path: ${{ github.workspace }}/speakeasy-client.tar.gz
@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: speakeasy-client-tar-gz
           path: ${{ github.workspace }}
