@@ -80,4 +80,4 @@ jobs:
             docker rm speakeasy-client || true
             gunzip -f /home/speakeasy/github/workspace/speakeasy-client.tar.gz &&
             docker load --input /home/speakeasy/github/workspace/speakeasy-client.tar &&
-            docker run -d -p 80:8100 --name speakeasy-client speakeasy-client-image:latest /usr/bin/bskyweb serve
+            docker run -d -p 8100:8100 --name speakeasy-client speakeasy-client-image:latest /usr/bin/bskyweb serve
