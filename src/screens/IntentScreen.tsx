@@ -5,6 +5,7 @@ import {useIntention} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useComposerControls} from '#/state/shell/composer'
 import {PressableWithHover} from '#/view/com/util/PressableWithHover'
+import {Logo} from '#/view/icons/Logo'
 import {atoms as a, useTheme} from '#/alf'
 import {useDialogControl} from '#/components/Dialog'
 import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
@@ -98,6 +99,7 @@ const IntentScreen = () => {
 
   return (
     <View style={[a.px_xl, styles.container]} role="navigation">
+      <Logo full width={360} style={a.mb_xl} />
       <TitleText style={styles.title}>What do you want to do?</TitleText>
       <View style={styles.grid}>
         <ActionItem
