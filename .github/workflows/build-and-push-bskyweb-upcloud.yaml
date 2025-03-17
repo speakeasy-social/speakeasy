@@ -78,6 +78,6 @@ jobs:
           script: |
             docker stop speakeasy-client || true
             docker rm speakeasy-client || true
-            gunzip ${{ github.workspace }}/speakeasy-client.tar.gz &&
-            docker load --input ${{ github.workspace }}/speakeasy-client.tar &&
+            gunzip /home/speakeasy/speakeasy-client.tar.gz &&
+            docker load --input /home/speakeasy/speakeasy-client.tar &&
             docker run -d -p 80:80 --name speakeasy-client speakeasy-client-image:latest
