@@ -102,13 +102,13 @@ export function DesktopRightNav({routeName}: {routeName: string}) {
           </>
         )}
         <InlineLinkText
-          to="https://bsky.social/about/support/privacy-policy"
+          to="https://about.spkeasy.social/privacy"
           label={_(msg`Privacy`)}>
           {_(msg`Privacy`)}
         </InlineLinkText>
         {' • '}
         <InlineLinkText
-          to="https://bsky.social/about/support/tos"
+          to="https://about.spkeasy.social/terms"
           label={_(msg`Terms`)}>
           {_(msg`Terms`)}
         </InlineLinkText>

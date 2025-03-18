@@ -33,7 +33,7 @@ export function AboutSettingsScreen({}: Props) {
       <Layout.Content>
         <SettingsList.Container>
           <SettingsList.LinkItem
-            to="https://bsky.social/about/support/tos"
+            to="https://about.spkeasy.social/terms"
             label={_(msg`Terms of Service`)}>
             <SettingsList.ItemIcon icon={NewspaperIcon} />
             <SettingsList.ItemText>
@@ -41,7 +41,7 @@ export function AboutSettingsScreen({}: Props) {
             </SettingsList.ItemText>
           </SettingsList.LinkItem>
           <SettingsList.LinkItem
-            to="https://bsky.social/about/support/privacy-policy"
+            to="https://about.spkeasy.social/privacy"
             label={_(msg`Privacy Policy`)}>
             <SettingsList.ItemIcon icon={NewspaperIcon} />
             <SettingsList.ItemText>
@@ -50,7 +50,7 @@ export function AboutSettingsScreen({}: Props) {
           </SettingsList.LinkItem>
           <SettingsList.LinkItem
             to={STATUS_PAGE_URL}
-            label={_(msg`Status Page`)}>
+            label={_(msg`Bluesky Status`)}>
             <SettingsList.ItemIcon icon={GlobeIcon} />
             <SettingsList.ItemText>
               <Trans>Status Page</Trans>
