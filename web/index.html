@@ -74,13 +74,18 @@
       }
       #splash {
         position: fixed;
-        width: 100px;
+        width: 60%;
         left: 50%;
         top: 50%;
         transform: translateX(-50%) translateY(-50%) translateY(-50px);
       }
       #splash svg {
-         margin-left: -190px;
+        width: 100%;
+      }
+      @media (max-width: 767px) {
+        #splash {
+          max-width: 100%;
+        }
       }
       /* Set fill color for the logo path */
       .logo-text {
@@ -213,7 +218,7 @@
               id="feComposite460" />
            <feColorMatrix
               type="matrix"
-              values="0 0 0 0 0.55 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0"
+              values="0 0 0 0 0.55 0 0 0 0 0 0 0 0 1 0 0 0 1 0"
               id="feColorMatrix462" />
            <feBlend
               mode="normal"
