@@ -69,14 +69,19 @@
     }
     #splash {
       position: fixed;
-      width: 100px;
+      width: 60%;
       left: 50%;
       top: 50%;
       transform: translateX(-50%) translateY(-50%) translateY(-50px);
     }
     #splash svg {
-       margin-left: -190px;
-    }
+      width: 100%;
+   }
+   @media (max-width: 767px) {
+        #splash {
+          max-width: 100%;
+        }
+      }
     .logo-text {
       fill: #1C1755;
     }
