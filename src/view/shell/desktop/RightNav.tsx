@@ -4,7 +4,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigation} from '@react-navigation/core'
 
-import {FEEDBACK_FORM_URL, HELP_DESK_URL} from '#/lib/constants'
+import {FEEDBACK_FORM_URL} from '#/lib/constants'
 import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
 import {useKawaiiMode} from '#/state/preferences/kawaii'
 import {useSession} from '#/state/session'
@@ -113,9 +113,6 @@ export function DesktopRightNav({routeName}: {routeName: string}) {
           {_(msg`Terms`)}
         </InlineLinkText>
         {' • '}
-        <InlineLinkText label={_(msg`Help`)} to={HELP_DESK_URL}>
-          {_(msg`Help`)}
-        </InlineLinkText>
       </Text>
 
       {kawaii && (
