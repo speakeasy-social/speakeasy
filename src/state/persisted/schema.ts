@@ -175,7 +175,7 @@ export const defaults: Schema = {
   subtitlesEnabled: true,
   trendingDisabled: false,
   trendingVideoDisabled: false,
-  showInteractionNumbers: true,
+  showInteractionNumbers: false,
 }
 
 export function tryParse(rawData: string): Schema | undefined {
