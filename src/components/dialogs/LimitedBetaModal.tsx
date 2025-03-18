@@ -35,7 +35,7 @@ export function LimitedBetaModal({
   const {data: profile} = useProfileQuery({did: currentAccount?.did})
 
   const handleLearnMore = () => {
-    const baseUrl = 'https://bsky.local/blog/beta-features'
+    const baseUrl = 'https://about.spkeasy.social/feature'
     const params = new URLSearchParams({
       utm_source: utmParams?.source || 'app',
       utm_medium: utmParams?.medium || 'modal',

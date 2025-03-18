@@ -12,7 +12,7 @@ We need to start building alternative infrastructure that serves humanity outsid
 
 We’re starting with social media, because it’s now the core of our information infrastructure and shapes how we perceive the world.
 
-- **Get the app [spkeasy.social](https://spkeasy.social)**
+- **Go to the app [spkeasy.social](https://spkeasy.social)**
 
 # What could social media do if it served us?
 

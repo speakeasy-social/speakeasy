@@ -164,18 +164,8 @@ function Footer() {
       ]}>
       <InlineLinkText
         label={_(msg`Learn more about Bluesky`)}
-        to="https://bsky.social">
-        <Trans>Business</Trans>
-      </InlineLinkText>
-      <InlineLinkText
-        label={_(msg`Read the Bluesky blog`)}
-        to="https://bsky.social/about/blog">
-        <Trans>Blog</Trans>
-      </InlineLinkText>
-      <InlineLinkText
-        label={_(msg`See jobs at Bluesky`)}
-        to="https://bsky.social/about/join">
-        <Trans>Jobs</Trans>
+        to="https://about.spkeasy.social">
+        <Trans>About</Trans>
       </InlineLinkText>
 
       <View style={a.flex_1} />
