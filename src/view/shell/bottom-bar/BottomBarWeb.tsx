@@ -8,6 +8,7 @@ import {useNavigationState} from '@react-navigation/native'
 import {IntentionFilter} from '#/lib/hooks/useIntention'
 import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransform'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
+import {makeProfileLink} from '#/lib/routes/links'
 import {CommonNavigatorParams} from '#/lib/routes/types'
 import {useGate} from '#/lib/statsig/statsig'
 import {useHomeBadge} from '#/state/home-badge'
@@ -39,12 +40,17 @@ import {
   Message_Stroke2_Corner0_Rounded as Message,
   Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
 } from '#/components/icons/Message'
+import {SettingsGear2_Stroke2_Corner0_Rounded as Settings} from '#/components/icons/SettingsGear2'
+import {
+  // UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
+  UserCircle_Stroke2_Corner0_Rounded as UserCircle,
+} from '#/components/icons/UserCircle'
 import {Text} from '#/components/Typography'
 import {styles} from './BottomBarStyles'
 
 export function BottomBarWeb() {
   const {_} = useLingui()
-  const {hasSession} = useSession()
+  const {currentAccount, hasSession} = useSession()
   const t = useTheme()
   const footerMinimalShellTransform = useMinimalShellFooterTransform()
   const {requestSwitchToAccount} = useLoggedOutViewControls()
@@ -75,11 +81,6 @@ export function BottomBarWeb() {
 
   // Check if the current route is the Intent route
   const isIntentScreen = currentRouteInfo.name === 'Intent'
-
-  // Conditionally render the bottom bar
-  if (hasSession && isIntentScreen) {
-    return null
-  }
 
   return (
     <>
@@ -115,127 +116,164 @@ export function BottomBarWeb() {
           footerMinimalShellTransform,
         ]}>
         {hasSession ? (
-          <>
-            <NavItem
-              routeName="Intent"
-              href="/"
-              hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
-              {({isActive}) => {
-                const Icon = isActive ? HomeFilled : Home
-                return (
-                  <Icon
+          isIntentScreen ? (
+            <>
+              <NavItem
+                routeName="Profile"
+                href={
+                  currentAccount
+                    ? makeProfileLink({
+                        did: currentAccount.did,
+                        handle: currentAccount.handle,
+                      })
+                    : '/'
+                }>
+                {() => (
+                  <UserCircle
                     aria-hidden={true}
-                    width={iconWidth + 1}
-                    style={[styles.ctrlIcon, t.atoms.text, styles.homeIcon]}
+                    width={iconWidth}
+                    style={[styles.ctrlIcon, t.atoms.text, styles.profileIcon]}
                   />
-                )
-              }}
-            </NavItem>
-            <IntentionFilter routeName="Search">
-              <NavItem routeName="Search" href="/search">
+                )}
+              </NavItem>
+              <NavItem routeName="Notifications" href="/notifications">
+                {() => (
+                  <Bell
+                    aria-hidden={true}
+                    width={iconWidth}
+                    style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
+                  />
+                )}
+              </NavItem>
+              <NavItem routeName="Settings" href="/settings">
+                {() => (
+                  <Settings
+                    aria-hidden={true}
+                    width={iconWidth}
+                    style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
+                  />
+                )}
+              </NavItem>
+            </>
+          ) : (
+            <>
+              <NavItem
+                routeName="Intent"
+                href="/"
+                hasNew={hasHomeBadge && gate('remove_show_latest_button')}>
                 {({isActive}) => {
-                  const Icon = isActive
-                    ? MagnifyingGlassFilled
-                    : MagnifyingGlass
+                  const Icon = isActive ? HomeFilled : Home
                   return (
                     <Icon
                       aria-hidden={true}
-                      width={iconWidth + 2}
-                      style={[styles.ctrlIcon, t.atoms.text, styles.searchIcon]}
+                      width={iconWidth + 1}
+                      style={[styles.ctrlIcon, t.atoms.text, styles.homeIcon]}
                     />
                   )
                 }}
               </NavItem>
-            </IntentionFilter>
-            <IntentionFilter routeName="Groups">
-              <NavItem
-                routeName="Groups"
-                href="#"
-                onClick={e => {
-                  e.preventDefault()
-                  setSelectedFeature('groups')
-                  groupsDialogControl.open()
-                }}>
-                {() => (
-                  <Group
-                    aria-hidden={true}
-                    width={iconWidth}
-                    style={[styles.ctrlIcon, t.atoms.text]}
-                  />
-                )}
-              </NavItem>
-            </IntentionFilter>
-            <IntentionFilter routeName="MutualAid">
-              <NavItem
-                routeName="MutualAid"
-                href="#"
-                notificationCount="1"
-                onClick={e => {
-                  e.preventDefault()
-                  setSelectedFeature('mutual-aid')
-                  groupsDialogControl.open()
-                }}>
-                {() => (
-                  <Heart
-                    aria-hidden={true}
-                    width={iconWidth}
-                    style={[styles.ctrlIcon, t.atoms.text]}
-                  />
-                )}
-              </NavItem>
-            </IntentionFilter>
+              <IntentionFilter routeName="Search">
+                <NavItem routeName="Search" href="/search">
+                  {({isActive}) => {
+                    const Icon = isActive
+                      ? MagnifyingGlassFilled
+                      : MagnifyingGlass
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth + 2}
+                        style={[
+                          styles.ctrlIcon,
+                          t.atoms.text,
+                          styles.searchIcon,
+                        ]}
+                      />
+                    )
+                  }}
+                </NavItem>
+              </IntentionFilter>
+              <IntentionFilter routeName="Groups">
+                <NavItem
+                  routeName="Groups"
+                  href="#"
+                  onClick={e => {
+                    e.preventDefault()
+                    setSelectedFeature('groups')
+                    groupsDialogControl.open()
+                  }}>
+                  {() => (
+                    <Group
+                      aria-hidden={true}
+                      width={iconWidth}
+                      style={[styles.ctrlIcon, t.atoms.text]}
+                    />
+                  )}
+                </NavItem>
+              </IntentionFilter>
+              <IntentionFilter routeName="MutualAid">
+                <NavItem
+                  routeName="MutualAid"
+                  href="#"
+                  notificationCount="1"
+                  onClick={e => {
+                    e.preventDefault()
+                    setSelectedFeature('mutual-aid')
+                    groupsDialogControl.open()
+                  }}>
+                  {() => (
+                    <Heart
+                      aria-hidden={true}
+                      width={iconWidth}
+                      style={[styles.ctrlIcon, t.atoms.text]}
+                    />
+                  )}
+                </NavItem>
+              </IntentionFilter>
 
-            {hasSession && (
-              <>
-                <IntentionFilter routeName="Messages">
-                  <NavItem
-                    routeName="Messages"
-                    href="/messages"
-                    notificationCount={
-                      unreadMessageCount.count > 0
-                        ? unreadMessageCount.numUnread
-                        : undefined
-                    }>
-                    {({isActive}) => {
-                      const Icon = isActive ? MessageFilled : Message
-                      return (
-                        <Icon
-                          aria-hidden={true}
-                          width={iconWidth - 1}
-                          style={[
-                            styles.ctrlIcon,
-                            t.atoms.text,
-                            styles.messagesIcon,
-                          ]}
-                        />
-                      )
-                    }}
-                  </NavItem>
-                </IntentionFilter>
-                <IntentionFilter routeName="Notifications">
-                  <NavItem
-                    routeName="Notifications"
-                    href="/notifications"
-                    notificationCount={notificationCountStr}>
-                    {({isActive}) => {
-                      const Icon = isActive ? BellFilled : Bell
-                      return (
-                        <Icon
-                          aria-hidden={true}
-                          width={iconWidth}
-                          style={[
-                            styles.ctrlIcon,
-                            t.atoms.text,
-                            styles.bellIcon,
-                          ]}
-                        />
-                      )
-                    }}
-                  </NavItem>
-                </IntentionFilter>
-              </>
-            )}
-          </>
+              <IntentionFilter routeName="Messages">
+                <NavItem
+                  routeName="Messages"
+                  href="/messages"
+                  notificationCount={
+                    unreadMessageCount.count > 0
+                      ? unreadMessageCount.numUnread
+                      : undefined
+                  }>
+                  {({isActive}) => {
+                    const Icon = isActive ? MessageFilled : Message
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth - 1}
+                        style={[
+                          styles.ctrlIcon,
+                          t.atoms.text,
+                          styles.messagesIcon,
+                        ]}
+                      />
+                    )
+                  }}
+                </NavItem>
+              </IntentionFilter>
+              <IntentionFilter routeName="Notifications">
+                <NavItem
+                  routeName="Notifications"
+                  href="/notifications"
+                  notificationCount={notificationCountStr}>
+                  {({isActive}) => {
+                    const Icon = isActive ? BellFilled : Bell
+                    return (
+                      <Icon
+                        aria-hidden={true}
+                        width={iconWidth}
+                        style={[styles.ctrlIcon, t.atoms.text, styles.bellIcon]}
+                      />
+                    )
+                  }}
+                </NavItem>
+              </IntentionFilter>
+            </>
+          )
         ) : (
           <>
             <View
@@ -250,8 +288,7 @@ export function BottomBarWeb() {
                 paddingRight: 6,
                 gap: 8,
               }}>
-              <View
-                style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Logo width={32} />
                 <View style={{paddingTop: 4}}>
                   <Logotype width={80} fill={t.atoms.text.color} />

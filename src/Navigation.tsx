@@ -436,7 +436,7 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         name="Intent"
         component={IntentScreen}
         options={{
-          title: i18n._(msg`Intent`),
+          title: i18n._(msg`Speakeasy`),
         }}
       />
     </>
