@@ -72,7 +72,7 @@ export function GalleryItem({
         accessibilityHint="">
         <Image
           source={{uri: image.thumb}}
-          style={[a.flex_1]}
+          style={[a.flex_1, imageStyle]}
           accessible={true}
           accessibilityLabel={image.alt}
           accessibilityHint=""
