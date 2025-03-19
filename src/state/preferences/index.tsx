@@ -9,6 +9,7 @@ import {Provider as InAppBrowserProvider} from './in-app-browser'
 import {Provider as KawaiiProvider} from './kawaii'
 import {Provider as LanguagesProvider} from './languages'
 import {Provider as LargeAltBadgeProvider} from './large-alt-badge'
+import {Provider as LeaveOptionsProvider} from './leave-options'
 import {Provider as ShowInteractionNumbersProvider} from './show-interaction-numbers'
 import {Provider as SubtitlesProvider} from './subtitles'
 import {Provider as TrendingSettingsProvider} from './trending'
@@ -27,6 +28,7 @@ export {
 export * from './hidden-posts'
 export {useLabelDefinitions} from './label-defs'
 export {useLanguagePrefs, useLanguagePrefsApi} from './languages'
+export {useLeaveOptions, useSetLeaveOptions} from './leave-options'
 export {
   useSetShowInteractionNumbers,
   useShowInteractionNumbers,
@@ -48,7 +50,9 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
                         <TrendingSettingsProvider>
                           <KawaiiProvider>
                             <ShowInteractionNumbersProvider>
-                              {children}
+                              <LeaveOptionsProvider>
+                                {children}
+                              </LeaveOptionsProvider>
                             </ShowInteractionNumbersProvider>
                           </KawaiiProvider>
                         </TrendingSettingsProvider>
