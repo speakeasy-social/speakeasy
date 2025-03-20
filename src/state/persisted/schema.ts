@@ -128,6 +128,14 @@ const schema = z.object({
   trendingDisabled: z.boolean().optional(),
   trendingVideoDisabled: z.boolean().optional(),
   showInteractionNumbers: z.boolean().optional(),
+  leaveOptions: z
+    .array(
+      z.object({
+        title: z.string(),
+        link: z.string(),
+      }),
+    )
+    .optional(),
 })
 export type Schema = z.infer<typeof schema>
 
@@ -176,6 +184,15 @@ export const defaults: Schema = {
   trendingDisabled: false,
   trendingVideoDisabled: false,
   showInteractionNumbers: false,
+  leaveOptions: [
+    {title: 'Read a Book', link: 'https://bookshop.org/'},
+    {
+      title: 'Message a Friend',
+      link: 'https://web.whatsapp.com/send?text=Hey!%20What%27s%20up%3F',
+    },
+    {title: 'Take Some Breaths', link: 'https://insighttimer.com/'},
+    {title: 'Take a Walk', link: 'close'},
+  ],
 }
 
 export function tryParse(rawData: string): Schema | undefined {

@@ -54,6 +54,7 @@ import {TrendingVideos as TrendingVideosInterstitial} from '#/components/interst
 import {DiscoverFallbackHeader} from './DiscoverFallbackHeader'
 import {FeedShutdownMsg} from './FeedShutdownMsg'
 import {MediaGrid} from './MediaGrid'
+import {PauseFeed} from './PauseFeed'
 import {PostFeedErrorMessage} from './PostFeedErrorMessage'
 import {PostFeedItem} from './PostFeedItem'
 import {ViewFullThread} from './ViewFullThread'
@@ -127,6 +128,11 @@ type FeedRow =
       key: string
       items: FeedPostSliceItem[]
     }
+  | {
+      type: 'pauseFeed'
+      key: string
+      sectionIndex: number
+    }
 
 export function getItemsForFeedback(feedRow: FeedRow):
   | {
@@ -147,6 +153,9 @@ export function getItemsForFeedback(feedRow: FeedRow):
     return []
   }
 }
+
+// Add a pause reminder every n posts
+const PAUSE_AFTER_VIEWING = 100
 
 // DISABLED need to check if this is causing random feed refreshes -prf
 // const REFRESH_AFTER = STALE.HOURS.ONE
@@ -208,9 +217,13 @@ let PostFeed = ({
   const [isPTRing, setIsPTRing] = React.useState(false)
   const checkForNewRef = React.useRef<(() => void) | null>(null)
   const lastFetchRef = React.useRef<number>(Date.now())
+  const [feedStartTime] = React.useState(() => Date.now())
   const [feedType, feedUri, feedTab] = feed.split('|')
   const {gtMobile, gtTablet} = useBreakpoints()
   const areVideoFeedsEnabled = isNative
+  // Track which end-of-feed markers have been clicked
+  const [pauseSectionCount, setPauseSectionCount] = React.useState(1)
+  const [pauseSectionsRendered, setPauseSectionsRendered] = React.useState(0)
 
   const feedCacheKey = feedParams?.feedCacheKey
   const opts = React.useMemo(
@@ -317,7 +330,14 @@ let PostFeed = ({
 
   const {trendingDisabled, trendingVideoDisabled} = useTrendingSettings()
 
+  // Function to handle expanding a section
+  const handleExpandSection = React.useCallback(() => {
+    setPauseSectionCount(pauseSectionCount + 1)
+  }, [pauseSectionCount])
+
   const feedItems: FeedRow[] = React.useMemo(() => {
+    let pauseSections = 0
+
     let feedKind: 'following' | 'discover' | 'profile' | 'thevids' | undefined
     if (feedType === 'following') {
       feedKind = 'following'
@@ -462,6 +482,31 @@ let PostFeed = ({
                   }
                 }
 
+                // Add end of feed marker every PAUSE_AFTER_VIEWING posts
+                if (
+                  sliceIndex > 0 &&
+                  (sliceIndex + 1) % PAUSE_AFTER_VIEWING === 0
+                ) {
+                  arr.push({
+                    type: 'pauseFeed',
+                    key: 'pauseFeed-' + sliceIndex,
+                    sectionIndex: pauseSections,
+                  })
+
+                  pauseSections += 1
+
+                  console.log(
+                    'injecting pause feed',
+                    pauseSections,
+                    pauseSectionCount,
+                  )
+
+                  if (pauseSections >= pauseSectionCount) {
+                    setPauseSectionsRendered(pauseSections)
+                    return arr
+                  }
+                }
+
                 if (slice.isFallbackMarker) {
                   arr.push({
                     type: 'fallbackMarker',
@@ -538,6 +583,8 @@ let PostFeed = ({
       }
     }
 
+    setPauseSectionsRendered(pauseSections)
+
     return arr
   }, [
     isFetched,
@@ -557,6 +604,7 @@ let PostFeed = ({
     isVideoFeed,
     areVideoFeedsEnabled,
     mediaGrid,
+    pauseSectionCount,
   ])
 
   // events
@@ -579,7 +627,14 @@ let PostFeed = ({
   }, [refetch, setIsPTRing, onHasNew, feed, feedType])
 
   const onEndReached = React.useCallback(async () => {
-    if (isFetching || !hasNextPage || isError) return
+    console.log('onEndReached', pauseSectionsRendered, pauseSectionCount)
+    if (
+      isFetching ||
+      !hasNextPage ||
+      isError ||
+      pauseSectionsRendered === pauseSectionCount
+    )
+      return
 
     logEvent('feed:endReached', {
       feedType: feedType,
@@ -599,6 +654,8 @@ let PostFeed = ({
     feed,
     feedType,
     feedItems.length,
+    pauseSectionsRendered,
+    pauseSectionCount,
   ])
 
   const onPressTryAgain = React.useCallback(() => {
@@ -637,6 +694,17 @@ let PostFeed = ({
         )
       } else if (row.type === 'loading') {
         return <PostFeedLoadingPlaceholder />
+      } else if (row.type === 'pauseFeed') {
+        console.log('rendering pause feed', row.sectionIndex, pauseSectionCount)
+        return (
+          <PauseFeed
+            onKeepScrolling={() => handleExpandSection()}
+            isCompact={row.sectionIndex < pauseSectionCount - 1}
+            sectionIndex={row.sectionIndex}
+            postsViewed={rowIndex}
+            feedStartTime={feedStartTime}
+          />
+        )
       } else if (row.type === 'feedShutdownMsg') {
         return <FeedShutdownMsg feedUri={feedUri} />
       } else if (row.type === 'interstitialFollows') {
@@ -715,6 +783,9 @@ let PostFeed = ({
       onPressRetryLoadMore,
       feedUri,
       feedCacheKey,
+      pauseSectionCount,
+      handleExpandSection,
+      feedStartTime,
     ],
   )
 
