@@ -1055,8 +1055,8 @@ msgstr "Bluesky 是一個開放的網路，您可以自行挑選託管服務提�
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Bluesky 因朋友而更好！"
+msgid "Speakeasy is better with friends!"
+msgstr "Speakeasy 因朋友而更好！"
 
 #: src/components/StarterPack/ProfileStarterPacks.tsx:300
 msgid "Bluesky will choose a set of recommended accounts from people in your network."

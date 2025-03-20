@@ -1301,7 +1301,7 @@ msgstr ""
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
+msgid "Speakeasy is better with friends!"
 msgstr ""
 
 #: src/view/com/auth/onboarding/WelcomeDesktop.tsx:80

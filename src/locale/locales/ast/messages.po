@@ -1138,8 +1138,8 @@ msgstr "Bluesky ye una rede abierta onde pues escoyer l'agospiador. Si yes desen
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "¡Bluesky ye meyor con compaña!"
+msgid "Speakeasy is better with friends!"
+msgstr "¡Speakeasy ye meyor con compaña!"
 
 #: src/components/StarterPack/ProfileStarterPacks.tsx:300
 msgid "Bluesky will choose a set of recommended accounts from people in your network."

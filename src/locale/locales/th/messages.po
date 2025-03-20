@@ -1296,8 +1296,8 @@ msgstr "Bluesky เป็นเครือข่ายเปิดที่ค�
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Bluesky สนุกยิ่งขึ้นเมื่อมีเพื่อน!"
+msgid "Speakeasy is better with friends!"
+msgstr "Speakeasy สนุกยิ่งขึ้นเมื่อมีเพื่อน!"
 
 #: src/view/com/auth/onboarding/WelcomeDesktop.tsx:80
 #: src/view/com/auth/onboarding/WelcomeMobile.tsx:82

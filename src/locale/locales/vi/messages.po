@@ -1097,8 +1097,8 @@ msgstr "Bluesky là mạng mở nơi bạn có thể chọn nhà cung cấp dị
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Bluesky cùng bạn bè sẽ vui hơn!"
+msgid "Speakeasy is better with friends!"
+msgstr "Speakeasy cùng bạn bè sẽ vui hơn!"
 
 #: src/components/StarterPack/ProfileStarterPacks.tsx:300
 msgid "Bluesky will choose a set of recommended accounts from people in your network."

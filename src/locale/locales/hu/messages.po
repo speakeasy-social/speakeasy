@@ -1116,8 +1116,8 @@ msgstr "A Bluesky egy nyílt hálózat, ahol saját szolgáltatót választhatsz
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "A Bluesky ismerősökkel még jobb!"
+msgid "Speakeasy is better with friends!"
+msgstr "A Speakeasy ismerősökkel még jobb!"
 
 #: src/components/StarterPack/ProfileStarterPacks.tsx:300
 msgid "Bluesky will choose a set of recommended accounts from people in your network."
