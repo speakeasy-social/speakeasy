@@ -1358,8 +1358,8 @@ msgstr "Bluesky, barındırma sağlayıcınızı seçebileceğiniz açık bir a�
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Bluesky arkadaşlarla daha güzel!"
+msgid "Speakeasy is better with friends!"
+msgstr "Speakeasy arkadaşlarla daha güzel!"
 
 #: src/view/com/auth/onboarding/WelcomeDesktop.tsx:80
 #: src/view/com/auth/onboarding/WelcomeMobile.tsx:82

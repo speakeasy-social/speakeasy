@@ -1190,8 +1190,8 @@ msgstr ""
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Mit Freunden ist Bluesky besser!"
+msgid "Speakeasy is better with friends!"
+msgstr "Mit Freunden ist Speakeasy besser!"
 
 #: src/components/dialogs/nuxs/TenMillion/index.tsx:206
 #~ msgid "Bluesky now has over 10 million users, and I was #{0}!"

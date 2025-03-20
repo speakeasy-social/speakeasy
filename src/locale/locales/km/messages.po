@@ -1138,8 +1138,8 @@ msgstr "Bluesky គឺជាបណ្តាញបើកចំហដែលអ្�
 
 #: src/components/ProgressGuide/List.tsx:53
 #: src/components/ProgressGuide/List.tsx:70
-msgid "Bluesky is better with friends!"
-msgstr "Bluesky គឺល្អជាមួយមិត្តភក្តិ!"
+msgid "Speakeasy is better with friends!"
+msgstr "Speakeasy គឺល្អជាមួយមិត្តភក្តិ!"
 
 #: src/components/StarterPack/ProfileStarterPacks.tsx:300
 msgid "Bluesky will choose a set of recommended accounts from people in your network."
