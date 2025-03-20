@@ -8401,7 +8401,7 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr ""
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
 msgstr ""
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29

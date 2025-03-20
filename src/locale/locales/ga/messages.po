@@ -8400,8 +8400,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "Sheolamar ríomhphost dearbhaithe eile chuig <0>{0}</0>."
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "Tá súil againn go mbeidh an-chraic agat anseo. Ná déan dearmad go bhfuil Bluesky:"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "Tá súil againn go mbeidh an-chraic agat anseo. Ná déan dearmad go bhfuil Speakeasy:"
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."

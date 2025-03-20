@@ -7722,8 +7722,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "<0>{0}</0>(으)로 또 다른 인증 이메일을 보냈습니다."
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "즐거운 시간 되시기 바랍니다. Bluesky의 다음 특징을 기억하세요."
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "즐거운 시간 되시기 바랍니다. Speakeasy의 다음 특징을 기억하세요."
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."

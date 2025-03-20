@@ -7722,8 +7722,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "別の確認コードを<0>{0}</0>へ送りました。"
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "素敵なひとときをお過ごしください。覚えておいてください、Blueskyは："
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "素敵なひとときをお過ごしください。覚えておいてください、Speakeasyは："
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."

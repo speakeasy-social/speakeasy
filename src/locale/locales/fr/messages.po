@@ -7722,8 +7722,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "Nous avons envoyé un autre e-mail de vérification à <0>{0}</0>."
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "Nous espérons que vous passerez un excellent moment. N’oubliez pas que Bluesky est :"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "Nous espérons que vous passerez un excellent moment. N’oubliez pas que Speakeasy est :"
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."

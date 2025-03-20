@@ -8405,8 +8405,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "Am trimis un alt e-mail de verificare către <0>{0}</0>."
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "Sperăm să ai un timp minunat. Amintește-ți, Bluesky este:"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "Sperăm să ai un timp minunat. Amintește-ți, Speakeasy este:"
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."

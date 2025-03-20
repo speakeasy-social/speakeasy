@@ -8852,7 +8852,7 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "हामीले अर्को प्रमाणीकरण इमेल <0>{0}</0> मा पठाएका छौं।"
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
 msgstr "हामी आशा गर्छौं कि तपाईंलाई रमाइलो समय बिताउन मिलोस्। सम्झनुहोस्, ब्लूस्काई छ:"
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
