@@ -9442,8 +9442,8 @@ msgid "We have sent another verification email to <0>{0}</0>."
 msgstr "เราได้ส่งอีเมลยืนยันอีกฉบับไปยัง <0>{0}</0>."
 
 #: src/screens/Onboarding/StepFinished.tsx:238
-msgid "We hope you have a wonderful time. Remember, Bluesky is:"
-msgstr "เราหวังว่าคุณจะมีช่วงเวลาที่ดีเยี่ยม จำไว้ว่า Bluesky คือ:"
+msgid "We hope you have a wonderful time. Remember, Speakeasy is:"
+msgstr "เราหวังว่าคุณจะมีช่วงเวลาที่ดีเยี่ยม จำไว้ว่า Speakeasy คือ:"
 
 #: src/view/com/posts/DiscoverFallbackHeader.tsx:29
 msgid "We ran out of posts from your follows. Here's the latest from <0/>."
