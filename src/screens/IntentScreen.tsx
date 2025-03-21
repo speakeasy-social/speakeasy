@@ -3,7 +3,9 @@ import {ScrollView, StyleSheet, Text, View} from 'react-native'
 
 import {useIntention} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
+import {useSession} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
+import {useLoggedOutViewControls} from '#/state/shell/logged-out'
 import {PressableWithHover} from '#/view/com/util/PressableWithHover'
 import {Logo} from '#/view/icons/Logo'
 import {atoms as a, useTheme} from '#/alf'
@@ -97,6 +99,9 @@ const IntentScreen = () => {
     navigate(feature)
   }
 
+  const {hasSession} = useSession()
+  const {setShowLoggedOut} = useLoggedOutViewControls()
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={[a.px_xl, styles.container]} role="navigation">
@@ -133,7 +138,13 @@ const IntentScreen = () => {
           <ActionItem
             icon={<EditBig width={NAV_ICON_WIDTH} aria-hidden={true} />}
             label="Post"
-            onPress={() => openComposer('default')}
+            onPress={() => {
+              if (hasSession) {
+                openComposer('default')
+              } else {
+                setShowLoggedOut(true)
+              }
+            }}
           />
           <ActionItem
             icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
