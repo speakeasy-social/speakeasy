@@ -76,7 +76,7 @@ import {
   UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
   UserCircle_Stroke2_Corner0_Rounded as UserCircle,
 } from '#/components/icons/UserCircle'
-import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
+//import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 import * as Menu from '#/components/Menu'
 import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
@@ -747,7 +747,7 @@ export function DesktopLeftNav() {
                 }}
               />
             </IntentionFilter>
-            <IntentionFilter routeName="VideoFeed">
+            {/* <IntentionFilter routeName="VideoFeed">
               <NavItem
                 href="/reels"
                 count="1"
@@ -771,7 +771,7 @@ export function DesktopLeftNav() {
                   groupsDialogControl.open()
                 }}
               />
-            </IntentionFilter>
+            </IntentionFilter> */}
             <IntentionFilter routeName="Lists">
               <NavItem
                 href="/lists"
