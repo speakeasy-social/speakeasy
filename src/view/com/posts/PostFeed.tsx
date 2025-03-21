@@ -155,7 +155,7 @@ export function getItemsForFeedback(feedRow: FeedRow):
 }
 
 // Add a pause reminder every n posts
-const PAUSE_AFTER_VIEWING = 100
+const PAUSE_AFTER_VIEWING = 50
 
 // DISABLED need to check if this is causing random feed refreshes -prf
 // const REFRESH_AFTER = STALE.HOURS.ONE
