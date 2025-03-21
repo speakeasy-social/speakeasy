@@ -32,10 +32,10 @@ Speakeasy is an open source, proof of concept client for Bluesky's open source A
 
 ## What can you do?
 
-* Use the app
-* Help us build the app and the infrastructure
-* Help us raise funds
-* Help us find more people who can do any of these things
+* Use the app ([Login!](https://spkeasy.social))
+* Help us build the app and the infrastructure ([Join us on Discord](https://discord.gg/2nwj58Mf3z))
+* Help us raise funds ([Donate](https://about.spkeasy.social/donate), [Transparency](https://opencollective.com/speakeasy-social))
+* Help us find more people who can do any of these things!
 
 ## Quick Start
 
