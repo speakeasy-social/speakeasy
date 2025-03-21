@@ -25,8 +25,8 @@ export const Policies = ({
     return <View />
   }
 
-  const tos = validWebLink(serviceDescription.links?.termsOfService)
-  const pp = validWebLink(serviceDescription.links?.privacyPolicy)
+  const tos = validWebLink('https://about.spkeasy.social/terms')
+  const pp = validWebLink('https://about.spkeasy.social/privacy')
 
   if (!tos && !pp) {
     return (
