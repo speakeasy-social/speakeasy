@@ -3,6 +3,7 @@ import {ScrollView, StyleSheet, Text, View} from 'react-native'
 
 import {useIntention} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
+import {useUnreadMessageCount} from '#/state/queries/messages/list-conversations'
 import {useSession} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
 import {useLoggedOutViewControls} from '#/state/shell/logged-out'
@@ -31,10 +32,12 @@ const ActionItem = ({
   icon,
   label,
   onPress,
+  notificationCount,
 }: {
   icon: React.ReactNode
   label: string
   onPress: () => void
+  notificationCount?: string
 }) => {
   const theme = useTheme()
   const pal = usePalette('default')
@@ -63,10 +66,38 @@ const ActionItem = ({
           {
             width: NAV_ICON_WIDTH,
             height: NAV_ICON_WIDTH,
+            position: 'relative',
           },
         ]}>
         {icon}
       </View>
+      {notificationCount && (
+        <View
+          style={[
+            {
+              position: 'absolute',
+              right: 24,
+              top: 10,
+              backgroundColor: '#0085FF', // colors.blue3
+              paddingHorizontal: 4,
+              paddingBottom: 1,
+              borderRadius: 6,
+              zIndex: 20,
+            },
+          ]}>
+          <Text
+            style={[
+              {
+                fontSize: 12,
+                fontWeight: '600',
+                color: '#fff',
+                fontVariant: ['tabular-nums'],
+              },
+            ]}>
+            {notificationCount}
+          </Text>
+        </View>
+      )}
       <Text
         style={[
           a.text_xl,
@@ -87,6 +118,7 @@ const IntentScreen = () => {
     'groups' | 'mutual-aid'
   >('groups')
   const {setIntention} = useIntention()
+  const numUnreadMessages = useUnreadMessageCount()
 
   // const handleFeatureSelect = (feature: 'groups' | 'mutual-aid') => {
   //   setSelectedFeature(feature)
@@ -150,6 +182,7 @@ const IntentScreen = () => {
             icon={<Message width={NAV_ICON_WIDTH} aria-hidden={true} />}
             label="Chat"
             onPress={() => onIntentionPress('Messages')}
+            notificationCount={numUnreadMessages.numUnread}
           />
           {/* <ActionItem
             icon={<Heart width={NAV_ICON_WIDTH} aria-hidden={true} />}
