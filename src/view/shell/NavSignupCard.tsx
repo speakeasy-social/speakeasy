@@ -14,7 +14,7 @@ import {Text} from '#/components/Typography'
 
 let NavSignupCard = ({}: {}): React.ReactNode => {
   const {_} = useLingui()
-  const {requestSwitchToAccount} = useLoggedOutViewControls()
+  const {requestSwitchToAccount, setShowLoggedOut} = useLoggedOutViewControls()
   const closeAllActiveElements = useCloseAllActiveElements()
 
   const showSignIn = React.useCallback(() => {
@@ -22,11 +22,11 @@ let NavSignupCard = ({}: {}): React.ReactNode => {
     requestSwitchToAccount({requestedAccount: 'none'})
   }, [requestSwitchToAccount, closeAllActiveElements])
 
-  const showCreateAccount = React.useCallback(() => {
-    closeAllActiveElements()
-    requestSwitchToAccount({requestedAccount: 'new'})
-    // setShowLoggedOut(true)
-  }, [requestSwitchToAccount, closeAllActiveElements])
+  // const showCreateAccount = React.useCallback(() => {
+  //   closeAllActiveElements()
+  //   requestSwitchToAccount({requestedAccount: 'new'})
+  //   // setShowLoggedOut(true)
+  // }, [requestSwitchToAccount, closeAllActiveElements])
 
   return (
     <View style={[{maxWidth: 200}]}>
@@ -43,7 +43,7 @@ let NavSignupCard = ({}: {}): React.ReactNode => {
 
       <View style={[a.flex_row, a.flex_wrap, a.gap_sm, a.pt_md]}>
         <Button
-          onPress={showCreateAccount}
+          onPress={() => setShowLoggedOut(true)}
           label={_(msg`Create account`)}
           size="small"
           variant="solid"

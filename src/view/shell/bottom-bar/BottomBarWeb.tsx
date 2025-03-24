@@ -54,7 +54,7 @@ export function BottomBarWeb() {
   const {currentAccount, hasSession} = useSession()
   const t = useTheme()
   const footerMinimalShellTransform = useMinimalShellFooterTransform()
-  const {requestSwitchToAccount} = useLoggedOutViewControls()
+  const {requestSwitchToAccount, setShowLoggedOut} = useLoggedOutViewControls()
   const closeAllActiveElements = useCloseAllActiveElements()
   const iconWidth = 26
 
@@ -72,11 +72,11 @@ export function BottomBarWeb() {
     requestSwitchToAccount({requestedAccount: 'none'})
   }, [requestSwitchToAccount, closeAllActiveElements])
 
-  const showCreateAccount = React.useCallback(() => {
-    closeAllActiveElements()
-    requestSwitchToAccount({requestedAccount: 'new'})
-    // setShowLoggedOut(true)
-  }, [requestSwitchToAccount, closeAllActiveElements])
+  // const showCreateAccount = React.useCallback(() => {
+  //   closeAllActiveElements()
+  //   requestSwitchToAccount({requestedAccount: 'new'})
+  //   // setShowLoggedOut(true)
+  // }, [requestSwitchToAccount, closeAllActiveElements])
 
   const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
 
@@ -321,7 +321,7 @@ export function BottomBarWeb() {
 
               <View style={[a.flex_row, a.flex_wrap, a.gap_sm]}>
                 <Button
-                  onPress={showCreateAccount}
+                  onPress={() => setShowLoggedOut(true)}
                   label={_(msg`Create account`)}
                   size="small"
                   variant="solid"

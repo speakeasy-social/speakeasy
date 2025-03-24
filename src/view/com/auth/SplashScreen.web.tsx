@@ -23,8 +23,8 @@ import {CenteredView} from '../util/Views'
 export const SplashScreen = ({
   onDismiss,
   onPressSignin,
-  onPressCreateAccount,
-}: {
+}: // onPressCreateAccount,
+{
   onDismiss?: () => void
   onPressSignin: () => void
   onPressCreateAccount: () => void
@@ -96,39 +96,77 @@ export const SplashScreen = ({
 
               <Text
                 style={[a.text_md, a.font_bold, t.atoms.text_contrast_medium]}>
-                <Trans>What's up?</Trans>
+                <Trans>By us, for us</Trans>
               </Text>
+
+              <View
+                style={[
+                  a.mt_2xl,
+                  a.self_center,
+                  {
+                    width: '80%',
+                    maxWidth: 500,
+                    minWidth: 280,
+                  },
+                ]}>
+                <View
+                  style={[
+                    a.px_md,
+                    a.py_sm,
+                    a.rounded_sm,
+                    a.border,
+                    t.atoms.bg_contrast_25,
+                    t.atoms.border_contrast_low,
+                    a.align_center,
+                  ]}>
+                  <View style={[a.gap_sm]}>
+                    <Text
+                      style={[a.leading_normal, t.atoms.text_contrast_medium]}>
+                      <Trans>Welcome to the Beta Release!</Trans>
+                    </Text>
+                    <Text
+                      style={[a.leading_normal, t.atoms.text_contrast_medium]}>
+                      <Trans>
+                        We plan to add signup support soon, but for now, you can
+                        sign in with your Bluesky account.
+                      </Trans>
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
             <View
               testID="signinOrCreateAccount"
               style={[a.w_full, a.px_xl, a.gap_md, a.pb_2xl, {maxWidth: 320}]}>
               <Button
-                testID="createAccountButton"
-                onPress={onPressCreateAccount}
-                label={_(msg`Create new account`)}
-                accessibilityHint={_(
-                  msg`Opens flow to create a new Bluesky account`,
-                )}
-                size="large"
-                variant="solid"
-                color="primary">
-                <ButtonText>
-                  <Trans>Create account</Trans>
-                </ButtonText>
-              </Button>
-              <Button
                 testID="signInButton"
                 onPress={onPressSignin}
-                label={_(msg`Sign in`)}
+                label={_(msg`Sign in to Speakeasy`)}
                 accessibilityHint={_(
                   msg`Opens flow to sign into your existing Bluesky account`,
                 )}
                 size="large"
                 variant="solid"
-                color="secondary">
+                color="primary">
                 <ButtonText>
-                  <Trans>Sign in</Trans>
+                  <Trans>Sign in to Speakeasy</Trans>
+                </ButtonText>
+              </Button>
+              <Button
+                testID="createAccountButton"
+                onPress={() =>
+                  (window.location.href = 'https://bsky.app/settings')
+                }
+                label={_(msg`Create Bluesky account`)}
+                accessibilityHint={_(
+                  msg`Opens flow to create a new Bluesky account`,
+                )}
+                size="large"
+                variant="solid"
+                color="bluesky">
+                <ButtonText>
+                  <Trans>Create a Bluesky account</Trans>
                 </ButtonText>
               </Button>
             </View>
