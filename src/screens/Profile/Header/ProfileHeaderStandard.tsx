@@ -21,6 +21,7 @@ import {
 } from '#/state/queries/profile'
 import {useRequireAuth, useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
+import {TrustButton} from '#/view/com/profile/TrustButton'
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
@@ -235,6 +236,7 @@ let ProfileHeaderStandard = ({
                   )}
                 </ButtonText>
               </Button>
+              <TrustButton profile={profile} />
             </>
           ) : null}
           <ProfileMenu profile={profile} />
