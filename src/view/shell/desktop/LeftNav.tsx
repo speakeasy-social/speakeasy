@@ -507,21 +507,23 @@ function ComposeBtn() {
     return null
   }
   return (
-    <View style={[a.flex_row, a.pl_md, a.pt_xl]}>
-      <Button
-        disabled={isFetchingHandle}
-        label={_(msg`Compose new post`)}
-        onPress={onPressCompose}
-        size="large"
-        variant="solid"
-        color="primary"
-        style={[a.rounded_full]}>
-        <ButtonIcon icon={EditBig} position="left" />
-        <ButtonText>
-          <Trans context="action">New Post</Trans>
-        </ButtonText>
-      </Button>
-    </View>
+    <IntentionFilter routeName="Compose">
+      <View style={[a.flex_row, a.pl_md, a.pt_xl]}>
+        <Button
+          disabled={isFetchingHandle}
+          label={_(msg`Compose new post`)}
+          onPress={onPressCompose}
+          size="large"
+          variant="solid"
+          color="primary"
+          style={[a.rounded_full]}>
+          <ButtonIcon icon={EditBig} position="left" />
+          <ButtonText>
+            <Trans context="action">New Post</Trans>
+          </ButtonText>
+        </Button>
+      </View>
+    </IntentionFilter>
   )
 }
 
@@ -561,15 +563,6 @@ export function DesktopLeftNav() {
   const [selectedFeature, setSelectedFeature] = React.useState<
     'groups' | 'mutual-aid'
   >('groups')
-  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
-
-  // Check if the current route is the home tab
-  const isIntentScreen = currentRouteInfo.name === 'Intent'
-
-  // Conditionally render the left nav
-  if (hasSession && isIntentScreen) {
-    return null
-  }
 
   return (
     <>
