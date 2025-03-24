@@ -1,4 +1,7 @@
 import React, {createContext, ReactNode, useContext, useState} from 'react'
+import {useNavigationState} from '@react-navigation/native'
+
+import {getCurrentRoute} from '#/lib/routes/helpers'
 
 // Define the shape of the context state
 interface IntentionContextType {
@@ -11,14 +14,16 @@ interface IntentionFeatures {
 }
 
 const intentionFeatures: IntentionFeatures = {
-  Feed: ['Feed', 'VideoFeed', 'Lists'],
+  Feed: ['Feed', 'VideoFeed', 'Lists', 'Compose'],
   VideoFeed: ['VideoFeed'],
   Search: ['Search'],
   Groups: ['Groups', 'Mutual Aid'],
   Notifications: ['Notifications'],
   Messages: ['Messages'],
-  Profile: ['Profiile'],
+  Profile: ['Profile'],
   'Mutual Aid': ['Mutual Aid'],
+  Settings: ['Settings'],
+  Intent: ['Notifications', 'Settings', 'Profile', 'Compose'],
 }
 
 // Create the context with default values
@@ -52,19 +57,33 @@ export const useIntention = (): IntentionContextType => {
 interface IntentionFilterProps {
   children: ReactNode
   routeName: string
+  hideOnEverything?: boolean
 }
 
 export const IntentionFilter: React.FC<IntentionFilterProps> = ({
   children,
   routeName,
+  hideOnEverything,
 }) => {
+  const currentRouteInfo = useNavigationState(state => {
+    if (!state) {
+      return {name: 'Intent'}
+    }
+    return getCurrentRoute(state)
+  })
+
+  const isIntentScreen = currentRouteInfo.name === 'Intent'
+
   const {intention} = useIntention()
 
-  const showRoute =
-    intention === 'Everything' ||
-    intentionFeatures[intention]?.includes(routeName)
+  if (intention === 'Everything' && hideOnEverything) {
+    return null
+  }
 
-  console.log('showRoute', showRoute, intention, routeName)
+  let selectedView = isIntentScreen ? 'Intent' : intention
+  const showRoute =
+    (intention === 'Everything' && !isIntentScreen) ||
+    intentionFeatures[selectedView]?.includes(routeName)
 
   return <>{showRoute && children}</>
 }

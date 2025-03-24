@@ -1,11 +1,12 @@
 import React from 'react'
-import {View} from 'react-native'
+import {GestureResponderEvent, View} from 'react-native'
 import Animated from 'react-native-reanimated'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigationState} from '@react-navigation/native'
+import {useLinkProps} from '@react-navigation/native'
 
-import {IntentionFilter} from '#/lib/hooks/useIntention'
+import {IntentionFilter, useIntention} from '#/lib/hooks/useIntention'
 import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransform'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
 import {makeProfileLink} from '#/lib/routes/links'
@@ -172,6 +173,30 @@ export function BottomBarWeb() {
                   )
                 }}
               </NavItem>
+              <IntentionFilter routeName="Profile" hideOnEverything={true}>
+                <NavItem
+                  routeName="Profile"
+                  href={
+                    currentAccount
+                      ? makeProfileLink({
+                          did: currentAccount.did,
+                          handle: currentAccount.handle,
+                        })
+                      : '/'
+                  }>
+                  {() => (
+                    <UserCircle
+                      aria-hidden={true}
+                      width={iconWidth}
+                      style={[
+                        styles.ctrlIcon,
+                        t.atoms.text,
+                        styles.profileIcon,
+                      ]}
+                    />
+                  )}
+                </NavItem>
+              </IntentionFilter>
               <IntentionFilter routeName="Search">
                 <NavItem routeName="Search" href="/search">
                   {({isActive}) => {
@@ -214,7 +239,6 @@ export function BottomBarWeb() {
                 <NavItem
                   routeName="MutualAid"
                   href="#"
-                  notificationCount="1"
                   onClick={e => {
                     e.preventDefault()
                     setSelectedFeature('mutual-aid')
@@ -335,6 +359,8 @@ const NavItem: React.FC<{
 }> = ({children, href, routeName, hasNew, notificationCount, onClick}) => {
   const {_} = useLingui()
   const {currentAccount} = useSession()
+  const {setIntention} = useIntention()
+  const {onPress: linkOnPress} = useLinkProps({to: href})
   const currentRoute = useNavigationState(state => {
     if (!state) {
       return {name: 'Home'}
@@ -348,8 +374,18 @@ const NavItem: React.FC<{
           currentAccount?.handle
       : isTab(currentRoute.name, routeName)
 
-  const extra: {onPress?: (e: GestureResponderEvent) => void} = {}
-  if (onClick) extra.onPress = onClick
+  const handlePress = (e: GestureResponderEvent) => {
+    if (onClick) {
+      onClick(e)
+    } else {
+      // Set intention based on route
+      if (['Notifications', 'Profile'].includes(routeName)) {
+        setIntention(routeName)
+      }
+      // Let the Link component handle navigation
+      linkOnPress()
+    }
+  }
 
   return (
     <Link
@@ -359,7 +395,7 @@ const NavItem: React.FC<{
       aria-role="link"
       aria-label={routeName}
       accessible={true}
-      {...extra}>
+      onPress={handlePress}>
       {children({isActive})}
       {notificationCount ? (
         <View

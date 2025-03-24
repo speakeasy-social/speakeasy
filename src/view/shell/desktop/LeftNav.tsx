@@ -10,7 +10,7 @@ import {
 } from '@react-navigation/native'
 
 import {useAccountSwitcher} from '#/lib/hooks/useAccountSwitcher'
-import {IntentionFilter} from '#/lib/hooks/useIntention'
+import {IntentionFilter, useIntention} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
 import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
@@ -325,6 +325,7 @@ function NavItem({
   const {_} = useLingui()
   const {currentAccount} = useSession()
   const {gtMobile, gtTablet} = useBreakpoints()
+  const {setIntention} = useIntention()
   const isTablet = gtMobile && !gtTablet
   const [pathName] = React.useMemo(() => router.matchPath(href), [href])
   const currentRouteInfo = useNavigationState(state => {
@@ -351,10 +352,14 @@ function NavItem({
       } else if (isCurrent) {
         emitSoftReset()
       } else {
+        // Set intention based on route
+        if (['Profile', 'Notifications', 'Settings'].includes(pathName)) {
+          setIntention(pathName)
+        }
         linkOnPress()
       }
     },
-    [linkOnPress, isCurrent, onPress],
+    [linkOnPress, isCurrent, onPress, pathName, setIntention],
   )
 
   return (
@@ -507,21 +512,23 @@ function ComposeBtn() {
     return null
   }
   return (
-    <View style={[a.flex_row, a.pl_md, a.pt_xl]}>
-      <Button
-        disabled={isFetchingHandle}
-        label={_(msg`Compose new post`)}
-        onPress={onPressCompose}
-        size="large"
-        variant="solid"
-        color="primary"
-        style={[a.rounded_full]}>
-        <ButtonIcon icon={EditBig} position="left" />
-        <ButtonText>
-          <Trans context="action">New Post</Trans>
-        </ButtonText>
-      </Button>
-    </View>
+    <IntentionFilter routeName="Compose">
+      <View style={[a.flex_row, a.pl_md, a.pt_xl]}>
+        <Button
+          disabled={isFetchingHandle}
+          label={_(msg`Compose new post`)}
+          onPress={onPressCompose}
+          size="large"
+          variant="solid"
+          color="primary"
+          style={[a.rounded_full]}>
+          <ButtonIcon icon={EditBig} position="left" />
+          <ButtonText>
+            <Trans context="action">New Post</Trans>
+          </ButtonText>
+        </Button>
+      </View>
+    </IntentionFilter>
   )
 }
 
@@ -561,15 +568,6 @@ export function DesktopLeftNav() {
   const [selectedFeature, setSelectedFeature] = React.useState<
     'groups' | 'mutual-aid'
   >('groups')
-  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
-
-  // Check if the current route is the home tab
-  const isIntentScreen = currentRouteInfo.name === 'Intent'
-
-  // Conditionally render the left nav
-  if (hasSession && isIntentScreen) {
-    return null
-  }
 
   return (
     <>
@@ -724,8 +722,6 @@ export function DesktopLeftNav() {
             <IntentionFilter routeName="Mutual">
               <NavItem
                 href="/mutual"
-                // count="1"
-                hasNew={true}
                 icon={
                   <Heart
                     aria-hidden={true}
@@ -812,24 +808,26 @@ export function DesktopLeftNav() {
                 label={_(msg`Profile`)}
               />
             </IntentionFilter>
-            <NavItem
-              href="/settings"
-              icon={
-                <Settings
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <SettingsFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Settings`)}
-            />
+            <IntentionFilter routeName="Settings">
+              <NavItem
+                href="/settings"
+                icon={
+                  <Settings
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <SettingsFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Settings`)}
+              />
+            </IntentionFilter>
 
             <ComposeBtn />
           </>
