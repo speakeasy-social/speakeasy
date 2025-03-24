@@ -23,7 +23,6 @@ import {emitSoftReset} from '#/state/events'
 import {useHomeBadge} from '#/state/home-badge'
 import {useFetchHandle} from '#/state/queries/handle'
 import {useUnreadMessageCount} from '#/state/queries/messages/list-conversations'
-import {useUnreadNotifications} from '#/state/queries/notifications/unread'
 import {useProfilesQuery} from '#/state/queries/profile'
 import {SessionAccount, useSession, useSessionApi} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
@@ -561,7 +560,6 @@ export function DesktopLeftNav() {
   const pal = usePalette('default')
   const {_} = useLingui()
   const {isDesktop, isTablet} = useWebMediaQueries()
-  const numUnreadNotifications = useUnreadNotifications()
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
   const groupsDialogControl = useDialogControl()
@@ -674,7 +672,6 @@ export function DesktopLeftNav() {
             <IntentionFilter routeName="Notifications">
               <NavItem
                 href="/notifications"
-                count={numUnreadNotifications}
                 icon={
                   <Bell
                     aria-hidden={true}
