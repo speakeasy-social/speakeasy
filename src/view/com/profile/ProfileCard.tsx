@@ -28,6 +28,7 @@ import {Link} from '../util/Link'
 import {Text} from '../util/text/Text'
 import {PreviewableUserAvatar} from '../util/UserAvatar'
 import {FollowButton} from './FollowButton'
+import {TrustButton} from './TrustButton'
 
 export function ProfileCard({
   testID,
@@ -206,7 +207,10 @@ export function ProfileCardWithFollowBtn({
         isMe
           ? undefined
           : profileShadow => (
-              <FollowButton profile={profileShadow} logContext={logContext} />
+              <View style={[a.flex_row, a.gap_sm]}>
+                <FollowButton profile={profileShadow} logContext={logContext} />
+                <TrustButton profile={profileShadow} />
+              </View>
             )
       }
       onPress={onPress}
