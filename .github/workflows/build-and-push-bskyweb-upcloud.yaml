@@ -7,6 +7,7 @@ on:
       - main
       - feature/deploy-upcloud
       - feature/deploy-upcloud2
+      - staging
 
 jobs:
   build:
@@ -47,11 +48,48 @@ jobs:
         with:
           name: speakeasy-client-tar-gz
           path: ${{ github.workspace }}/speakeasy-client.tar.gz
+  
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: staging
+    if: github.ref == 'refs/heads/staging'
 
-  deploy:
+    steps:
+      - name: Download Docker Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: speakeasy-client-tar-gz
+          path: ${{ github.workspace }}
+
+      - name: Copy Docker Image to UpCloud Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: ${{ github.workspace }}/speakeasy-client.tar.gz
+          target: /home/speakeasy
+
+      - name: Deploy and Run Docker Image on UpCloud Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker stop speakeasy-client || true
+            docker rm speakeasy-client || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-client.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-client.tar &&
+            docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client speakeasy-client-image:latest /usr/bin/bskyweb serve
+            
+
+  deploy-production:
     runs-on: ubuntu-latest
     needs: build
     environment: production
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Download Docker Image Artifact

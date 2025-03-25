@@ -5,6 +5,7 @@ on:
   push:
     branches: 
       - main
+      - staging
     paths:
       - 'bskyembed/**'
 
@@ -46,10 +47,46 @@ jobs:
           name: speakeasy-embedr-tar-gz
           path: ${{ github.workspace }}/speakeasy-embedr.tar.gz
 
-  deploy:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: staging
+    if: github.ref == 'refs/heads/staging'
+
+    steps:
+      - name: Download Docker Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: speakeasy-embedr-tar-gz
+          path: ${{ github.workspace }}
+
+      - name: Copy Docker Image to UpCloud Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: ${{ github.workspace }}/speakeasy-embedr.tar.gz
+          target: /home/speakeasy
+
+      - name: Deploy and Run Docker Image on UpCloud Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker stop speakeasy-embedr || true
+            docker rm speakeasy-embedr || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-embedr.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-embedr.tar &&
+            docker run -d -p 127.0.0.1:8101:8101 --restart=unless-stopped --name speakeasy-embedr speakeasy-embedr-image:latest /usr/bin/embedr serve
+
+  deploy-production:
     runs-on: ubuntu-latest
     needs: build
     environment: production
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Download Docker Image Artifact
