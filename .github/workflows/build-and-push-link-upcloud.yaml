@@ -7,7 +7,8 @@ on:
       - main
       - staging
     paths:
-      - 'bskylink/**'
+      - bskylink/**
+      - '.github/workflows/build-and-push-link-upcloud.yaml'
 
 jobs:
   build:

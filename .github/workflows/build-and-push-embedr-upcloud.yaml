@@ -7,7 +7,8 @@ on:
       - main
       - staging
     paths:
-      - 'bskyembed/**'
+      - bskyembed/**
+      - '.github/workflows/build-and-push-embedr-upcloud.yaml'
 
 jobs:
   build:

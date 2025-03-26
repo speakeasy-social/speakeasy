@@ -7,7 +7,8 @@ on:
       - main
       - staging
     paths:
-      - 'bskyogcard/**'
+      - bskyogcard/**
+      - '.github/workflows/build-and-push-ogcard-upcloud.yaml'
 
 jobs:
   build:
