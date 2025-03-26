@@ -5,7 +5,7 @@ interface Window {
   }
 }
 
-const EMBED_URL = 'https://embed.bsky.app'
+const EMBED_URL = 'https://embed.spkeasy.social'
 
 window.bluesky = window.bluesky || {
   scan,

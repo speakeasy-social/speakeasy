@@ -44,6 +44,7 @@ func run(args []string) {
 					Name:     "ogcard-host",
 					Usage:    "scheme, hostname, and port of ogcard service",
 					Required: false,
+					Value:    "https://localhost:8102",
 					EnvVars:  []string{"OGCARD_HOST"},
 				},
 				&cli.StringFlag{
@@ -57,7 +58,7 @@ func run(args []string) {
 					Name:     "link-host",
 					Usage:    "scheme, hostname, and port of link service",
 					Required: false,
-					Value:    "",
+					Value:    "https://localhost:8103",
 					EnvVars:  []string{"LINK_HOST"},
 				},
 				&cli.StringFlag{
