@@ -8,8 +8,6 @@ on:
       - feature/deploy-upcloud
       - feature/deploy-upcloud2
       - staging
-    paths:
-      - 'bskyweb/**'
 
 jobs:
   build:
