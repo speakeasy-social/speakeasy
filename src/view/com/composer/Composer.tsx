@@ -53,6 +53,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
+import {createDefaultHiddenMessage} from '#/lib/api'
 import * as apilib from '#/lib/api/index'
 import {EmbeddingDisabledError} from '#/lib/api/resolve'
 import {until} from '#/lib/async/until'
@@ -121,6 +122,7 @@ import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {VerifyEmailDialog} from '#/components/dialogs/VerifyEmailDialog'
 import {CircleInfo_Stroke2_Corner0_Rounded as CircleInfo} from '#/components/icons/CircleInfo'
 import {EmojiArc_Stroke2_Corner0_Rounded as EmojiSmile} from '#/components/icons/Emoji'
+import {Gift1_Stroke2_Corner0_Rounded as Gift} from '#/components/icons/Gift1'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {TimesLarge_Stroke2_Corner0_Rounded as X} from '#/components/icons/Times'
@@ -155,6 +157,7 @@ export const ComposePost = ({
   text: initText,
   imageUris: initImageUris,
   videoUri: initVideoUri,
+  audience: initAudience,
   cancelRef,
 }: Props & {
   cancelRef?: React.RefObject<CancelRef>
@@ -180,7 +183,13 @@ export const ComposePost = ({
 
   const [composerState, composerDispatch] = useReducer(
     composerReducer,
-    {initImageUris, initQuoteUri: initQuote?.uri, initText, initMention},
+    {
+      initImageUris,
+      initQuoteUri: initQuote?.uri,
+      initText,
+      initMention,
+      initAudience,
+    },
     createComposerState,
   )
 
@@ -835,6 +844,38 @@ let ComposerPost = React.memo(function ComposerPost({
           )}
         />
       </View>
+
+      {post.audience === 'hidden' && (
+        <View style={[styles.textInputLayout, styles.publicMessageLayout]}>
+          <TextInput
+            richtext={createDefaultHiddenMessage(post.publicMessage)}
+            placeholder={_(
+              msg`This is a hidden post and can only be seen on @spkeasy.social`,
+            )}
+            webForceMinHeight={forceMinHeight}
+            hasRightPadding={isPartOfThread}
+            isActive={isActive}
+            onPressPublish={() => {}}
+            onPhotoPasted={() => {}}
+            onNewLink={() => {}}
+            onError={() => {}}
+            setRichText={rt => {
+              dispatchPost({type: 'update_public_message', richtext: rt})
+            }}
+            onFocus={() => {
+              dispatch({
+                type: 'focus_post',
+                postId: post.id,
+              })
+            }}
+            accessible={true}
+            accessibilityLabel={_(msg`Public message`)}
+            accessibilityHint={_(
+              msg`Write a public message that will be visible to everyone`,
+            )}
+          />
+        </View>
+      )}
 
       {canRemovePost && isActive && (
         <>
@@ -1513,6 +1554,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  publicMessageLayout: {
+    marginTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.gray3,
+    paddingTop: 8,
+  },
 })
 
 function ErrorBanner({
@@ -1705,7 +1752,27 @@ function AudienceBar({
     }
   }, [dispatch, post.id, post.audience, groupsDialogControl])
 
-  const label = post.audience === 'public' ? _('Public') : _('Trusted')
+  const getLabel = () => {
+    switch (post.audience) {
+      case 'public':
+        return _('Public')
+      case 'trusted':
+        return _('Trusted')
+      case 'hidden':
+        return _('Hidden')
+    }
+  }
+
+  const getIcon = () => {
+    switch (post.audience) {
+      case 'public':
+        return Globe
+      case 'trusted':
+        return Lock
+      case 'hidden':
+        return Gift
+    }
+  }
 
   return (
     <>
@@ -1732,17 +1799,12 @@ function AudienceBar({
             {paddingLeft: 12, paddingRight: 12},
           ]}
           accessibilityHint={_(
-            msg`Choose to make the post visible publicly or only to trusted community`,
+            msg`Choose to make the post visible publicly, only to trusted community, or hidden`,
           )}
-          accessibilityLabel={
-            post.audience === 'public' ? _('Public') : _('Trusted')
-          }
-          label={label}>
-          <ButtonIcon
-            icon={post.audience === 'public' ? Globe : Lock}
-            size="sm"
-          />
-          <ButtonText style={[a.ml_xs]}>{label}</ButtonText>
+          accessibilityLabel={getLabel()}
+          label={getLabel()}>
+          <ButtonIcon icon={getIcon()} size="sm" />
+          <ButtonText style={[a.ml_xs]}>{getLabel()}</ButtonText>
         </Button>
         <ThreadgateBtn
           postgate={thread.postgate}
