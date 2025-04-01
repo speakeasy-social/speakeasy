@@ -51,6 +51,7 @@ interface TextInputProps {
   onNewLink: (uri: string) => void
   onError: (err: string) => void
   onFocus: () => void
+  disableDrop?: boolean
 }
 
 export const TextInput = React.forwardRef(function TextInputImpl(
@@ -65,6 +66,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     onPressPublish,
     onNewLink,
     onFocus,
+    disableDrop,
   }: // onError, TODO
   TextInputProps,
   ref,
@@ -124,6 +126,11 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     }
 
     const handleDrop = (event: DragEvent) => {
+      if (disableDrop) {
+        event.preventDefault()
+        setIsDropping(false)
+        return
+      }
       const transfer = event.dataTransfer
       if (transfer) {
         const items = transfer.items
@@ -137,6 +144,10 @@ export const TextInput = React.forwardRef(function TextInputImpl(
       setIsDropping(false)
     }
     const handleDragEnter = (event: DragEvent) => {
+      if (disableDrop) {
+        event.preventDefault()
+        return
+      }
       const transfer = event.dataTransfer
 
       event.preventDefault()
@@ -160,7 +171,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
       document.body.removeEventListener('dragover', handleDragEnter)
       document.body.removeEventListener('dragleave', handleDragLeave)
     }
-  }, [setIsDropping, isActive])
+  }, [setIsDropping, isActive, disableDrop])
 
   const pastSuggestedUris = useRef(new Set<string>())
   const prevDetectedUris = useRef(new Map<string, LinkFacetMatch>())

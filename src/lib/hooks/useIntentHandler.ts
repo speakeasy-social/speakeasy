@@ -56,6 +56,11 @@ export function useIntentHandler() {
             text: params.get('text'),
             imageUrisStr: params.get('imageUris'),
             videoUri: params.get('videoUri'),
+            audience: params.get('audience') as
+              | 'public'
+              | 'trusted'
+              | 'hidden'
+              | undefined,
           })
           return
         }
@@ -91,10 +96,12 @@ export function useComposeIntent() {
       text,
       imageUrisStr,
       videoUri,
+      audience,
     }: {
       text: string | null
       imageUrisStr: string | null
       videoUri: string | null
+      audience?: 'public' | 'trusted' | 'hidden'
     }) => {
       if (!hasSession) return
 
@@ -106,6 +113,7 @@ export function useComposeIntent() {
         openComposer({
           text: text ?? undefined,
           videoUri: {uri, width: Number(width), height: Number(height)},
+          audience,
         })
         return
       }
@@ -131,6 +139,7 @@ export function useComposeIntent() {
         openComposer({
           text: text ?? undefined,
           imageUris: isNative ? imageUris : undefined,
+          audience,
         })
       }, 500)
     },

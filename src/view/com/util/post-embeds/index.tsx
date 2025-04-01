@@ -34,6 +34,7 @@ import {Dimensions} from '../../lightbox/ImageViewing/@types'
 import {AutoSizedImage} from '../images/AutoSizedImage'
 import {ImageCarousel} from '../images/ImageCarousel'
 import {ExternalLinkEmbed} from './ExternalLinkEmbed'
+import {PrivateMessageEmbed} from './PrivateMessageEmbed'
 import {MaybeQuoteEmbed} from './QuoteEmbed'
 import {PostEmbedViewContext, QuoteEmbedViewContext} from './types'
 import {VideoEmbed} from './VideoEmbed'
@@ -46,7 +47,17 @@ type Embed =
   | AppBskyEmbedVideo.View
   | AppBskyEmbedExternal.View
   | AppBskyEmbedRecordWithMedia.View
+  | PrivateMessageEmbed
   | {$type: string; [k: string]: unknown}
+
+interface PrivateMessageEmbed {
+  $type: 'app.spkeasy.embed.privateMessage'
+  privateMessage: {
+    message: string
+    publicMessage: string
+  }
+  decodedEmbed?: AppBskyFeedDefs.PostView
+}
 
 export function PostEmbeds({
   embed,
@@ -64,6 +75,21 @@ export function PostEmbeds({
   viewContext?: PostEmbedViewContext
 }) {
   const {openLightbox} = useLightboxControls()
+
+  if (!embed) {
+    return null
+  }
+
+  if (embed.$type === 'app.spkeasy.embed.privateMessage') {
+    const privateEmbed = embed as PrivateMessageEmbed
+    return (
+      <PrivateMessageEmbed
+        message={privateEmbed.privateMessage.message}
+        publicMessage={privateEmbed.privateMessage.publicMessage}
+        decodedEmbed={privateEmbed.decodedEmbed}
+      />
+    )
+  }
 
   // quote post with media
   // =

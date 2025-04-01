@@ -1,47 +1,22 @@
 import React from 'react'
+import {StyleProp, StyleSheet, View, ViewStyle} from 'react-native'
 import {
-  StyleProp,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native'
-import {
-  AppBskyEmbedExternal,
-  AppBskyEmbedImages,
   AppBskyEmbedRecord,
-  AppBskyEmbedRecordWithMedia,
-  AppBskyEmbedVideo,
   AppBskyFeedDefs,
   AppBskyFeedPost,
   ModerationDecision,
-  RichText as RichTextAPI,
 } from '@atproto/api'
-import {AtUri} from '@atproto/api'
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome'
-import {msg, Trans} from '@lingui/macro'
-import {useLingui} from '@lingui/react'
-import {useQueryClient} from '@tanstack/react-query'
+import {Trans} from '@lingui/macro'
 
-import {HITSLOP_20} from '#/lib/constants'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {InfoCircleIcon} from '#/lib/icons'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
-import {makeProfileLink} from '#/lib/routes/links'
-import {s} from '#/lib/styles'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
-import {precacheProfile} from '#/state/queries/profile'
 import {useResolveLinkQuery} from '#/state/queries/resolve-link'
 import {useSession} from '#/state/session'
 import {atoms as a, useTheme} from '#/alf'
-import {RichText} from '#/components/RichText'
-import {SubtleWebHover} from '#/components/SubtleWebHover'
-import {ContentHider} from '../../../../components/moderation/ContentHider'
-import {PostAlerts} from '../../../../components/moderation/PostAlerts'
-import {Link} from '../Link'
-import {PostMeta} from '../PostMeta'
 import {Text} from '../text/Text'
-import {PostEmbeds} from '.'
+import {EmbeddedPost, EmbeddedPostX} from './EmbeddedPost'
 import {QuoteEmbedViewContext} from './types'
 
 export function MaybeQuoteEmbed({
@@ -163,132 +138,19 @@ export function QuoteEmbed({
   allowNestedQuotes?: boolean
   viewContext?: QuoteEmbedViewContext
 }) {
-  const t = useTheme()
-  const queryClient = useQueryClient()
-  const pal = usePalette('default')
-  const itemUrip = new AtUri(quote.uri)
-  const itemHref = makeProfileLink(quote.author, 'post', itemUrip.rkey)
-  const itemTitle = `Post by ${quote.author.handle}`
-
-  const richText = React.useMemo(() => {
-    const text = AppBskyFeedPost.isRecord(quote.record) ? quote.record.text : ''
-    const facets = AppBskyFeedPost.isRecord(quote.record)
-      ? quote.record.facets
-      : undefined
-    return text.trim()
-      ? new RichTextAPI({text: text, facets: facets})
-      : undefined
-  }, [quote.record])
-
-  const embed = React.useMemo(() => {
-    const e = quote.embed
-
-    if (allowNestedQuotes) {
-      return e
-    } else {
-      if (
-        AppBskyEmbedImages.isView(e) ||
-        AppBskyEmbedExternal.isView(e) ||
-        AppBskyEmbedVideo.isView(e)
-      ) {
-        return e
-      } else if (
-        AppBskyEmbedRecordWithMedia.isView(e) &&
-        (AppBskyEmbedImages.isView(e.media) ||
-          AppBskyEmbedExternal.isView(e.media) ||
-          AppBskyEmbedVideo.isView(e.media))
-      ) {
-        return e.media
-      }
-    }
-  }, [quote.embed, allowNestedQuotes])
-
-  const onBeforePress = React.useCallback(() => {
-    precacheProfile(queryClient, quote.author)
-    onOpen?.()
-  }, [queryClient, quote.author, onOpen])
-
-  const [hover, setHover] = React.useState(false)
   return (
-    <View
-      onPointerEnter={() => {
-        setHover(true)
-      }}
-      onPointerLeave={() => {
-        setHover(false)
-      }}>
-      <ContentHider
-        modui={moderation?.ui('contentList')}
-        style={[
-          a.rounded_md,
-          a.p_md,
-          a.mt_sm,
-          a.border,
-          t.atoms.border_contrast_low,
-          style,
-        ]}
-        childContainerStyle={[a.pt_sm]}>
-        <SubtleWebHover hover={hover} />
-        <Link
-          hoverStyle={{borderColor: pal.colors.borderLinkHover}}
-          href={itemHref}
-          title={itemTitle}
-          onBeforePress={onBeforePress}>
-          <View pointerEvents="none">
-            <PostMeta
-              author={quote.author}
-              moderation={moderation}
-              showAvatar
-              postHref={itemHref}
-              timestamp={quote.indexedAt}
-            />
-          </View>
-          {moderation ? (
-            <PostAlerts
-              modui={moderation.ui('contentView')}
-              style={[a.py_xs]}
-            />
-          ) : null}
-          {richText ? (
-            <RichText
-              value={richText}
-              style={a.text_md}
-              numberOfLines={20}
-              disableLinks
-            />
-          ) : null}
-          {embed && <PostEmbeds embed={embed} moderation={moderation} />}
-        </Link>
-      </ContentHider>
-    </View>
+    <EmbeddedPost
+      post={quote}
+      moderation={moderation}
+      onOpen={onOpen}
+      style={style}
+      allowNestedQuotes={allowNestedQuotes}
+    />
   )
 }
 
 export function QuoteX({onRemove}: {onRemove: () => void}) {
-  const {_} = useLingui()
-  return (
-    <TouchableOpacity
-      style={[
-        a.absolute,
-        a.p_xs,
-        a.rounded_full,
-        a.align_center,
-        a.justify_center,
-        {
-          top: 16,
-          right: 10,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        },
-      ]}
-      onPress={onRemove}
-      accessibilityRole="button"
-      accessibilityLabel={_(msg`Remove quote`)}
-      accessibilityHint={_(msg`Removes quoted post`)}
-      onAccessibilityEscape={onRemove}
-      hitSlop={HITSLOP_20}>
-      <FontAwesomeIcon size={12} icon="xmark" style={s.white} />
-    </TouchableOpacity>
-  )
+  return <EmbeddedPostX onRemove={onRemove} />
 }
 
 export function LazyQuoteEmbed({uri}: {uri: string}) {
@@ -320,6 +182,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    padding: 8,
     borderRadius: 8,
     marginTop: 8,
     paddingVertical: 14,

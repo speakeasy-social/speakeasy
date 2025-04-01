@@ -51,6 +51,7 @@ interface TextInputProps extends ComponentProps<typeof RNTextInput> {
   onPressPublish: (richtext: RichText) => void
   onNewLink: (uri: string) => void
   onError: (err: string) => void
+  disableDrop?: boolean
 }
 
 interface Selection {
@@ -67,6 +68,7 @@ export const TextInput = forwardRef(function TextInputImpl(
     onPhotoPasted,
     onNewLink,
     onError,
+    disableDrop,
     ...props
   }: TextInputProps,
   ref,
@@ -152,6 +154,10 @@ export const TextInput = forwardRef(function TextInputImpl(
         return onError(cleanError(err))
       }
 
+      if (disableDrop) {
+        return
+      }
+
       const uris = files.map(f => f.uri)
       const uri = uris.find(isUriImage)
 
@@ -159,7 +165,7 @@ export const TextInput = forwardRef(function TextInputImpl(
         onPhotoPasted(uri)
       }
     },
-    [onError, onPhotoPasted],
+    [onError, onPhotoPasted, disableDrop],
   )
 
   const onSelectionChange = useCallback(
