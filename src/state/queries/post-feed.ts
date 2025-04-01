@@ -13,6 +13,7 @@ import {
   QueryClient,
   QueryKey,
   useInfiniteQuery,
+  useQueryClient,
 } from '@tanstack/react-query'
 
 import {AuthorFeedAPI} from '#/lib/api/feed/author'
@@ -25,7 +26,12 @@ import {MergeFeedAPI} from '#/lib/api/feed/merge'
 import {FeedAPI, ReasonFeedSource} from '#/lib/api/feed/types'
 import {aggregateUserInterests} from '#/lib/api/feed/utils'
 import {FeedTuner, FeedTunerFn} from '#/lib/api/feed-manip'
-import {DISCOVER_FEED_URI} from '#/lib/constants'
+import {
+  DISCOVER_FEED_URI,
+  LOCAL_DEV_CDN,
+  LOCAL_DEV_SERVICE,
+  PROD_CDN,
+} from '#/lib/constants'
 import {BSKY_FEED_OWNER_DIDS} from '#/lib/constants'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {logger} from '#/logger'
@@ -142,6 +148,10 @@ export function usePostFeedQuery(
     result: InfiniteData<FeedPage>
   } | null>(null)
   const isDiscover = feedDesc.includes(DISCOVER_FEED_URI)
+  const baseUrl =
+    agent.service.toString() === `${LOCAL_DEV_SERVICE}/`
+      ? LOCAL_DEV_CDN
+      : PROD_CDN
 
   /**
    * The number of posts to fetch in a single request. Because we filter
@@ -157,8 +167,9 @@ export function usePostFeedQuery(
       moderationOpts,
       ignoreFilterFor: opts?.ignoreFilterFor,
       isDiscover,
+      baseUrl,
     }),
-    [feedTuners, moderationOpts, opts?.ignoreFilterFor, isDiscover],
+    [feedTuners, moderationOpts, opts?.ignoreFilterFor, isDiscover, baseUrl],
   )
 
   const query = useInfiniteQuery<
@@ -354,6 +365,45 @@ export function usePostFeedQuery(
                         parentAuthor: item.parentAuthor,
                         isParentBlocked: item.isParentBlocked,
                         isParentNotFound: item.isParentNotFound,
+                      }
+                      if (
+                        !item.post.embed &&
+                        item.record.embed &&
+                        item.record.embed.$type ===
+                          'app.spkeasy.embed.privateMessage'
+                      ) {
+                        const privateMessage = item.record.embed
+                          .privateMessage as {
+                          message: string
+                          publicMessage: string
+                        }
+                        try {
+                          const decodedContent = decodePrivateMessage(
+                            privateMessage.message,
+                            item.post.author.did, // Pass the parent post's author DID
+                            selectArgs.baseUrl,
+                          )
+                          feedPostSliceItem.post.embed = {
+                            $type: 'app.spkeasy.embed.privateMessage',
+                            privateMessage,
+                            decodedEmbed: {
+                              uri: decodedContent.uri,
+                              cid: decodedContent.cid,
+                              author: decodedContent.author,
+                              record: decodedContent.record,
+                              embed: decodedContent.embed,
+                              indexedAt: decodedContent.indexedAt,
+                              labels: decodedContent.labels,
+                              likeCount: decodedContent.likeCount,
+                              replyCount: decodedContent.replyCount,
+                              repostCount: decodedContent.repostCount,
+                              viewer: decodedContent.viewer || {},
+                              $type: decodedContent.$type,
+                            },
+                          }
+                        } catch (e) {
+                          console.error('Failed to decode private message:', e)
+                        }
                       }
                       return feedPostSliceItem
                     }),
@@ -645,5 +695,217 @@ export function resetProfilePostsQueries(
 export function isFeedPostSlice(v: any): v is FeedPostSlice {
   return (
     v && typeof v === 'object' && '_isFeedPostSlice' in v && v._isFeedPostSlice
+  )
+}
+
+function transformImageEmbed(
+  embed: any,
+  authorDid: string,
+  baseUrl: string,
+): any {
+  if (embed?.$type === 'app.bsky.embed.images' && embed.images?.length > 0) {
+    return {
+      ...embed,
+      $type: 'app.bsky.embed.images#view',
+      images: embed.images.map((img: any) => {
+        const mimeType = img.image.mimeType.split('/')[1]
+        const blobRef = img.image.ref.$link
+        return {
+          thumb: `${baseUrl}/img/feed_thumbnail/plain/${authorDid}/${blobRef}@${mimeType}`,
+          fullsize: `${baseUrl}/img/feed_fullsize/plain/${authorDid}/${blobRef}@${mimeType}`,
+          alt: img.alt || '',
+          aspectRatio: img.aspectRatio,
+        }
+      }),
+    }
+  }
+  return embed
+}
+
+function transformVideoEmbed(
+  embed: any,
+  _authorDid: string,
+  _baseUrl: string,
+): any {
+  if (embed?.$type === 'app.bsky.embed.video' && embed.video) {
+    return {
+      ...embed,
+      $type: 'app.bsky.embed.video#view',
+      video: {
+        ...embed.video,
+        uri: embed.video.uri,
+        mimeType: embed.video.mimeType,
+      },
+    }
+  }
+  return embed
+}
+
+function transformExternalEmbed(
+  embed: any,
+  authorDid: string,
+  baseUrl: string,
+): any {
+  if (embed?.$type === 'app.bsky.embed.external' && embed.external) {
+    return {
+      ...embed,
+      $type: 'app.bsky.embed.external#view',
+      external: {
+        ...embed.external,
+        uri: embed.external.uri,
+        title: embed.external.title,
+        description: embed.external.description,
+        thumb: embed.external.thumb
+          ? `${baseUrl}/img/feed_thumbnail/plain/${authorDid}/${
+              embed.external.thumb.ref.$link
+            }@${embed.external.thumb.mimeType.split('/')[1]}`
+          : undefined,
+      },
+    }
+  }
+  return embed
+}
+
+function transformRecordEmbed(embed: any): any {
+  if (embed?.$type === 'app.bsky.embed.record') {
+    return {
+      ...embed,
+      $type: 'app.bsky.embed.record#view',
+      record: embed.record,
+    }
+  }
+  return embed
+}
+
+function transformRecordWithMediaEmbed(
+  embed: any,
+  authorDid: string,
+  baseUrl: string,
+): any {
+  if (embed?.$type === 'app.bsky.embed.recordWithMedia') {
+    const transformedMedia =
+      embed.media?.$type === 'app.bsky.embed.images'
+        ? transformImageEmbed(embed.media, authorDid, baseUrl)
+        : embed.media?.$type === 'app.bsky.embed.video'
+        ? transformVideoEmbed(embed.media, authorDid, baseUrl)
+        : embed.media
+
+    return {
+      ...embed,
+      $type: 'app.bsky.embed.recordWithMedia#view',
+      record: transformRecordEmbed(embed.record),
+      media: transformedMedia,
+    }
+  }
+  return embed
+}
+
+export function decodePrivateMessage(
+  message: string,
+  authorDid: string,
+  baseUrl: string,
+): AppBskyFeedDefs.PostView {
+  try {
+    const decoded = JSON.parse(atob(message))
+    console.log('Decoded private message:', decoded)
+
+    const text = decoded.record?.text || decoded.text || ''
+
+    // Transform any embeds into view format
+    let transformedEmbed = decoded.embed
+    if (transformedEmbed) {
+      if (transformedEmbed.$type === 'app.bsky.embed.images') {
+        transformedEmbed = transformImageEmbed(
+          transformedEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (transformedEmbed.$type === 'app.bsky.embed.video') {
+        transformedEmbed = transformVideoEmbed(
+          transformedEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (transformedEmbed.$type === 'app.bsky.embed.external') {
+        transformedEmbed = transformExternalEmbed(
+          transformedEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (transformedEmbed.$type === 'app.bsky.embed.record') {
+        transformedEmbed = transformRecordEmbed(transformedEmbed)
+      } else if (transformedEmbed.$type === 'app.bsky.embed.recordWithMedia') {
+        transformedEmbed = transformRecordWithMediaEmbed(
+          transformedEmbed,
+          authorDid,
+          baseUrl,
+        )
+      }
+    }
+
+    // Construct a minimal PostView with just text
+    const postView: AppBskyFeedDefs.PostView = {
+      uri: decoded.uri || 'at://unknown',
+      cid: decoded.cid || 'unknown',
+      author: decoded.author || {
+        did: authorDid,
+        handle: 'unknown',
+        viewer: {muted: false, blockedBy: false},
+        labels: [],
+      },
+      record: {
+        text,
+        $type: 'app.bsky.feed.post',
+        createdAt: decoded.record?.createdAt || new Date().toISOString(),
+        ...(decoded.embed ? {embed: decoded.embed} : {}),
+      } as AppBskyFeedPost.Record,
+      embed: transformedEmbed,
+      indexedAt: decoded.indexedAt || new Date().toISOString(),
+      $type: 'app.bsky.feed.defs#postView',
+      labels: [],
+      likeCount: 0,
+      replyCount: 0,
+      repostCount: 0,
+      quoteCount: 0,
+    }
+
+    console.log('Constructed PostView:', postView)
+    return postView
+  } catch (e) {
+    console.error('Failed to decode private message:', e)
+    throw e
+  }
+}
+
+export function useGetPost() {
+  const queryClient = useQueryClient()
+  const agent = useAgent()
+  return useCallback(
+    async ({uri}: {uri: string}) => {
+      return queryClient.fetchQuery({
+        queryKey: ['post', uri],
+        async queryFn() {
+          const urip = new AtUri(uri)
+
+          if (!urip.host.startsWith('did:')) {
+            const res = await agent.resolveHandle({
+              handle: urip.host,
+            })
+            urip.host = res.data.did
+          }
+
+          const res = await agent.getPosts({
+            uris: [urip.toString()],
+          })
+
+          if (res.success && res.data.posts[0]) {
+            return res.data.posts[0]
+          }
+
+          throw new Error('useGetPost: post not found')
+        },
+      })
+    },
+    [queryClient, agent],
   )
 }
