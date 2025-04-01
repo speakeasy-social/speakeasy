@@ -165,17 +165,6 @@ export function EmbeddedPost({
   viewContext?: QuoteEmbedViewContext
   showAuthor?: boolean
 }) {
-  console.log('EmbeddedPost received post:', {
-    uri: post.uri,
-    cid: post.cid,
-    text: AppBskyFeedPost.isRecord(post.record) ? post.record.text : undefined,
-    hasEmbed: !!post.embed,
-    embedType: post.embed?.$type,
-    author: post.author,
-    showAuthor,
-  })
-  console.log('post:', post)
-
   const t = useTheme()
   const queryClient = useQueryClient()
   const pal = usePalette('default')

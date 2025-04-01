@@ -807,7 +807,6 @@ export function decodePrivateMessage(
 ): AppBskyFeedDefs.PostView {
   try {
     const decoded = JSON.parse(atob(message))
-    console.log('Decoded private message:', decoded)
 
     const text = decoded.record?.text || decoded.text || ''
 
@@ -869,7 +868,6 @@ export function decodePrivateMessage(
       quoteCount: 0,
     }
 
-    console.log('Constructed PostView:', postView)
     return postView
   } catch (e) {
     console.error('Failed to decode private message:', e)

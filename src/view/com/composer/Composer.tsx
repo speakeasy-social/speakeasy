@@ -859,6 +859,7 @@ let ComposerPost = React.memo(function ComposerPost({
             onPhotoPasted={() => {}}
             onNewLink={() => {}}
             onError={() => {}}
+            disableDrop={true}
             setRichText={rt => {
               dispatchPost({type: 'update_public_message', richtext: rt})
             }}
