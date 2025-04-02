@@ -23,7 +23,8 @@ import {CenteredView} from '../util/Views'
 export const SplashScreen = ({
   onDismiss,
   onPressSignin,
-}: // onPressCreateAccount,
+  onPressCreateAccount
+}:
 {
   onDismiss?: () => void
   onPressSignin: () => void
@@ -155,12 +156,10 @@ export const SplashScreen = ({
               </Button>
               <Button
                 testID="createAccountButton"
-                onPress={() =>
-                  (window.location.href = 'https://bsky.app/settings')
-                }
-                label={_(msg`Create Bluesky account`)}
+                onPress={onPressCreateAccount}
+                label={_(msg`Create SpeakEasy account`)}
                 accessibilityHint={_(
-                  msg`Opens flow to create a new Bluesky account`,
+                  msg`Opens flow to create a new SpeakEasy account`,
                 )}
                 size="large"
                 variant="solid"
