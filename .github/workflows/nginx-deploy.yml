@@ -33,6 +33,14 @@ jobs:
               -e "s/{{CARD_DOMAIN}}/${{ env.CARD_DOMAIN }}/g" \
               infra/nginx/sites-available/speakeasy.template > infra/nginx/sites-available/speakeasy
 
+      - name: Create target directory
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: mkdir -p ~/nginx-configs
+
       - name: Deploy nginx configs
         uses: appleboy/scp-action@master
         with:
@@ -46,19 +54,12 @@ jobs:
           target: "~/nginx-configs"
           strip_components: 0
 
-      - name: Test and reload nginx
+      - name: Deploy and reload nginx
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            sudo cp ~/nginx-configs/speakeasy /etc/nginx/sites-available/ &&
-            sudo cp ~/nginx-configs/default /etc/nginx/sites-available/ &&
-            sudo cp ~/nginx-configs/nginx.conf /etc/nginx/ &&
-            if sudo nginx -t; then
-              sudo systemctl reload nginx &&
-              rm -rf ~/nginx-configs
-            else
-              echo "Nginx configuration test failed. Aborting reload."
-              exit 1 
+            sudo /usr/local/bin/deploy-nginx.sh ~/nginx-configs/speakeasy ~/nginx-configs/default ~/nginx-configs/nginx.conf &&
+            rm -rf ~/nginx-configs
