@@ -1,13 +1,14 @@
-name: build-and-push-bskyweb-upcloud
+name: build-and-push-bskyembed-upcloud
 
 on:
   workflow_dispatch:
   push:
     branches: 
       - main
-      - feature/deploy-upcloud
-      - feature/deploy-upcloud2
       - staging
+    paths:
+      - bskyembed/**
+      - '.github/workflows/build-and-push-embedr-upcloud.yaml'
 
 jobs:
   build:
@@ -31,24 +32,22 @@ jobs:
         with:
           context: .
           push: false
-          file: ./Dockerfile
+          file: ./Dockerfile.embedr
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=docker,dest=${{ github.workspace }}/speakeasy-client.tar
-          build-args: |
-            EXPO_PUBLIC_BUNDLE_IDENTIFIER=${{ steps.vars.outputs.sha_short }}
-          tags: speakeasy-client-image:latest
+          outputs: type=docker,dest=${{ github.workspace }}/speakeasy-embedr.tar
+          tags: speakeasy-embedr-image:latest
 
       - name: Gzip Docker Image
         run: |
-          gzip -c ${{ github.workspace }}/speakeasy-client.tar > ${{ github.workspace }}/speakeasy-client.tar.gz
+          gzip -c ${{ github.workspace }}/speakeasy-embedr.tar > ${{ github.workspace }}/speakeasy-embedr.tar.gz
 
       - name: Upload Docker Image Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: speakeasy-client-tar-gz
-          path: ${{ github.workspace }}/speakeasy-client.tar.gz
-  
+          name: speakeasy-embedr-tar-gz
+          path: ${{ github.workspace }}/speakeasy-embedr.tar.gz
+
   deploy-staging:
     runs-on: ubuntu-latest
     needs: build
@@ -59,7 +58,7 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: speakeasy-client-tar-gz
+          name: speakeasy-embedr-tar-gz
           path: ${{ github.workspace }}
 
       - name: Copy Docker Image to UpCloud Server
@@ -68,7 +67,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: ${{ github.workspace }}/speakeasy-client.tar.gz
+          source: ${{ github.workspace }}/speakeasy-embedr.tar.gz
           target: /home/speakeasy
 
       - name: Deploy and Run Docker Image on UpCloud Server
@@ -78,11 +77,11 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker stop speakeasy-client || true
-            docker rm speakeasy-client || true
-            gunzip -f /home/speakeasy/github/workspace/speakeasy-client.tar.gz &&
-            docker load --input /home/speakeasy/github/workspace/speakeasy-client.tar &&
-            docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
+            docker stop speakeasy-embedr || true
+            docker rm speakeasy-embedr || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-embedr.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-embedr.tar &&
+            docker run -d -p 127.0.0.1:8101:8100 --restart=unless-stopped --name speakeasy-embedr speakeasy-embedr-image:latest /usr/bin/embedr serve
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -94,7 +93,7 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: speakeasy-client-tar-gz
+          name: speakeasy-embedr-tar-gz
           path: ${{ github.workspace }}
 
       - name: Copy Docker Image to UpCloud Server
@@ -103,7 +102,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: ${{ github.workspace }}/speakeasy-client.tar.gz
+          source: ${{ github.workspace }}/speakeasy-embedr.tar.gz
           target: /home/speakeasy
 
       - name: Deploy and Run Docker Image on UpCloud Server
@@ -113,9 +112,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker stop speakeasy-client || true
-            docker rm speakeasy-client || true
-            gunzip -f /home/speakeasy/github/workspace/speakeasy-client.tar.gz &&
-            docker load --input /home/speakeasy/github/workspace/speakeasy-client.tar &&
-            docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
+            docker stop speakeasy-embedr || true
+            docker rm speakeasy-embedr || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-embedr.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-embedr.tar &&
+            docker run -d -p 127.0.0.1:8101:8100 --restart=unless-stopped --name speakeasy-embedr speakeasy-embedr-image:latest /usr/bin/embedr serve
             
