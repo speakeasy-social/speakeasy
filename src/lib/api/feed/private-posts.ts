@@ -26,6 +26,11 @@ export class PrivatePostsFeedAPI implements FeedAPI {
             ...(cursor ? {cursor} : {}),
             limit: limit.toString(),
           }),
+        {
+          headers: {
+            Authorization: `Bearer ${this.agent.session?.accessJwt}`,
+          },
+        },
       )
 
       if (!response.ok) {
