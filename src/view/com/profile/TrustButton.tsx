@@ -28,9 +28,9 @@ export function TrustButton({
 
   return (
     <Button
-      type={isTrusted ? 'purple-outline' : 'purple'}
+      type={isTrusted ? 'purple' : 'purple-outline'}
       onPress={onPressTrust}
-      label={_(msg`${isTrusted ? 'Untrust' : 'Trust'}`)}
+      label={_(msg`${isTrusted ? 'Trusted' : 'Trust'}`)}
       labelStyle={labelStyle}
     />
   )
