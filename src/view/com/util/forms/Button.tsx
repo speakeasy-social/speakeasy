@@ -15,6 +15,7 @@ import {
 
 import {choose} from '#/lib/functions'
 import {useTheme} from '#/lib/ThemeContext'
+import {useTheme as useAlfTheme} from '#/alf'
 import {Text} from '../text/Text'
 
 export type ButtonType =
@@ -27,6 +28,8 @@ export type ButtonType =
   | 'primary-light'
   | 'secondary-light'
   | 'default-light'
+  | 'purple'
+  | 'purple-outline'
 
 // Augment type for react-native-web (see https://github.com/necolas/react-native-web/issues/1684#issuecomment-766451866)
 declare module 'react-native' {
@@ -69,6 +72,7 @@ export function Button({
   disabled?: boolean
 }>) {
   const theme = useTheme()
+  const alfTheme = useAlfTheme()
   const typeOuterStyle = choose<ViewStyle, Record<ButtonType, ViewStyle>>(
     type,
     {
@@ -102,6 +106,14 @@ export function Button({
       },
       'default-light': {
         backgroundColor: theme.palette.default.background,
+      },
+      purple: {
+        backgroundColor: alfTheme.palette.primary_500,
+      },
+      'purple-outline': {
+        backgroundColor: theme.palette.default.background,
+        borderWidth: 1,
+        borderColor: alfTheme.palette.primary_500,
       },
     },
   )
@@ -142,6 +154,14 @@ export function Button({
       'default-light': {
         color: theme.palette.default.text,
         fontWeight: theme.palette.default.isLowContrast ? '600' : undefined,
+      },
+      purple: {
+        color: theme.palette.primary.text,
+        fontWeight: '600',
+      },
+      'purple-outline': {
+        color: alfTheme.palette.primary_500,
+        fontWeight: '600',
       },
     },
   )
