@@ -5,7 +5,9 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {Shadow} from '#/state/cache/types'
+import {useTrustMutationQueue} from '#/state/queries/trust'
 import {Button} from '../util/forms/Button'
+import * as Toast from '../util/Toast'
 
 export function TrustButton({
   profile,
@@ -16,10 +18,21 @@ export function TrustButton({
 }) {
   const {_} = useLingui()
   const [isTrusted, setIsTrusted] = useState(false)
+  const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
 
   const onPressTrust = async () => {
-    setIsTrusted(!isTrusted)
-    // TODO: Implement actual trust functionality
+    try {
+      if (isTrusted) {
+        await queueUntrust()
+      } else {
+        await queueTrust()
+      }
+      setIsTrusted(!isTrusted)
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
+      }
+    }
   }
 
   if (!profile.viewer) {

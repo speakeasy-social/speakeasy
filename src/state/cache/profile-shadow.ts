@@ -26,6 +26,7 @@ export interface ProfileShadow {
   followingUri: string | undefined
   muted: boolean | undefined
   blockingUri: string | undefined
+  trusted: boolean | undefined
 }
 
 const shadows: WeakMap<

@@ -1,5 +1,6 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
+import {getPrivatePostsServerUrl} from '../config'
 import {FeedAPI, FeedAPIResponse} from './types'
 
 export class PrivatePostsFeedAPI implements FeedAPI {
@@ -8,7 +9,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
 
   constructor({agent}: {agent: BskyAgent}) {
     this.agent = agent
-    this.privatePostsServerUrl = 'http://localhost:3002'
+    this.privatePostsServerUrl = getPrivatePostsServerUrl(agent)
   }
 
   async fetch({
