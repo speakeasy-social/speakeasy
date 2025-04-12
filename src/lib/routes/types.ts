@@ -17,6 +17,8 @@ export type CommonNavigatorParams = {
   ProfileFollowers: {name: string}
   ProfileFollows: {name: string}
   ProfileKnownFollowers: {name: string}
+  ProfileTrustedUsers: undefined
+  Trusted: undefined
   ProfileList: {name: string; rkey: string}
   PostThread: {name: string; rkey: string}
   PostLikedBy: {name: string; rkey: string}
