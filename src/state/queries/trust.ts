@@ -1,9 +1,8 @@
 import {useCallback} from 'react'
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 
-import {getPrivatePostsServerUrl} from '#/lib/api/config'
+import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
-import {useAgent} from '#/state/session'
 import {RQKEY as TRUST_STATUS_RQKEY} from './trust-status'
 
 const RQKEY_ROOT = 'trust'
@@ -52,28 +51,18 @@ export function useTrustMutationQueue(profile: {did: string}) {
 }
 
 function useTrustMutation() {
-  const agent = useAgent()
+  const {call} = useSpeakeasyApi()
   return useMutation<void, Error, {did: string}>({
     mutationFn: async ({did}) => {
-      const serverUrl = getPrivatePostsServerUrl(
-        agent,
-        'social.spkeasy.graph.addTrusted',
-      )
-      const response = await fetch(
-        `${serverUrl}/xrpc/social.spkeasy.graph.addTrusted`,
-        {
+      try {
+        await call({
+          api: 'social.spkeasy.graph.addTrusted',
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${agent.session?.accessJwt}`,
-          },
-          body: JSON.stringify({
+          body: {
             recipientDid: did,
-          }),
-        },
-      )
-      if (!response.ok) {
-        const error = await response.json()
+          },
+        })
+      } catch (error: any) {
         if (error.code === 'AlreadyExists') {
           return
         }
@@ -84,32 +73,21 @@ function useTrustMutation() {
 }
 
 function useUntrustMutation() {
-  const agent = useAgent()
+  const {call} = useSpeakeasyApi()
   return useMutation<void, Error, {did: string}>({
     mutationFn: async ({did}) => {
-      const serverUrl = getPrivatePostsServerUrl(
-        agent,
-        'social.spkeasy.graph.removeTrusted',
-      )
-      const response = await fetch(
-        `${serverUrl}/xrpc/social.spkeasy.graph.removeTrusted`,
-        {
+      try {
+        await call({
+          api: 'social.spkeasy.graph.removeTrusted',
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${agent.session?.accessJwt}`,
-          },
-          body: JSON.stringify({
+          body: {
             recipientDid: did,
-          }),
-        },
-      )
-      if (!response.ok) {
-        const error = await response.json()
+          },
+        })
+      } catch (error: any) {
         if (error.code === 'NotFoundError') {
           return
         }
-
         throw new Error('Failed to remove trusted user')
       }
     },

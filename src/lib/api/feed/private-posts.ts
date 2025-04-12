@@ -1,15 +1,13 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
-import {getPrivatePostsServerUrl} from '../config'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {FeedAPI, FeedAPIResponse} from './types'
 
 export class PrivatePostsFeedAPI implements FeedAPI {
   agent: BskyAgent
-  privatePostsServerUrl: string
 
   constructor({agent}: {agent: BskyAgent}) {
     this.agent = agent
-    this.privatePostsServerUrl = getPrivatePostsServerUrl(agent)
   }
 
   async fetch({
@@ -20,25 +18,14 @@ export class PrivatePostsFeedAPI implements FeedAPI {
     limit: number
   }): Promise<FeedAPIResponse> {
     try {
-      const response = await fetch(
-        `${this.privatePostsServerUrl}/xrpc/social.spkeasy.privatePosts.getPosts?` +
-          new URLSearchParams({
-            recipient: this.agent.session?.did || '',
-            ...(cursor ? {cursor} : {}),
-            limit: limit.toString(),
-          }),
-        {
-          headers: {
-            Authorization: `Bearer ${this.agent.session?.accessJwt}`,
-          },
+      const data = await callSpeakeasyApiWithAgent(this.agent, {
+        api: 'social.spkeasy.privatePosts.getPosts',
+        query: {
+          recipient: this.agent.session?.did || '',
+          ...(cursor ? {cursor} : {}),
+          limit: limit.toString(),
         },
-      )
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch private posts: ${response.statusText}`)
-      }
-
-      const data = await response.json()
+      })
 
       // Convert private posts to FeedViewPost format
       const feed = data.posts.map((post: any) => ({
