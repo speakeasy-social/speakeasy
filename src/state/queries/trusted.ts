@@ -1,4 +1,4 @@
-import {useQuery, useQueryClient} from '@tanstack/react-query'
+import {QueryClient, useQuery, useQueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
@@ -18,32 +18,40 @@ type TrustedResponse = {
   trusted: Array<{recipientDid: string}>
 }
 
+export async function getTrustedUsers(
+  did: string,
+  speakeasyApi: any,
+  queryClient: QueryClient,
+) {
+  const data = (await speakeasyApi({
+    api: 'social.spkeasy.graph.getTrusted',
+    query: {
+      authorDid: did,
+    },
+  })) as TrustedResponse
+
+  // Update trust status cache for each trusted user
+  data.trusted.forEach(({recipientDid}: {recipientDid: string}) => {
+    queryClient.setQueryData(TRUST_STATUS_RQKEY(recipientDid), true)
+  })
+
+  return data.trusted
+}
+
 export function useTrustedQuery(did: string | undefined) {
   const agent = useAgent()
   const queryClient = useQueryClient()
-  const {call} = useSpeakeasyApi()
+  const {call: speakeasyApi} = useSpeakeasyApi()
 
   return useQuery({
     enabled: !!did,
     staleTime: STALE.MINUTES.FIVE,
     queryKey: RQKEY(did || ''),
     queryFn: async () => {
-      const data = (await call({
-        api: 'social.spkeasy.graph.getTrusted',
-        query: {
-          authorDid: did!,
-        },
-      })) as TrustedResponse
-
-      // Update trust status cache for each trusted user
-      data.trusted.forEach(({recipientDid}: {recipientDid: string}) => {
-        queryClient.setQueryData(TRUST_STATUS_RQKEY(recipientDid), true)
-      })
+      const trusted = await getTrustedUsers(did!, speakeasyApi, queryClient)
 
       // Fetch profile information for each trusted DID in batches of 25
-      const dids = data.trusted.map(
-        (t: {recipientDid: string}) => t.recipientDid,
-      )
+      const dids = trusted.map((t: {recipientDid: string}) => t.recipientDid)
       const batches = chunk(dids, 25)
       const profilePromises = batches.map(batch =>
         agent.getProfiles({actors: batch}),

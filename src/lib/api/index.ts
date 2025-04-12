@@ -1,9 +1,11 @@
 import {
+  AppBskyActorDefs,
   AppBskyEmbedExternal,
   AppBskyEmbedImages,
   AppBskyEmbedRecord,
   AppBskyEmbedRecordWithMedia,
   AppBskyEmbedVideo,
+  AppBskyFeedDefs,
   AppBskyFeedPost,
   AtUri,
   BlobRef,
@@ -50,11 +52,11 @@ interface PostOpts {
   langs?: string[]
 }
 
-export async function post(
+export async function preparePost(
   agent: BskyAgent,
   queryClient: QueryClient,
   opts: PostOpts,
-) {
+): Promise<{writes: ComAtprotoRepoApplyWrites.Create[]; uris: string[]}> {
   const thread = opts.thread
   opts.onStateChange?.(t`Processing...`)
 
@@ -133,7 +135,7 @@ export async function post(
       finalText = rtPublic.text
       finalFacets = rtPublic.facets
       finalEmbed = {
-        $type: 'app.spkeasy.embed.privateMessage',
+        $type: 'social.spkeasy.embed.privateMessage',
         privateMessage: {
           encodedMessage: btoa(JSON.stringify(hiddenContent)),
         },
@@ -198,6 +200,16 @@ export async function post(
     }
   }
 
+  return {writes, uris}
+}
+
+export async function post(
+  agent: BskyAgent,
+  queryClient: QueryClient,
+  opts: PostOpts,
+) {
+  const {writes, uris} = await preparePost(agent, queryClient, opts)
+
   try {
     await agent.com.atproto.repo.applyWrites({
       repo: agent.assertDid,
@@ -259,7 +271,7 @@ async function resolveEmbed(
   | AppBskyEmbedRecord.Main
   | AppBskyEmbedRecordWithMedia.Main
   | {
-      $type: 'app.spkeasy.embed.privateMessage'
+      $type: 'social.spkeasy.embed.privateMessage'
       privateMessage: {encodedMessage: string}
     }
   | undefined
@@ -532,4 +544,70 @@ export function createDefaultHiddenMessage(
       ],
     })
   )
+}
+
+export type CombinedPost = AppBskyFeedDefs.PostView & {
+  threadgate?: {
+    uri: string
+    cid: string
+    record: AppBskyFeedThreadgate.Record
+  }
+  postgate?: {
+    uri: string
+    cid: string
+    record: AppBskyFeedPostgate.Record
+  }
+}
+
+export function combinePostGates(
+  writes: ComAtprotoRepoApplyWrites.Create[],
+  uris: string[],
+  cids: string[],
+): CombinedPost[] {
+  const formattedPosts: CombinedPost[] = []
+
+  writes.forEach(write => {
+    if (!write.rkey) return
+
+    const uri = `at://${write.rkey.split('/')[0]}/${write.collection}/${
+      write.rkey.split('/')[1]
+    }`
+
+    if (write.collection === 'app.bsky.feed.post' && write.value) {
+      const postIndex = uris.indexOf(uri)
+      const record = write.value as AppBskyFeedPost.Record
+      const author = record.author as AppBskyActorDefs.ProfileViewBasic
+      formattedPosts.push({
+        uri,
+        cid: cids[postIndex],
+        author,
+        record,
+        indexedAt: new Date().toISOString(),
+      })
+    } else if (write.collection === 'app.bsky.feed.threadgate' && write.value) {
+      const lastPost = formattedPosts[formattedPosts.length - 1]
+      if (lastPost) {
+        lastPost.threadgate = {
+          uri: `at://${
+            lastPost.author.did
+          }/app.bsky.feed.threadgate/${lastPost.uri.split('/').pop()}`,
+          cid: '', // This would need to be filled in from the actual response
+          record: write.value as AppBskyFeedThreadgate.Record,
+        }
+      }
+    } else if (write.collection === 'app.bsky.feed.postgate' && write.value) {
+      const lastPost = formattedPosts[formattedPosts.length - 1]
+      if (lastPost) {
+        lastPost.postgate = {
+          uri: `at://${
+            lastPost.author.did
+          }/app.bsky.feed.postgate/${lastPost.uri.split('/').pop()}`,
+          cid: '', // This would need to be filled in from the actual response
+          record: write.value as AppBskyFeedPostgate.Record,
+        }
+      }
+    }
+  })
+
+  return formattedPosts
 }
