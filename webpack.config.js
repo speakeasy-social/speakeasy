@@ -33,6 +33,11 @@ module.exports = async function (env, argv) {
     config.output.publicPath = 'auto'
   }
 
+  if (!config.resolve) config.resolve = {}
+  if (!config.resolve.fallback) config.resolve.fallback = {}
+  config.resolve.fallback.crypto = require.resolve('crypto-browserify')
+  config.resolve.fallback.stream = require.resolve('stream-browserify')
+
   if (GENERATE_STATS || OPEN_ANALYZER) {
     config.plugins.push(
       new BundleAnalyzerPlugin({
