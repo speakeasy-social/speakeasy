@@ -68,6 +68,8 @@ function useTrustMutation() {
         }
         throw new Error('Failed to add trusted user')
       }
+
+      // FIXME, check if they have a public key, if not, request one be generated
     },
   })
 }

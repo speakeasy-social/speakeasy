@@ -27,8 +27,28 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         },
       })
 
+      const privateKey = await getPrivateKey(this.agent)
+
+      const posts = (
+        await Promise.all(
+          data.encryptedPosts.map(async (encryptedPost: any) => {
+            const encryptedDek = data.encryptedSessionKeys.find(
+              key => key.sessionId === encryptedPost.authorDid,
+            )?.encryptedDek
+            if (!sessionKey) return null
+            const dek = decryptDek(encryptedDek, privateKey)
+
+            const post = await decryptPost(encryptedPost, sessionKey)
+            return {
+              ...post,
+              ...encryptedPost,
+            }
+          }),
+        )
+      ).filter(post => !!post)
+
       // Convert private posts to FeedViewPost format
-      const feed = data.posts.map((post: any) => ({
+      const feed = data.encryptedPosts.map((post: any) => ({
         $type: 'app.bsky.feed.defs#feedViewPost',
         post: {
           $type: 'app.bsky.feed.defs#postView',

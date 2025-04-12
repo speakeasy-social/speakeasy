@@ -56,6 +56,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import {createDefaultHiddenMessage} from '#/lib/api'
 import * as apilib from '#/lib/api/index'
 import {EmbeddingDisabledError} from '#/lib/api/resolve'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {
   MAX_GRAPHEME_LENGTH,
@@ -142,6 +143,7 @@ import {
 import {NO_VIDEO, NoVideoState, processVideo, VideoState} from './state/video'
 import {getVideoMetadata} from './videos/pickVideo'
 import {clearThumbnailCache} from './videos/VideoTranscodeBackdrop'
+import {usePrivateSession} from '#/lib/api/private-sessions'
 
 type CancelRef = {
   onPressCancel: () => void
@@ -374,6 +376,8 @@ export const ComposePost = ({
         ),
     )
 
+  const getPrivateSession = usePrivateSession()
+
   const onPressPublish = React.useCallback(async () => {
     if (isPublishing) {
       return
@@ -400,24 +404,58 @@ export const ComposePost = ({
 
     let postUri
     try {
-      postUri = (
-        await apilib.post(agent, queryClient, {
+      // Check if this is a private post
+      if (activePost.audience === 'trusted') {
+        await getPrivateSession();
+
+        const {writes,uris} = await apilib.preparePost(agent, queryClient, {
           thread,
           replyTo: replyTo?.uri,
           onStateChange: setPublishingStage,
           langs: toPostLanguages(langPrefs.postLanguage),
         })
-      ).uris[0]
-      try {
-        await whenAppViewReady(agent, postUri, res => {
-          const postedThread = res.data.thread
-          return AppBskyFeedDefs.isThreadViewPost(postedThread)
+
+        const posts = apilib.combinePostGates(writes, uris, cids).map(post => ({
+          reply: post.reply ? {
+            root: post.reply.root,
+            parent: post.reply.parent,
+          } : undefined,          
+          uri: post.uri,
+          langs: post.lang,
+          encryptedContent: JSON.stringify(post),
+        }))
+        
+        await callSpeakeasyApiWithAgent(agent, {
+          api: 'social.spkeasy.createPosts',
+          method: 'POST',
+          body: {
+            sessionId: 'FIXME',
+            encryptedPosts: posts,
+          },
         })
-      } catch (waitErr: any) {
-        logger.error(waitErr, {
-          message: `Waiting for app view failed`,
-        })
-        // Keep going because the post *was* published.
+
+        postUri = uris[0]
+      } else {
+        // Regular public post flow
+        postUri = (
+          await apilib.post(agent, queryClient, {
+            thread,
+            replyTo: replyTo?.uri,
+            onStateChange: setPublishingStage,
+            langs: toPostLanguages(langPrefs.postLanguage),
+          })
+        ).uris[0]
+        try {
+          await whenAppViewReady(agent, postUri, res => {
+            const postedThread = res.data.thread
+            return AppBskyFeedDefs.isThreadViewPost(postedThread)
+          })
+        } catch (waitErr: any) {
+          logger.error(waitErr, {
+            message: `Waiting for app view failed`,
+          })
+          // Keep going because the post *was* published.
+        }
       }
     } catch (e: any) {
       logger.error(e, {
@@ -503,6 +541,9 @@ export const ComposePost = ({
     replyTo,
     setLangPrefs,
     queryClient,
+    activePost.audience,
+    activePost.richtext.text,
+    getPrivateSession,
   ])
 
   // Preserves the referential identity passed to each post item.
@@ -1769,21 +1810,23 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
+  const canPostPrivate = true;
 
   const onToggleAudience = useCallback(() => {
-    if (post.audience === 'public') {
+    if (!canPostPrivate && (post.audience === 'public')) {
       groupsDialogControl.open()
     } else {
+      const newAudience = post.audience === 'public' ? 'trusted' : 'public';
       dispatch({
         type: 'update_post',
         postId: post.id,
         postAction: {
           type: 'update_audience',
-          audience: 'public',
+          audience: newAudience,
         },
       })
     }
-  }, [dispatch, post.id, post.audience, groupsDialogControl])
+  }, [canPostPrivate,dispatch, post.id, post.audience, groupsDialogControl])
 
   const getLabel = () => {
     switch (post.audience) {
