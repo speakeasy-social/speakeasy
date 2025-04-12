@@ -59,13 +59,14 @@ export type PostDraft = {
   labels: SelfLabel[]
   embed: EmbedDraft
   shortenedGraphemeLength: number
-  audience: 'public' | 'trusted'
+  audience: 'public' | 'trusted' | 'hidden'
+  publicMessage?: RichText // Only used when audience is 'hidden'
 }
 
 export type PostAction =
   | {type: 'update_richtext'; richtext: RichText}
   | {type: 'update_labels'; labels: SelfLabel[]}
-  | {type: 'update_audience'; audience: 'public' | 'trusted'}
+  | {type: 'update_audience'; audience: 'public' | 'trusted' | 'hidden'}
   | {type: 'embed_add_images'; images: ComposerImage[]}
   | {type: 'embed_update_image'; image: ComposerImage}
   | {type: 'embed_remove_image'; image: ComposerImage}
@@ -82,6 +83,7 @@ export type PostAction =
   | {type: 'embed_add_gif'; gif: Gif}
   | {type: 'embed_update_gif'; alt: string}
   | {type: 'embed_remove_gif'}
+  | {type: 'update_public_message'; richtext: RichText}
 
 export type ThreadDraft = {
   posts: PostDraft[]
@@ -478,6 +480,12 @@ function postReducer(state: PostDraft, action: PostAction): PostDraft {
         },
       }
     }
+    case 'update_public_message': {
+      return {
+        ...state,
+        publicMessage: action.richtext,
+      }
+    }
   }
 }
 
@@ -486,11 +494,13 @@ export function createComposerState({
   initMention,
   initImageUris,
   initQuoteUri,
+  initAudience,
 }: {
   initText: string | undefined
   initMention: string | undefined
   initImageUris: ComposerOpts['imageUris']
   initQuoteUri: string | undefined
+  initAudience?: 'public' | 'trusted' | 'hidden'
 }): ComposerState {
   let media: ImagesMedia | undefined
   if (initImageUris?.length) {
@@ -598,7 +608,7 @@ export function createComposerState({
             media,
             link,
           },
-          audience: 'public',
+          audience: initAudience || 'public',
         },
       ],
       postgate: createPostgateRecord({post: ''}),

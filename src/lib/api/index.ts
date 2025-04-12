@@ -85,6 +85,13 @@ export async function post(
 
     // Not awaited to avoid waterfalls.
     const rtPromise = resolveRT(agent, draft.richtext)
+    let rtPromisePublic
+    if (draft.audience === 'hidden') {
+      rtPromisePublic = resolveRT(
+        agent,
+        createDefaultHiddenMessage(draft.publicMessage),
+      )
+    }
     const embedPromise = resolveEmbed(
       agent,
       queryClient,
@@ -110,15 +117,35 @@ export async function post(
     const rt = await rtPromise
     const embed = await embedPromise
     const reply = await replyPromise
+    const rtPublic = await rtPromisePublic
+
+    // For hidden posts, encode the content in the embed and use public message as text
+    let finalText = rt.text
+    let finalEmbed = embed
+    let finalFacets = rt.facets
+    if (draft.audience === 'hidden' && rtPublic) {
+      const hiddenContent = {
+        text: rt.text,
+        facets: rt.facets,
+        embed: embed,
+      }
+      finalText = rtPublic.text
+      finalFacets = rtPublic.facets
+      finalEmbed = {
+        $type: 'app.spkeasy.embed.privateMessage',
+        privateMessage: {
+          message: btoa(JSON.stringify(hiddenContent)),
+        },
+      }
+    }
+
     const record: AppBskyFeedPost.Record = {
-      // IMPORTANT: $type has to exist, CID is calculated with the `$type` field
-      // present and will produce the wrong CID if you omit it.
       $type: 'app.bsky.feed.post',
       createdAt: now.toISOString(),
-      text: rt.text,
-      facets: rt.facets,
+      text: finalText,
+      facets: finalFacets,
       reply,
-      embed,
+      embed: finalEmbed,
       langs,
       labels,
     }
@@ -230,6 +257,10 @@ async function resolveEmbed(
   | AppBskyEmbedExternal.Main
   | AppBskyEmbedRecord.Main
   | AppBskyEmbedRecordWithMedia.Main
+  | {
+      $type: 'app.spkeasy.embed.privateMessage'
+      privateMessage: {message: string}
+    }
   | undefined
 > {
   if (draft.embed.quote) {
@@ -478,4 +509,26 @@ function isPlainObject(v: any): boolean {
   }
   const proto = Object.getPrototypeOf(v)
   return proto === Object.prototype || proto === null
+}
+
+export function createDefaultHiddenMessage(
+  richtext: RichText | undefined,
+): RichText {
+  return (
+    richtext ||
+    new RichText({
+      text: 'This is a hidden post and can only be seen on @spkeasy.social',
+      facets: [
+        {
+          index: {byteStart: 46, byteEnd: 61},
+          features: [
+            {
+              $type: 'app.bsky.richtext.facet#mention',
+              did: 'did:plc:spkeasy.social',
+            },
+          ],
+        },
+      ],
+    })
+  )
 }
