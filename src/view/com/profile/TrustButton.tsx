@@ -1,11 +1,11 @@
-import {useState} from 'react'
 import {StyleProp, TextStyle, View} from 'react-native'
 import {AppBskyActorDefs} from '@atproto/api'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {Shadow} from '#/state/cache/types'
 import {useTrustMutationQueue} from '#/state/queries/trust'
+import {useTrustStatusQuery} from '#/state/queries/trust-status'
+import {useSession} from '#/state/session'
 import {Button} from '../util/forms/Button'
 import * as Toast from '../util/Toast'
 
@@ -13,11 +13,14 @@ export function TrustButton({
   profile,
   labelStyle,
 }: {
-  profile: Shadow<AppBskyActorDefs.ProfileViewBasic>
+  profile: AppBskyActorDefs.ProfileViewDetailed
   labelStyle?: StyleProp<TextStyle>
 }) {
   const {_} = useLingui()
-  const [isTrusted, setIsTrusted] = useState(false)
+  const {currentAccount} = useSession()
+  const isOwnProfile = currentAccount?.did === profile.did
+
+  const {data: isTrusted} = useTrustStatusQuery(profile.did)
   const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
 
   const onPressTrust = async () => {
@@ -27,7 +30,6 @@ export function TrustButton({
       } else {
         await queueTrust()
       }
-      setIsTrusted(!isTrusted)
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
         Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
@@ -37,6 +39,10 @@ export function TrustButton({
 
   if (!profile.viewer) {
     return <View />
+  }
+
+  if (isOwnProfile) {
+    return null
   }
 
   return (

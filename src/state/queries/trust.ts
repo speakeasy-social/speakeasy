@@ -3,8 +3,8 @@ import {useMutation, useQueryClient} from '@tanstack/react-query'
 
 import {getPrivatePostsServerUrl} from '#/lib/api/config'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
-import {updateProfileShadow} from '#/state/cache/profile-shadow'
 import {useAgent} from '#/state/session'
+import {RQKEY as TRUST_STATUS_RQKEY} from './trust-status'
 
 const RQKEY_ROOT = 'trust'
 export const RQKEY = (did: string) => [RQKEY_ROOT, did]
@@ -31,26 +31,20 @@ export function useTrustMutationQueue(profile: {did: string}) {
       }
     },
     onSuccess(finalTrusted: boolean) {
-      // finalize
-      updateProfileShadow(queryClient, did, {
-        trusted: finalTrusted,
-      })
+      // Update trust status cache
+      queryClient.setQueryData(TRUST_STATUS_RQKEY(did), finalTrusted)
     },
   })
 
   const queueTrust = useCallback(() => {
-    // optimistically update
-    updateProfileShadow(queryClient, did, {
-      trusted: true,
-    })
+    // Optimistically update trust status cache
+    queryClient.setQueryData(TRUST_STATUS_RQKEY(did), true)
     return queueToggle(true)
   }, [queryClient, did, queueToggle])
 
   const queueUntrust = useCallback(() => {
-    // optimistically update
-    updateProfileShadow(queryClient, did, {
-      trusted: false,
-    })
+    // Optimistically update trust status cache
+    queryClient.setQueryData(TRUST_STATUS_RQKEY(did), false)
     return queueToggle(false)
   }, [queryClient, did, queueToggle])
 
@@ -61,7 +55,10 @@ function useTrustMutation() {
   const agent = useAgent()
   return useMutation<void, Error, {did: string}>({
     mutationFn: async ({did}) => {
-      const serverUrl = getPrivatePostsServerUrl(agent)
+      const serverUrl = getPrivatePostsServerUrl(
+        agent,
+        'social.spkeasy.graph.addTrusted',
+      )
       const response = await fetch(
         `${serverUrl}/xrpc/social.spkeasy.graph.addTrusted`,
         {
@@ -76,6 +73,10 @@ function useTrustMutation() {
         },
       )
       if (!response.ok) {
+        const error = await response.json()
+        if (error.code === 'AlreadyExists') {
+          return
+        }
         throw new Error('Failed to add trusted user')
       }
     },
@@ -86,7 +87,10 @@ function useUntrustMutation() {
   const agent = useAgent()
   return useMutation<void, Error, {did: string}>({
     mutationFn: async ({did}) => {
-      const serverUrl = getPrivatePostsServerUrl(agent)
+      const serverUrl = getPrivatePostsServerUrl(
+        agent,
+        'social.spkeasy.graph.removeTrusted',
+      )
       const response = await fetch(
         `${serverUrl}/xrpc/social.spkeasy.graph.removeTrusted`,
         {
@@ -101,6 +105,11 @@ function useUntrustMutation() {
         },
       )
       if (!response.ok) {
+        const error = await response.json()
+        if (error.code === 'NotFoundError') {
+          return
+        }
+
         throw new Error('Failed to remove trusted user')
       }
     },

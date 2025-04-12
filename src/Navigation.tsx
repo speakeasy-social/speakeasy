@@ -79,6 +79,7 @@ import {ProfileFeedScreen} from '#/screens/Profile/ProfileFeed'
 import {ProfileFollowersScreen} from '#/screens/Profile/ProfileFollowers'
 import {ProfileFollowsScreen} from '#/screens/Profile/ProfileFollows'
 import {ProfileLabelerLikedByScreen} from '#/screens/Profile/ProfileLabelerLikedBy'
+import {ProfileTrustedUsersScreen} from '#/screens/Profile/TrustedUsers'
 import {AppearanceSettingsScreen} from '#/screens/Settings/AppearanceSettings'
 import {AppIconSettingsScreen} from '#/screens/Settings/AppIconSettings'
 import {NotificationSettingsScreen} from '#/screens/Settings/NotificationSettings'
@@ -193,6 +194,14 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         options={({route}) => ({
           title: title(msg`Followers of @${route.params.name} that you know`),
         })}
+      />
+      <Stack.Screen
+        name="Trusted"
+        getComponent={() => ProfileTrustedUsersScreen}
+        options={{
+          title: title(msg`Trusted Users`),
+          requireAuth: true,
+        }}
       />
       <Stack.Screen
         name="ProfileList"
