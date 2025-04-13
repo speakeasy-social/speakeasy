@@ -155,6 +155,7 @@ export const ComposePost = ({
   mention: initMention,
   openEmojiPicker,
   text: initText,
+  realTalk: initRealTalk,
   imageUris: initImageUris,
   videoUri: initVideoUri,
   audience: initAudience,
@@ -187,6 +188,7 @@ export const ComposePost = ({
       initImageUris,
       initQuoteUri: initQuote?.uri,
       initText,
+      initRealTalk,
       initMention,
       initAudience,
     },
@@ -1800,7 +1802,7 @@ function AudienceBar({
             {paddingLeft: 12, paddingRight: 12},
           ]}
           accessibilityHint={_(
-            msg`Choose to make the post visible publicly, only to trusted community, or hidden`,
+            msg`Choose to make the post visible publicly, or only to people you trust`,
           )}
           accessibilityLabel={getLabel()}
           label={getLabel()}>

@@ -103,6 +103,7 @@ function Inner({state}: {state: ComposerOpts}) {
             quote={state.quote}
             onPost={state.onPost}
             mention={state.mention}
+            realTalk={state.realTalk}
             openEmojiPicker={onOpenPicker}
             text={state.text}
             imageUris={state.imageUris}

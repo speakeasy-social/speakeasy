@@ -125,6 +125,7 @@ export async function post(
     let finalFacets = rt.facets
     if (draft.audience === 'hidden' && rtPublic) {
       const hiddenContent = {
+        realTalk: draft.realTalk,
         text: rt.text,
         facets: rt.facets,
         embed: embed,
@@ -134,7 +135,7 @@ export async function post(
       finalEmbed = {
         $type: 'app.spkeasy.embed.privateMessage',
         privateMessage: {
-          message: btoa(JSON.stringify(hiddenContent)),
+          encodedMessage: btoa(JSON.stringify(hiddenContent)),
         },
       }
     }
@@ -259,7 +260,7 @@ async function resolveEmbed(
   | AppBskyEmbedRecordWithMedia.Main
   | {
       $type: 'app.spkeasy.embed.privateMessage'
-      privateMessage: {message: string}
+      privateMessage: {encodedMessage: string}
     }
   | undefined
 > {

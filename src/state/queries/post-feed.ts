@@ -374,12 +374,12 @@ export function usePostFeedQuery(
                       ) {
                         const privateMessage = item.record.embed
                           .privateMessage as {
-                          message: string
+                          encodedMessage: string
                           publicMessage: string
                         }
                         try {
                           const decodedContent = decodePrivateMessage(
-                            privateMessage.message,
+                            privateMessage.encodedMessage,
                             item.post.author.did, // Pass the parent post's author DID
                             selectArgs.baseUrl,
                           )
@@ -809,6 +809,7 @@ export function decodePrivateMessage(
     const decoded = JSON.parse(atob(message))
 
     const text = decoded.record?.text || decoded.text || ''
+    const facets = decoded.record?.facets || decoded.facets || []
 
     // Transform any embeds into view format
     let transformedEmbed = decoded.embed
@@ -842,6 +843,38 @@ export function decodePrivateMessage(
       }
     }
 
+    // Also transform any embeds in the record
+    if (decoded.record?.embed) {
+      const recordEmbed = decoded.record.embed
+      if (recordEmbed.$type === 'app.bsky.embed.images') {
+        decoded.record.embed = transformImageEmbed(
+          recordEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (recordEmbed.$type === 'app.bsky.embed.video') {
+        decoded.record.embed = transformVideoEmbed(
+          recordEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (recordEmbed.$type === 'app.bsky.embed.external') {
+        decoded.record.embed = transformExternalEmbed(
+          recordEmbed,
+          authorDid,
+          baseUrl,
+        )
+      } else if (recordEmbed.$type === 'app.bsky.embed.record') {
+        decoded.record.embed = transformRecordEmbed(recordEmbed)
+      } else if (recordEmbed.$type === 'app.bsky.embed.recordWithMedia') {
+        decoded.record.embed = transformRecordWithMediaEmbed(
+          recordEmbed,
+          authorDid,
+          baseUrl,
+        )
+      }
+    }
+
     // Construct a minimal PostView with just text
     const postView: AppBskyFeedDefs.PostView = {
       uri: decoded.uri || 'at://unknown',
@@ -856,7 +889,8 @@ export function decodePrivateMessage(
         text,
         $type: 'app.bsky.feed.post',
         createdAt: decoded.record?.createdAt || new Date().toISOString(),
-        ...(decoded.embed ? {embed: decoded.embed} : {}),
+        ...(decoded.record?.embed ? {embed: decoded.record.embed} : {}),
+        ...(facets.length > 0 ? {facets} : {}),
       } as AppBskyFeedPost.Record,
       embed: transformedEmbed,
       indexedAt: decoded.indexedAt || new Date().toISOString(),

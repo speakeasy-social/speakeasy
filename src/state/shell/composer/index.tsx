@@ -32,6 +32,7 @@ export interface ComposerOpts {
   mention?: string // handle of user to mention
   openEmojiPicker?: (pos: EmojiPickerPosition | undefined) => void
   text?: string
+  realTalk?: string
   imageUris?: {uri: string; width: number; height: number; altText?: string}[]
   videoUri?: {uri: string; width: number; height: number}
   audience?: 'public' | 'trusted' | 'hidden'

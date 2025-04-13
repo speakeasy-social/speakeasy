@@ -58,9 +58,10 @@ export type PostDraft = {
   richtext: RichText
   labels: SelfLabel[]
   embed: EmbedDraft
+  realTalk: string | undefined
   shortenedGraphemeLength: number
   audience: 'public' | 'trusted' | 'hidden'
-  publicMessage?: RichText // Only used when audience is 'hidden'
+  publicMessage?: RichText
 }
 
 export type PostAction =
@@ -493,12 +494,14 @@ export function createComposerState({
   initText,
   initMention,
   initImageUris,
+  initRealTalk,
   initQuoteUri,
   initAudience,
 }: {
   initText: string | undefined
   initMention: string | undefined
   initImageUris: ComposerOpts['imageUris']
+  initRealTalk: string | undefined
   initQuoteUri: string | undefined
   initAudience?: 'public' | 'trusted' | 'hidden'
 }): ComposerState {
@@ -602,6 +605,7 @@ export function createComposerState({
           id: nanoid(),
           richtext: initRichText,
           shortenedGraphemeLength: getShortenedLength(initRichText),
+          realTalk: initRealTalk,
           labels: [],
           embed: {
             quote,
