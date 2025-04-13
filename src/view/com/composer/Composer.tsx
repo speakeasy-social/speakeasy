@@ -664,6 +664,7 @@ export const ComposePost = ({
             dispatch={composerDispatch}
             isReply={!!replyTo}
           />
+          <TrustedAudienceBanner post={activePost} />
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
@@ -709,6 +710,35 @@ export const ComposePost = ({
         />
       </KeyboardAvoidingView>
     </BottomSheetPortalProvider>
+  )
+}
+
+function TrustedAudienceBanner({post}: {post: PostDraft}) {
+  const t = useTheme()
+  const {_} = useLingui()
+
+  if (post.audience !== 'trusted') {
+    return null
+  }
+
+  return (
+    <View style={[a.px_lg, a.py_sm]}>
+      <View
+        style={[
+          a.px_md,
+          a.py_sm,
+          a.rounded_sm,
+          t.atoms.bg_contrast_25,
+          a.flex_row,
+          a.align_center,
+          a.gap_sm,
+        ]}>
+        <Lock size="sm" fill={t.palette.primary_500} />
+        <NewText style={[a.flex_1, a.leading_snug]}>
+          {_(msg`The post will only be visible to people that you trust`)}
+        </NewText>
+      </View>
+    </View>
   )
 }
 
