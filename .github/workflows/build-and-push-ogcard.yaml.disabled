@@ -1,4 +1,4 @@
-name: build-and-push-bskyembed-upcloud
+name: build-and-push-ogcard
 
 on:
   workflow_dispatch:
@@ -7,8 +7,8 @@ on:
       - main
       - staging
     paths:
-      - bskyembed/**
-      - '.github/workflows/build-and-push-embedr-upcloud.yaml'
+      - bskyogcard/**
+      - '.github/workflows/build-and-push-ogcard.yaml'
 
 jobs:
   build:
@@ -32,21 +32,21 @@ jobs:
         with:
           context: .
           push: false
-          file: ./Dockerfile.embedr
+          file: ./Dockerfile.bskyogcard
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=docker,dest=${{ github.workspace }}/speakeasy-embedr.tar
-          tags: speakeasy-embedr-image:latest
+          outputs: type=docker,dest=${{ github.workspace }}/speakeasy-ogcard.tar
+          tags: speakeasy-ogcard-image:latest
 
       - name: Gzip Docker Image
         run: |
-          gzip -c ${{ github.workspace }}/speakeasy-embedr.tar > ${{ github.workspace }}/speakeasy-embedr.tar.gz
+          gzip -c ${{ github.workspace }}/speakeasy-ogcard.tar > ${{ github.workspace }}/speakeasy-ogcard.tar.gz
 
       - name: Upload Docker Image Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: speakeasy-embedr-tar-gz
-          path: ${{ github.workspace }}/speakeasy-embedr.tar.gz
+          name: speakeasy-ogcard-tar-gz
+          path: ${{ github.workspace }}/speakeasy-ogcard.tar.gz
 
   deploy-staging:
     runs-on: ubuntu-latest
@@ -58,30 +58,30 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: speakeasy-embedr-tar-gz
+          name: speakeasy-ogcard-tar-gz
           path: ${{ github.workspace }}
 
-      - name: Copy Docker Image to UpCloud Server
+      - name: Copy Docker Image to Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: ${{ github.workspace }}/speakeasy-embedr.tar.gz
+          source: ${{ github.workspace }}/speakeasy-ogcard.tar.gz
           target: /home/speakeasy
 
-      - name: Deploy and Run Docker Image on UpCloud Server
+      - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker stop speakeasy-embedr || true
-            docker rm speakeasy-embedr || true
-            gunzip -f /home/speakeasy/github/workspace/speakeasy-embedr.tar.gz &&
-            docker load --input /home/speakeasy/github/workspace/speakeasy-embedr.tar &&
-            docker run -d -p 127.0.0.1:8101:8100 --restart=unless-stopped --name speakeasy-embedr speakeasy-embedr-image:latest /usr/bin/embedr serve
+            docker stop speakeasy-ogcard || true
+            docker rm speakeasy-ogcard || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-ogcard.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-ogcard.tar &&
+            docker run -d -p 127.0.0.1:8102:8102 --restart=unless-stopped --name speakeasy-ogcard speakeasy-ogcard-image:latest
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -93,28 +93,28 @@ jobs:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
         with:
-          name: speakeasy-embedr-tar-gz
+          name: speakeasy-ogcard-tar-gz
           path: ${{ github.workspace }}
 
-      - name: Copy Docker Image to UpCloud Server
+      - name: Copy Docker Image to Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: ${{ github.workspace }}/speakeasy-embedr.tar.gz
+          source: ${{ github.workspace }}/speakeasy-ogcard.tar.gz
           target: /home/speakeasy
 
-      - name: Deploy and Run Docker Image on UpCloud Server
+      - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker stop speakeasy-embedr || true
-            docker rm speakeasy-embedr || true
-            gunzip -f /home/speakeasy/github/workspace/speakeasy-embedr.tar.gz &&
-            docker load --input /home/speakeasy/github/workspace/speakeasy-embedr.tar &&
-            docker run -d -p 127.0.0.1:8101:8100 --restart=unless-stopped --name speakeasy-embedr speakeasy-embedr-image:latest /usr/bin/embedr serve
+            docker stop speakeasy-ogcard || true
+            docker rm speakeasy-ogcard || true
+            gunzip -f /home/speakeasy/github/workspace/speakeasy-ogcard.tar.gz &&
+            docker load --input /home/speakeasy/github/workspace/speakeasy-ogcard.tar &&
+            docker run -d -p 127.0.0.1:8102:8102 --restart=unless-stopped --name speakeasy-ogcard speakeasy-ogcard-image:latest
             

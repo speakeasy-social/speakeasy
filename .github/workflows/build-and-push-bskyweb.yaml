@@ -1,12 +1,10 @@
-name: build-and-push-bskyweb-upcloud
+name: build-and-push-bskyweb
 
 on:
   workflow_dispatch:
   push:
     branches: 
       - main
-      - feature/deploy-upcloud
-      - feature/deploy-upcloud2
       - staging
 
 jobs:
@@ -62,7 +60,7 @@ jobs:
           name: speakeasy-client-tar-gz
           path: ${{ github.workspace }}
 
-      - name: Copy Docker Image to UpCloud Server
+      - name: Copy Docker Image to Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -71,7 +69,7 @@ jobs:
           source: ${{ github.workspace }}/speakeasy-client.tar.gz
           target: /home/speakeasy
 
-      - name: Deploy and Run Docker Image on UpCloud Server
+      - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -97,7 +95,7 @@ jobs:
           name: speakeasy-client-tar-gz
           path: ${{ github.workspace }}
 
-      - name: Copy Docker Image to UpCloud Server
+      - name: Copy Docker Image to Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -106,7 +104,7 @@ jobs:
           source: ${{ github.workspace }}/speakeasy-client.tar.gz
           target: /home/speakeasy
 
-      - name: Deploy and Run Docker Image on UpCloud Server
+      - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
