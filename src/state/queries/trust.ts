@@ -2,6 +2,7 @@ import {useCallback} from 'react'
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
+import {getPublicKey} from '#/lib/api/user-keys'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {RQKEY as TRUST_STATUS_RQKEY} from './trust-status'
 
@@ -62,7 +63,10 @@ function useTrustMutation() {
             recipientDid: did,
           },
         })
+        // Prompt the key server to generate a public key for the user
+        await getPublicKey(did, call)
       } catch (error: any) {
+        // Ignore sync issues
         if (error.code === 'AlreadyExists') {
           return
         }

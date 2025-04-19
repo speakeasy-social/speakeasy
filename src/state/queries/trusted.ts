@@ -14,21 +14,29 @@ const STALE = {
 const RQKEY_ROOT = 'trusted'
 export const RQKEY = (did: string) => [RQKEY_ROOT, did]
 
-type TrustedResponse = {
-  trusted: Array<{recipientDid: string}>
+type TrustedUser = {
+  recipientDid: string
+  createdAt: string
 }
 
+/**
+ * Fetches the list of users that a given DID trusts
+ * @param {string} did - The DID of the user whose trusted users we want to fetch
+ * @param {any} speakeasyApi - The Speakeasy API client instance
+ * @param {QueryClient} queryClient - The React Query client instance
+ * @returns {Promise<Array<{recipientDid: string}>>} A promise that resolves to an array of trusted users
+ */
 export async function getTrustedUsers(
   did: string,
   speakeasyApi: any,
   queryClient: QueryClient,
-) {
-  const data = (await speakeasyApi({
+): Promise<TrustedUser[]> {
+  const data = await speakeasyApi({
     api: 'social.spkeasy.graph.getTrusted',
     query: {
       authorDid: did,
     },
-  })) as TrustedResponse
+  })
 
   // Update trust status cache for each trusted user
   data.trusted.forEach(({recipientDid}: {recipientDid: string}) => {
@@ -38,6 +46,11 @@ export async function getTrustedUsers(
   return data.trusted
 }
 
+/**
+ * React Query hook to fetch and manage trusted users for a given DID
+ * @param {string | undefined} did - The DID of the user whose trusted users we want to fetch
+ * @returns {UseQueryResult} A React Query result object containing the trusted users' profiles
+ */
 export function useTrustedQuery(did: string | undefined) {
   const agent = useAgent()
   const queryClient = useQueryClient()
