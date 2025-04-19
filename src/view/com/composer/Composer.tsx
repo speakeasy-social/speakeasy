@@ -1810,7 +1810,8 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
-  const canPostPrivate = true;
+  // Disabled until private posts are launched
+  const canPostPrivate = false;
 
   const onToggleAudience = useCallback(() => {
     if (!canPostPrivate && (post.audience === 'public')) {
