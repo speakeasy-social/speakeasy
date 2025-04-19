@@ -5,6 +5,7 @@ import {useLingui} from '@lingui/react'
 
 import {makeProfileLink} from '#/lib/routes/links'
 import {Shadow} from '#/state/cache/types'
+import {useSession} from '#/state/session'
 import {formatCount} from '#/view/com/util/numeric/format'
 import {atoms as a, useTheme} from '#/alf'
 import {InlineLinkText} from '#/components/Link'
@@ -17,6 +18,8 @@ export function ProfileHeaderMetrics({
 }) {
   const t = useTheme()
   const {_, i18n} = useLingui()
+  const {currentAccount} = useSession()
+  const isOwnProfile = currentAccount?.did === profile.did
   const following = formatCount(i18n, profile.followsCount || 0)
   const followers = formatCount(i18n, profile.followersCount || 0)
   const pluralizedFollowers = plural(profile.followersCount || 0, {
@@ -58,6 +61,18 @@ export function ProfileHeaderMetrics({
           {plural(profile.postsCount || 0, {one: 'post', other: 'posts'})}
         </Text>
       </Text>
+      {isOwnProfile && (
+        <InlineLinkText
+          style={[a.flex_row, t.atoms.text]}
+          to="/trusted"
+          label="0 trusted">
+          <Text style={[a.font_bold, a.text_md]}>0 </Text>
+          <Text
+            style={[t.atoms.text_contrast_medium, a.font_normal, a.text_md]}>
+            trusted
+          </Text>
+        </InlineLinkText>
+      )}
     </View>
   )
 }

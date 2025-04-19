@@ -1,6 +1,7 @@
 import {chunk} from 'lodash'
 
-import {SpeakeasyApi} from './speakeasy'
+import {generateKeyPair} from '#/lib/encryption'
+import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
 
 /**
  * Retrieves the encrypted session key from the Speakeasy API.
@@ -8,7 +9,7 @@ import {SpeakeasyApi} from './speakeasy'
  * @returns {Promise<string>} The encrypted session key
  */
 export async function getSession(
-  speakeasyApi: SpeakeasyApi,
+  speakeasyApi: SpeakeasyApiCall,
 ): Promise<{sessionId: string; encryptedDek: string}> {
   const data = await speakeasyApi({
     api: 'social.spkeasy.graph.getSession',
@@ -25,10 +26,10 @@ export async function getSession(
  */
 export async function getPublicKey(
   did: string,
-  speakeasyApi: SpeakeasyApi,
+  speakeasyApi: SpeakeasyApiCall,
 ): Promise<string> {
   const data = await speakeasyApi({
-    api: 'social.spkeasy.user.getPublicKey',
+    api: 'social.spkeasy.keys.getPublicKey',
     query: {
       did,
     },
@@ -45,7 +46,7 @@ export async function getPublicKey(
  */
 export async function getPublicKeys(
   dids: string[],
-  speakeasyApi: SpeakeasyApi,
+  speakeasyApi: SpeakeasyApiCall,
 ): Promise<{publicKey: string; recipientDid: string}[]> {
   const CHUNK_SIZE = 25
   const chunks = chunk(dids, CHUNK_SIZE)
@@ -53,7 +54,7 @@ export async function getPublicKeys(
 
   for (const didChunk of chunks) {
     const data = await speakeasyApi({
-      api: 'social.spkeasy.user.getPublicKeys',
+      api: 'social.spkeasy.keys.getPublicKeys',
       query: {
         dids: didChunk.join(','),
       },
@@ -70,10 +71,10 @@ export async function getPublicKeys(
  * @returns {Promise<string>} The user's private key
  */
 export async function getPrivateKey(
-  speakeasyApi: SpeakeasyApi,
+  speakeasyApi: SpeakeasyApiCall,
 ): Promise<string> {
   const data = await speakeasyApi({
-    api: 'social.spkeasy.user.getPrivateKey',
+    api: 'social.spkeasy.keys.getPrivateKey',
   })
 
   return data.sessionKey
@@ -92,13 +93,36 @@ interface KeyPair {
  */
 export async function updateUserKeyPair(
   {privateKey, publicKey}: KeyPair,
-  speakeasyApi: SpeakeasyApi,
+  speakeasyApi: SpeakeasyApiCall,
 ): Promise<void> {
   await speakeasyApi({
-    api: 'social.spkeasy.user.setKeyPair',
+    api: 'social.spkeasy.keys.setKeyPair',
     body: {
       privateKey,
       publicKey,
     },
   })
+}
+
+/**
+ * Gets or creates a public key for the given agent.
+ * @param {any} agent - The agent object containing user information
+ * @param {any} call - The API call function
+ * @returns {Promise<{publicKey: string, privateKey: string}>} The public and private key pair
+ */
+export async function getOrCreatePublicKey(agent: any, call: any) {
+  let publicKey: string
+  let privateKey: string | null = null
+
+  try {
+    publicKey = await getPublicKey(agent.did!, call)
+  } catch (error) {
+    if (getErrorCode(error) === 'NotFound') {
+      ;({publicKey, privateKey} = await generateKeyPair())
+      await updateUserKeyPair({publicKey, privateKey}, call)
+    } else {
+      throw error
+    }
+  }
+  return {publicKey, privateKey}
 }

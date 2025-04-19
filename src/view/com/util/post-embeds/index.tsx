@@ -51,7 +51,7 @@ type Embed =
   | {$type: string; [k: string]: unknown}
 
 interface PrivateMessageEmbed {
-  $type: 'app.spkeasy.embed.privateMessage'
+  $type: 'social.spkeasy.embed.privateMessage'
   privateMessage: {
     message: string
     publicMessage: string
@@ -80,7 +80,7 @@ export function PostEmbeds({
     return null
   }
 
-  if (embed.$type === 'app.spkeasy.embed.privateMessage') {
+  if (embed.$type === 'social.spkeasy.embed.privateMessage') {
     const privateEmbed = embed as PrivateMessageEmbed
     return (
       <PrivateMessageEmbed

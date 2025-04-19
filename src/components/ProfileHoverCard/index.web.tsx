@@ -14,6 +14,7 @@ import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {usePrefetchProfileQuery, useProfileQuery} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
+import {TrustButton} from '#/view/com/profile/TrustButton'
 import {formatCount} from '#/view/com/util/numeric/format'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {ProfileHeaderHandle} from '#/screens/Profile/Header/Handle'
@@ -461,6 +462,7 @@ function Inner({
               </ButtonText>
             </Button>
           ))}
+        <TrustButton profile={profileShadow} />
       </View>
 
       <Link to={profileURL} label={_(msg`View profile`)} onPress={hide}>

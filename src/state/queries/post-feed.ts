@@ -370,7 +370,7 @@ export function usePostFeedQuery(
                         !item.post.embed &&
                         item.record.embed &&
                         item.record.embed.$type ===
-                          'app.spkeasy.embed.privateMessage'
+                          'social.spkeasy.embed.privateMessage'
                       ) {
                         const privateMessage = item.record.embed
                           .privateMessage as {
@@ -384,7 +384,7 @@ export function usePostFeedQuery(
                             selectArgs.baseUrl,
                           )
                           feedPostSliceItem.post.embed = {
-                            $type: 'app.spkeasy.embed.privateMessage',
+                            $type: 'social.spkeasy.embed.privateMessage',
                             privateMessage,
                             decodedEmbed: {
                               uri: decodedContent.uri,
