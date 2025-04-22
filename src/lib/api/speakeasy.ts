@@ -82,3 +82,27 @@ export function useSpeakeasyApi(): {
     },
   }
 }
+
+export type Feature = {
+  key: string
+  value: string
+}
+
+/**
+ * Get the features for the current user
+ * @param agent - The BskyAgent instance
+ * @returns The features for the current user
+ */
+export async function getFeatures(agent: BskyAgent): Promise<Feature[]> {
+  try {
+    const response = await callSpeakeasyApiWithAgent(agent, {
+      api: 'social.spkeasy.actor.getFeatures',
+      query: {did: agent.session!.did},
+    })
+    return response.features
+  } catch (error) {
+    // Feature flags are disabled by default, so assume none rather than throw an error
+    console.error(error)
+    return []
+  }
+}

@@ -55,6 +55,7 @@ import {useQueryClient} from '@tanstack/react-query'
 
 import {createDefaultHiddenMessage} from '#/lib/api'
 import * as apilib from '#/lib/api/index'
+import {usePrivateSession} from '#/lib/api/private-sessions'
 import {EmbeddingDisabledError} from '#/lib/api/resolve'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
@@ -85,6 +86,7 @@ import {
   useLanguagePrefs,
   useLanguagePrefsApi,
 } from '#/state/preferences/languages'
+import {useFeaturesQuery} from '#/state/queries/features'
 import {useProfileQuery} from '#/state/queries/profile'
 import {Gif} from '#/state/queries/tenor'
 import {useAgent, useSession} from '#/state/session'
@@ -143,7 +145,6 @@ import {
 import {NO_VIDEO, NoVideoState, processVideo, VideoState} from './state/video'
 import {getVideoMetadata} from './videos/pickVideo'
 import {clearThumbnailCache} from './videos/VideoTranscodeBackdrop'
-import {usePrivateSession} from '#/lib/api/private-sessions'
 
 type CancelRef = {
   onPressCancel: () => void
@@ -426,7 +427,7 @@ export const ComposePost = ({
         }))
         
         await callSpeakeasyApiWithAgent(agent, {
-          api: 'social.spkeasy.createPosts',
+          api: 'social.spkeasy.privateSession.createPosts',
           method: 'POST',
           body: {
             sessionId: 'FIXME',
@@ -1810,8 +1811,8 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
-  // Disabled until private posts are launched
-  const canPostPrivate = false;
+  const {data: features = []} = useFeaturesQuery()
+  const canPostPrivate = features.some(f => f.key === 'private-posts' && f.value === 'true')
 
   const onToggleAudience = useCallback(() => {
     if (!canPostPrivate && (post.audience === 'public')) {
@@ -1827,7 +1828,7 @@ function AudienceBar({
         },
       })
     }
-  }, [canPostPrivate,dispatch, post.id, post.audience, groupsDialogControl])
+  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
 
   const getLabel = () => {
     switch (post.audience) {
