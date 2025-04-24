@@ -1,7 +1,23 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getPrivateKey} from '#/lib/api/user-keys'
+import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {FeedAPI, FeedAPIResponse} from './types'
+
+export type EncryptedPost = {
+  uri: string
+  rkey: string
+  authorDid: string
+  encryptedContent: string
+  createdAt: string
+  sessionId: string
+  reply: {
+    root: string | null
+    parent: string | null
+  }
+  langs: string[]
+}
 
 export class PrivatePostsFeedAPI implements FeedAPI {
   agent: BskyAgent
@@ -27,20 +43,41 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         },
       })
 
-      const privateKey = await getPrivateKey(this.agent)
+      const {
+        encryptedPosts,
+        encryptedSessionKeys,
+      }: {
+        cursor: string
+        encryptedPosts: EncryptedPost[]
+        encryptedSessionKeys: {
+          sessionId: string
+          encryptedDek: string
+          recipientDid: string
+        }[]
+      } = data
+
+      // const privateKey = await getPrivateKey(this.agent)
 
       const posts = (
         await Promise.all(
-          data.encryptedPosts.map(async (encryptedPost: any) => {
-            const encryptedDek = data.encryptedSessionKeys.find(
-              key => key.sessionId === encryptedPost.authorDid,
-            )?.encryptedDek
-            if (!sessionKey) return null
-            const dek = decryptDek(encryptedDek, privateKey)
+          encryptedPosts.map(async (encryptedPost: any) => {
+            // const encryptedDek = encryptedSessionKeys.find(
+            //   key => key.sessionId === encryptedPost.sessionId,
+            // )?.encryptedDek
+            // // If we can't find a session to decode it, discard the post
+            // if (!encryptedDek) return null
+            // const dek = await decryptDEK(encryptedDek, privateKey)
 
-            const post = await decryptPost(encryptedPost, sessionKey)
+            // const post = await decryptContent(
+            //   encryptedPost.encryptedContent,
+            //   dek,
+            // )
+            // return {
+            //   ...post,
+            //   ...encryptedPost,
+            // }
             return {
-              ...post,
+              ...JSON.parse(encryptedPost.encryptedContent),
               ...encryptedPost,
             }
           }),
@@ -48,7 +85,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
       ).filter(post => !!post)
 
       // Convert private posts to FeedViewPost format
-      const feed = data.encryptedPosts.map((post: any) => ({
+      const feed = posts.map((post: any) => ({
         $type: 'app.bsky.feed.defs#feedViewPost',
         post: {
           $type: 'app.bsky.feed.defs#postView',

@@ -7,6 +7,8 @@ import {
   AppBskyEmbedVideo,
   AppBskyFeedDefs,
   AppBskyFeedPost,
+  AppBskyFeedPostgate,
+  AppBskyFeedThreadgate,
   AtUri,
   BlobRef,
   BskyAgent,
@@ -14,6 +16,7 @@ import {
   ComAtprotoRepoApplyWrites,
   ComAtprotoRepoStrongRef,
   RichText,
+  AppBskyRichtextFacet,
 } from '@atproto/api'
 import {TID} from '@atproto/common-web'
 import * as dcbor from '@ipld/dag-cbor'
@@ -50,14 +53,20 @@ interface PostOpts {
   replyTo?: string
   onStateChange?: (state: string) => void
   langs?: string[]
+  collection: 'app.bsky.feed.post' | 'social.spkeasy.feed.privatePost'
 }
 
 export async function preparePost(
   agent: BskyAgent,
   queryClient: QueryClient,
   opts: PostOpts,
-): Promise<{writes: ComAtprotoRepoApplyWrites.Create[]; uris: string[]}> {
+): Promise<{
+  writes: ComAtprotoRepoApplyWrites.Create[]
+  uris: string[]
+  cids: string[]
+}> {
   const thread = opts.thread
+  const cids = []
   opts.onStateChange?.(t`Processing...`)
 
   let replyPromise:
@@ -113,7 +122,7 @@ export async function preparePost(
     now.setMilliseconds(now.getMilliseconds() + 1)
     tid = TID.next(tid)
     const rkey = tid.toString()
-    const uri = `at://${did}/app.bsky.feed.post/${rkey}`
+    const uri = `at://${did}/${opts.collection}/${rkey}`
     uris.push(uri)
 
     const rt = await rtPromise
@@ -135,7 +144,7 @@ export async function preparePost(
       finalText = rtPublic.text
       finalFacets = rtPublic.facets
       finalEmbed = {
-        $type: 'social.spkeasy.embed.privateMessage',
+        $type: 'social.spkeasy.embed.hiddenMessage',
         privateMessage: {
           encodedMessage: btoa(JSON.stringify(hiddenContent)),
         },
@@ -143,7 +152,7 @@ export async function preparePost(
     }
 
     const record: AppBskyFeedPost.Record = {
-      $type: 'app.bsky.feed.post',
+      $type: opts.collection,
       createdAt: now.toISOString(),
       text: finalText,
       facets: finalFacets,
@@ -154,7 +163,7 @@ export async function preparePost(
     }
     writes.push({
       $type: 'com.atproto.repo.applyWrites#create',
-      collection: 'app.bsky.feed.post',
+      collection: opts.collection,
       rkey: rkey,
       value: record,
     })
@@ -189,9 +198,12 @@ export async function preparePost(
       })
     }
 
+    const cid = await computeCid(record)
+    cids.push(cid)
+
     // Prepare a ref to the current post for the next post in the thread.
     const ref = {
-      cid: await computeCid(record),
+      cid,
       uri,
     }
     replyPromise = {
@@ -200,7 +212,7 @@ export async function preparePost(
     }
   }
 
-  return {writes, uris}
+  return {writes, uris, cids}
 }
 
 export async function post(
@@ -271,7 +283,7 @@ async function resolveEmbed(
   | AppBskyEmbedRecord.Main
   | AppBskyEmbedRecordWithMedia.Main
   | {
-      $type: 'social.spkeasy.embed.privateMessage'
+      $type: 'social.spkeasy.embed.hiddenMessage'
       privateMessage: {encodedMessage: string}
     }
   | undefined
@@ -546,7 +558,24 @@ export function createDefaultHiddenMessage(
   )
 }
 
-export type CombinedPost = AppBskyFeedDefs.PostView & {
+export type CombinedPost = {
+  uri: string
+  cid: string
+  record: {
+    reply?: AppBskyFeedPost.ReplyRef
+    langs?: string[]
+    facets?: AppBskyRichtextFacet.Main[]
+    labels?: any
+    text: string
+    embed?:
+      | AppBskyEmbedImages.View
+      | AppBskyEmbedVideo.View
+      | AppBskyEmbedExternal.View
+      | AppBskyEmbedRecord.View
+      | AppBskyEmbedRecordWithMedia.View
+      | {$type: string; [k: string]: unknown}
+    [k: string]: unknown
+  }
   threadgate?: {
     uri: string
     cid: string
@@ -560,6 +589,7 @@ export type CombinedPost = AppBskyFeedDefs.PostView & {
 }
 
 export function combinePostGates(
+  authorDid: string,
   writes: ComAtprotoRepoApplyWrites.Create[],
   uris: string[],
   cids: string[],
@@ -569,28 +599,23 @@ export function combinePostGates(
   writes.forEach(write => {
     if (!write.rkey) return
 
-    const uri = `at://${write.rkey.split('/')[0]}/${write.collection}/${
-      write.rkey.split('/')[1]
-    }`
+    const uri = `at://${authorDid}/${write.collection}/${write.rkey}`
 
-    if (write.collection === 'app.bsky.feed.post' && write.value) {
+    if (write.collection === 'social.spkeasy.feed.privatePost' && write.value) {
       const postIndex = uris.indexOf(uri)
       const record = write.value as AppBskyFeedPost.Record
-      const author = record.author as AppBskyActorDefs.ProfileViewBasic
       formattedPosts.push({
         uri,
         cid: cids[postIndex],
-        author,
-        record,
-        indexedAt: new Date().toISOString(),
+        record: record as any,
       })
     } else if (write.collection === 'app.bsky.feed.threadgate' && write.value) {
       const lastPost = formattedPosts[formattedPosts.length - 1]
       if (lastPost) {
         lastPost.threadgate = {
-          uri: `at://${
-            lastPost.author.did
-          }/app.bsky.feed.threadgate/${lastPost.uri.split('/').pop()}`,
+          uri: `at://${authorDid}/app.bsky.feed.threadgate/${lastPost.uri
+            .split('/')
+            .pop()}`,
           cid: '', // This would need to be filled in from the actual response
           record: write.value as AppBskyFeedThreadgate.Record,
         }
@@ -599,9 +624,9 @@ export function combinePostGates(
       const lastPost = formattedPosts[formattedPosts.length - 1]
       if (lastPost) {
         lastPost.postgate = {
-          uri: `at://${
-            lastPost.author.did
-          }/app.bsky.feed.postgate/${lastPost.uri.split('/').pop()}`,
+          uri: `at://${authorDid}/app.bsky.feed.postgate/${lastPost.uri
+            .split('/')
+            .pop()}`,
           cid: '', // This would need to be filled in from the actual response
           record: write.value as AppBskyFeedPostgate.Record,
         }
@@ -610,4 +635,28 @@ export function combinePostGates(
   })
 
   return formattedPosts
+}
+
+export function formatPrivatePosts(posts: CombinedPost[]) {
+  console.log('posts to format', posts)
+
+  return posts.map(formattedPost => {
+    const contentToEncrypt = {
+      ...formattedPost.record,
+      postgate: formattedPost.postgate,
+      threadgate: formattedPost.threadgate,
+    }
+    return {
+      rkey: formattedPost.uri.split('/').pop(),
+      reply: formattedPost.record.reply
+        ? {
+            root: formattedPost.record.reply.root,
+            parent: formattedPost.record.reply.parent,
+          }
+        : undefined,
+      uri: formattedPost.uri,
+      langs: formattedPost.record.langs,
+      encryptedContent: JSON.stringify(contentToEncrypt),
+    }
+  })
 }

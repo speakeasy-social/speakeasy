@@ -407,27 +407,26 @@ export const ComposePost = ({
     try {
       // Check if this is a private post
       if (activePost.audience === 'trusted') {
-        await getPrivateSession();
+        // await getPrivateSession();
 
-        const {writes,uris} = await apilib.preparePost(agent, queryClient, {
+        const {writes,uris,cids} = await apilib.preparePost(agent, queryClient, {
           thread,
           replyTo: replyTo?.uri,
           onStateChange: setPublishingStage,
           langs: toPostLanguages(langPrefs.postLanguage),
+          collection: 'social.spkeasy.feed.privatePost',
         })
 
-        const posts = apilib.combinePostGates(writes, uris, cids).map(post => ({
-          reply: post.reply ? {
-            root: post.reply.root,
-            parent: post.reply.parent,
-          } : undefined,          
-          uri: post.uri,
-          langs: post.lang,
-          encryptedContent: JSON.stringify(post),
-        }))
+        console.log('writes', writes)
+
+        const authorDid = agent.assertDid
+
+        const posts = apilib.formatPrivatePosts(apilib.combinePostGates(authorDid, writes, uris, cids))
+
+        console.log('posts', posts)
         
         await callSpeakeasyApiWithAgent(agent, {
-          api: 'social.spkeasy.privateSession.createPosts',
+          api: 'social.spkeasy.privatePosts.createPosts',
           method: 'POST',
           body: {
             sessionId: 'FIXME',
@@ -444,6 +443,7 @@ export const ComposePost = ({
             replyTo: replyTo?.uri,
             onStateChange: setPublishingStage,
             langs: toPostLanguages(langPrefs.postLanguage),
+            collection: 'app.bsky.feed.post',
           })
         ).uris[0]
         try {
@@ -543,8 +543,6 @@ export const ComposePost = ({
     setLangPrefs,
     queryClient,
     activePost.audience,
-    activePost.richtext.text,
-    getPrivateSession,
   ])
 
   // Preserves the referential identity passed to each post item.
