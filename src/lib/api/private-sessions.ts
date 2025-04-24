@@ -23,6 +23,7 @@ async function createSession(
 ) {
   const {sessionId} = await call({
     api: 'social.spkeasy.privateSession.create',
+    method: 'POST',
     body: {
       sessionKeys,
     },
@@ -39,6 +40,7 @@ async function createSession(
  */
 async function createNewSession(
   myPublicKey: string,
+  myUserKeyPairId: string,
   agent: BskyAgent,
   call: SpeakeasyApiCall,
   queryClient: QueryClient,
@@ -60,8 +62,13 @@ async function createNewSession(
     call,
   )
 
+  // Create a session with the current user and their trusted users
   const allSessionUsers = [
-    {recipientDid: agent.did!, publicKey: myPublicKey},
+    {
+      recipientDid: agent.did!,
+      publicKey: myPublicKey,
+      userKeyPairId: myUserKeyPairId,
+    },
     ...recipientPublicKeys,
   ]
 
@@ -69,7 +76,11 @@ async function createNewSession(
   const encryptedDeks = await Promise.all(
     allSessionUsers.map(async recipient => {
       const encryptedDek = await encryptDEK(dek, recipient.publicKey)
-      return {recipientDid: recipient.recipientDid, encryptedDek}
+      return {
+        encryptedDek,
+        recipientDid: recipient.recipientDid,
+        userKeyPairId: recipient.userKeyPairId,
+      }
     }),
   )
 
@@ -94,15 +105,20 @@ export async function getOrCreatePrivateSession(
   let publicKey
   let encryptedDek
   let sessionId
+  let userKeyPairId
 
   // Get the session
   try {
     ;({sessionId, encryptedDek} = await getSession(call))
   } catch (error) {
     if (getErrorCode(error) === 'NotFound') {
-      ;({publicKey, privateKey} = await getOrCreatePublicKey(agent, call))
+      ;({publicKey, privateKey, userKeyPairId} = await getOrCreatePublicKey(
+        agent,
+        call,
+      ))
       ;({sessionId, encryptedDek} = await createNewSession(
         publicKey,
+        userKeyPairId,
         agent,
         call,
         queryClient,
@@ -113,7 +129,7 @@ export async function getOrCreatePrivateSession(
   }
 
   if (!privateKey) {
-    privateKey = await getPrivateKey(call)
+    ;({privateKey, userKeyPairId} = await getPrivateKey(call))
   }
 
   const sessionKey = await decryptDEK(encryptedDek, privateKey)

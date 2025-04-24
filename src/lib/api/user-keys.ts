@@ -12,7 +12,7 @@ export async function getSession(
   speakeasyApi: SpeakeasyApiCall,
 ): Promise<{sessionId: string; encryptedDek: string}> {
   const data = await speakeasyApi({
-    api: 'social.spkeasy.graph.getSession',
+    api: 'social.spkeasy.privateSession.getSession',
   })
 
   return data.encryptedSessionKey
@@ -27,15 +27,15 @@ export async function getSession(
 export async function getPublicKey(
   did: string,
   speakeasyApi: SpeakeasyApiCall,
-): Promise<string> {
+): Promise<{userKeyPairId: string; publicKey: string}> {
   const data = await speakeasyApi({
-    api: 'social.spkeasy.keys.getPublicKey',
+    api: 'social.spkeasy.key.getPublicKey',
     query: {
       did,
     },
   })
 
-  return data.sessionKey
+  return data
 }
 
 /**
@@ -47,14 +47,18 @@ export async function getPublicKey(
 export async function getPublicKeys(
   dids: string[],
   speakeasyApi: SpeakeasyApiCall,
-): Promise<{publicKey: string; recipientDid: string}[]> {
+): Promise<{publicKey: string; recipientDid: string; userKeyPairId: string}[]> {
   const CHUNK_SIZE = 25
   const chunks = chunk(dids, CHUNK_SIZE)
-  const allPublicKeys: {publicKey: string; recipientDid: string}[] = []
+  const allPublicKeys: {
+    publicKey: string
+    recipientDid: string
+    userKeyPairId: string
+  }[] = []
 
   for (const didChunk of chunks) {
     const data = await speakeasyApi({
-      api: 'social.spkeasy.keys.getPublicKeys',
+      api: 'social.spkeasy.key.getPublicKeys',
       query: {
         dids: didChunk.join(','),
       },
@@ -72,12 +76,12 @@ export async function getPublicKeys(
  */
 export async function getPrivateKey(
   speakeasyApi: SpeakeasyApiCall,
-): Promise<string> {
+): Promise<{privateKey: string; userKeyPairId: string}> {
   const data = await speakeasyApi({
-    api: 'social.spkeasy.keys.getPrivateKey',
+    api: 'social.spkeasy.key.getPrivateKey',
   })
 
-  return data.sessionKey
+  return data
 }
 
 interface KeyPair {
@@ -94,14 +98,16 @@ interface KeyPair {
 export async function updateUserKeyPair(
   {privateKey, publicKey}: KeyPair,
   speakeasyApi: SpeakeasyApiCall,
-): Promise<void> {
-  await speakeasyApi({
-    api: 'social.spkeasy.keys.setKeyPair',
+): Promise<{userKeyPairId: string}> {
+  const data = await speakeasyApi({
+    api: 'social.spkeasy.key.rotate',
+    method: 'POST',
     body: {
       privateKey,
       publicKey,
     },
   })
+  return {userKeyPairId: data.userKeyPairId}
 }
 
 /**
@@ -113,16 +119,20 @@ export async function updateUserKeyPair(
 export async function getOrCreatePublicKey(agent: any, call: any) {
   let publicKey: string
   let privateKey: string | null = null
+  let userKeyPairId: string
 
   try {
-    publicKey = await getPublicKey(agent.did!, call)
+    ;({publicKey, userKeyPairId} = await getPublicKey(agent.did!, call))
   } catch (error) {
     if (getErrorCode(error) === 'NotFound') {
       ;({publicKey, privateKey} = await generateKeyPair())
-      await updateUserKeyPair({publicKey, privateKey}, call)
+      ;({userKeyPairId} = await updateUserKeyPair(
+        {publicKey, privateKey},
+        call,
+      ))
     } else {
       throw error
     }
   }
-  return {publicKey, privateKey}
+  return {publicKey, privateKey, userKeyPairId}
 }

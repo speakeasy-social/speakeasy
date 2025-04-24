@@ -11,7 +11,7 @@ const MAX_CACHE_SIZE = 5
 let isRandomDisabled = false
 
 /**
- * Secure wrapper around secureGetRandomValues that guards against poor randomness
+ * Secure wrapper around crypto.getRandomValues that guards against poor randomness
  * by checking for duplicate values in recent history.
  *
  * @param array - The array to fill with random values
@@ -25,7 +25,7 @@ function secureGetRandomValues<T extends ArrayBufferView>(array: T): T {
     )
   }
 
-  const result = secureGetRandomValues(array)
+  const result = crypto.getRandomValues(array)
 
   // Only track Uint8Array values for simplicity
   if (array instanceof Uint8Array) {

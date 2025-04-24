@@ -407,29 +407,36 @@ export const ComposePost = ({
     try {
       // Check if this is a private post
       if (activePost.audience === 'trusted') {
-        // await getPrivateSession();
+        const {sessionId, sessionKey} = await getPrivateSession()
 
-        const {writes,uris,cids} = await apilib.preparePost(agent, queryClient, {
-          thread,
-          replyTo: replyTo?.uri,
-          onStateChange: setPublishingStage,
-          langs: toPostLanguages(langPrefs.postLanguage),
-          collection: 'social.spkeasy.feed.privatePost',
-        })
+        const {writes, uris, cids} = await apilib.preparePost(
+          agent,
+          queryClient,
+          {
+            thread,
+            replyTo: replyTo?.uri,
+            onStateChange: setPublishingStage,
+            langs: toPostLanguages(langPrefs.postLanguage),
+            collection: 'social.spkeasy.feed.privatePost',
+          },
+        )
 
         console.log('writes', writes)
 
         const authorDid = agent.assertDid
 
-        const posts = apilib.formatPrivatePosts(apilib.combinePostGates(authorDid, writes, uris, cids))
+        const posts = await apilib.formatPrivatePosts(
+          apilib.combinePostGates(authorDid, writes, uris, cids),
+          sessionKey,
+        )
 
         console.log('posts', posts)
-        
+
         await callSpeakeasyApiWithAgent(agent, {
           api: 'social.spkeasy.privatePosts.createPosts',
           method: 'POST',
           body: {
-            sessionId: 'FIXME',
+            sessionId,
             encryptedPosts: posts,
           },
         })
@@ -543,6 +550,7 @@ export const ComposePost = ({
     setLangPrefs,
     queryClient,
     activePost.audience,
+    getPrivateSession,
   ])
 
   // Preserves the referential identity passed to each post item.
@@ -1810,13 +1818,15 @@ function AudienceBar({
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
   const {data: features = []} = useFeaturesQuery()
-  const canPostPrivate = features.some(f => f.key === 'private-posts' && f.value === 'true')
+  const canPostPrivate = features.some(
+    f => f.key === 'private-posts' && f.value === 'true',
+  )
 
   const onToggleAudience = useCallback(() => {
-    if (!canPostPrivate && (post.audience === 'public')) {
+    if (!canPostPrivate && post.audience === 'public') {
       groupsDialogControl.open()
     } else {
-      const newAudience = post.audience === 'public' ? 'trusted' : 'public';
+      const newAudience = post.audience === 'public' ? 'trusted' : 'public'
       dispatch({
         type: 'update_post',
         postId: post.id,

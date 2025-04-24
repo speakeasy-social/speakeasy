@@ -28,7 +28,7 @@ export function getHost(agent: BskyAgent, endpoint: string): string {
   // Temporary, lets get an NGINX proxy running in develop
   const devHosts = [
     {prefix: 'social.spkeasy.graph', host: 'http://localhost:3001'},
-    {prefix: 'social.spkeasy.keys', host: 'http://localhost:3004'},
+    {prefix: 'social.spkeasy.key', host: 'http://localhost:3004'},
     // Catch all
     {prefix: 'social.spkeasy', host: 'http://localhost:3002'},
   ]

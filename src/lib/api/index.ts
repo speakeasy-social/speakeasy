@@ -1,14 +1,13 @@
 import {
-  AppBskyActorDefs,
   AppBskyEmbedExternal,
   AppBskyEmbedImages,
   AppBskyEmbedRecord,
   AppBskyEmbedRecordWithMedia,
   AppBskyEmbedVideo,
-  AppBskyFeedDefs,
   AppBskyFeedPost,
   AppBskyFeedPostgate,
   AppBskyFeedThreadgate,
+  AppBskyRichtextFacet,
   AtUri,
   BlobRef,
   BskyAgent,
@@ -16,7 +15,6 @@ import {
   ComAtprotoRepoApplyWrites,
   ComAtprotoRepoStrongRef,
   RichText,
-  AppBskyRichtextFacet,
 } from '@atproto/api'
 import {TID} from '@atproto/common-web'
 import * as dcbor from '@ipld/dag-cbor'
@@ -26,6 +24,7 @@ import {sha256} from 'js-sha256'
 import {CID} from 'multiformats/cid'
 import * as Hasher from 'multiformats/hashes/hasher'
 
+import {encryptContent} from '#/lib/encryption'
 import {isNetworkError} from '#/lib/strings/errors'
 import {shortenLinks, stripInvalidMentions} from '#/lib/strings/rich-text-manip'
 import {logger} from '#/logger'
@@ -637,26 +636,39 @@ export function combinePostGates(
   return formattedPosts
 }
 
-export function formatPrivatePosts(posts: CombinedPost[]) {
+export async function formatPrivatePosts(
+  posts: CombinedPost[],
+  sessionKey: string,
+) {
   console.log('posts to format', posts)
 
-  return posts.map(formattedPost => {
-    const contentToEncrypt = {
-      ...formattedPost.record,
-      postgate: formattedPost.postgate,
-      threadgate: formattedPost.threadgate,
-    }
-    return {
-      rkey: formattedPost.uri.split('/').pop(),
-      reply: formattedPost.record.reply
-        ? {
-            root: formattedPost.record.reply.root,
-            parent: formattedPost.record.reply.parent,
-          }
-        : undefined,
-      uri: formattedPost.uri,
-      langs: formattedPost.record.langs,
-      encryptedContent: JSON.stringify(contentToEncrypt),
-    }
-  })
+  return Promise.all(
+    posts.map(async formattedPost => {
+      const contentToEncrypt = {
+        ...formattedPost.record,
+        postgate: formattedPost.postgate,
+        threadgate: formattedPost.threadgate,
+      }
+      const encryptedContent = await encryptContent(
+        JSON.stringify(contentToEncrypt),
+        sessionKey,
+      )
+      // This is just here so we don't have to delete variables to
+      // clear eslint issues
+      // Remove once we're using the encryptedContent
+      console.log('encryptedContent', encryptedContent.slice(0, 10))
+      return {
+        rkey: formattedPost.uri.split('/').pop(),
+        reply: formattedPost.record.reply
+          ? {
+              root: formattedPost.record.reply.root,
+              parent: formattedPost.record.reply.parent,
+            }
+          : undefined,
+        uri: formattedPost.uri,
+        langs: formattedPost.record.langs,
+        encryptedContent: JSON.stringify(contentToEncrypt),
+      }
+    }),
+  )
 }
