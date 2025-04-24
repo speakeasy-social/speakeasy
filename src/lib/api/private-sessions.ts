@@ -1,62 +1,67 @@
 import {useCallback} from 'react'
-import {useQueryClient} from '@tanstack/react-query'
+import {BskyAgent} from '@atproto/api'
+import {QueryClient, useQueryClient} from '@tanstack/react-query'
 
-import {useSpeakeasyApi} from '#/lib/api/speakeasy'
-import {generateDEK, generateKeyPair} from '#/lib/encryption'
+import {
+  getErrorCode,
+  SpeakeasyApiCall,
+  useSpeakeasyApi,
+} from '#/lib/api/speakeasy'
+import {decryptDEK, encryptDEK, generateDEK} from '#/lib/encryption'
 import {getTrustedUsers, RQKEY} from '#/state/queries/trusted'
 import {useAgent} from '#/state/session'
+import {
+  getOrCreatePublicKey,
+  getPrivateKey,
+  getPublicKeys,
+  getSession,
+} from './user-keys'
 
-export async function getSession(speakeasyApi: any) {
-  const data = await speakeasyApi({
-    api: 'social.spkeasy.graph.getSession',
-  })
-
-  return data.encryptedSessionKey
-}
-
-export async function getPublicKey(did: string, speakeasyApi: any) {
-  const data = await speakeasyApi({
-    api: 'social.spkeasy.user.getPublicKey',
-    query: {
-      did,
-    },
-  })
-
-  return data.sessionKey
-}
-
-export async function getPrivateKey(speakeasyApi: any) {
-  const data = await speakeasyApi({
-    api: 'social.spkeasy.user.getPrivateKey',
-  })
-
-  return data.sessionKey
-}
-
-export async function updateUserKeyPair(
-  {privateKey, publicKey},
-  speakeasyApi: any,
+async function createSession(
+  sessionKeys: {recipientDid: string; encryptedDek: string}[],
+  call: SpeakeasyApiCall,
 ) {
-  const data = await speakeasyApi({
-    api: 'social.spkeasy.user.rotate',
+  const {sessionId} = await call({
+    api: 'social.spkeasy.privateSession.create',
     body: {
-      privateKey,
-      publicKey,
+      sessionKeys,
     },
   })
+
+  return {sessionId}
 }
 
-async function createNewSession(myDid, myPublicKey) {
-  const dek = generateDEK()
+/**
+ * Creates a new session with the current user and their trusted users.
+ * @param {string} myDid - The DID of the current user
+ * @param {string} myPublicKey - The public key of the current user
+ * @returns {Promise<{sessionId: string, encryptedDek: string}>} The session ID and encrypted data encryption key
+ */
+async function createNewSession(
+  myPublicKey: string,
+  agent: BskyAgent,
+  call: SpeakeasyApiCall,
+  queryClient: QueryClient,
+) {
+  const dek = await generateDEK()
 
-  const trustedUsers = await getTrustedUsers(myDid, call, queryClient)
+  // Get cached trusted users data
+  let trustedUsers: {recipientDid: string}[] | undefined =
+    queryClient.getQueryData(RQKEY(agent.did!))
+
+  if (trustedUsers) {
+    trustedUsers = trustedUsers
+  } else {
+    trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
+  }
 
   const recipientPublicKeys = await getPublicKeys(
     trustedUsers.map(user => user.recipientDid),
+    call,
   )
 
   const allSessionUsers = [
-    {recipientDid: myDid, publicKey: myPublicKey},
+    {recipientDid: agent.did!, publicKey: myPublicKey},
     ...recipientPublicKeys,
   ]
 
@@ -64,62 +69,44 @@ async function createNewSession(myDid, myPublicKey) {
   const encryptedDeks = await Promise.all(
     allSessionUsers.map(async recipient => {
       const encryptedDek = await encryptDEK(dek, recipient.publicKey)
-      return {recipientDid: recipient.did, encryptedDek}
+      return {recipientDid: recipient.recipientDid, encryptedDek}
     }),
   )
 
-  const {sessionId} = await createSession(allSessionUsers, encryptedDeks)
+  const {sessionId} = await createSession(encryptedDeks, call)
 
   return {sessionId, encryptedDek: encryptedDeks[0].encryptedDek}
 }
 
-async function getOrCreatePublicKey(agent: any, call: any) {
-  let publicKey
-  let privateKey
-
-  try {
-    publicKey = await getPublicKey(agent.did!, call)
-  } catch (error) {
-    if (error.code === 'NotFound') {
-      ;({publicKey, privateKey} = await generateKeyPair())
-      await updateUserKeyPair({publicKey, privateKey}, call)
-    } else {
-      throw error
-    }
-
-    return {publicKey, privateKey}
-  }
-}
-
-export async function getPrivateSession(agent, call, queryClient) {
+/**
+ * Retrieves or creates a private session for the current user.
+ * @param {any} agent - The agent object containing user information
+ * @param {any} call - The API call function
+ * @param {any} queryClient - The React Query client instance
+ * @returns {Promise<{sessionId: string, sessionKey: string}>} The session ID and decrypted session key
+ */
+export async function getOrCreatePrivateSession(
+  agent: BskyAgent,
+  call: SpeakeasyApiCall,
+  queryClient: QueryClient,
+) {
   let privateKey
   let publicKey
   let encryptedDek
   let sessionId
 
-  // Get the private key
-  try {
-    privateKey = await getPrivateKey(call)
-  } catch (error) {
-    if (error.code === 'NotFound') {
-      ;({publicKey, privateKey} = await generateKeyPair())
-      await updateUserKeyPair({publicKey, privateKey}, call)
-    } else {
-      throw error
-    }
-  }
-
   // Get the session
   try {
     ;({sessionId, encryptedDek} = await getSession(call))
   } catch (error) {
-    if (error.code === 'NotFound') {
-      ;({publicKey, privateKey} = await getOrCreatePublicKey(agent, call))(
-        ({sessionId, encryptedDek} = await createNewSession(
-          publicKey,
-          queryClient,
-        )),
-      )
+    if (getErrorCode(error) === 'NotFound') {
+      ;({publicKey, privateKey} = await getOrCreatePublicKey(agent, call))
+      ;({sessionId, encryptedDek} = await createNewSession(
+        publicKey,
+        agent,
+        call,
+        queryClient,
+      ))
     } else {
       throw error
     }
@@ -137,21 +124,16 @@ export async function getPrivateSession(agent, call, queryClient) {
   }
 }
 
+/**
+ * React hook for managing private sessions.
+ * @returns {Function} A callback function that returns the trusted users data
+ */
 export function usePrivateSession() {
   const agent = useAgent()
   const queryClient = useQueryClient()
   const {call} = useSpeakeasyApi()
 
   return useCallback(async () => {
-    // Get cached trusted users data
-    const cachedTrusted = queryClient.getQueryData(RQKEY(agent.did!))
-
-    if (cachedTrusted) {
-      return cachedTrusted
-    }
-
-    // If not in cache, fetch fresh data
-    const trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
-    return trustedUsers
+    return getOrCreatePrivateSession(agent, call, queryClient)
   }, [agent, call, queryClient])
 }

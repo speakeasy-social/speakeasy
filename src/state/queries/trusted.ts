@@ -52,7 +52,6 @@ export async function getTrustedUsers(
  * @returns {UseQueryResult} A React Query result object containing the trusted users' profiles
  */
 export function useTrustedQuery(did: string | undefined) {
-  const agent = useAgent()
   const queryClient = useQueryClient()
   const {call: speakeasyApi} = useSpeakeasyApi()
 
@@ -61,18 +60,32 @@ export function useTrustedQuery(did: string | undefined) {
     staleTime: STALE.MINUTES.FIVE,
     queryKey: RQKEY(did || ''),
     queryFn: async () => {
-      const trusted = await getTrustedUsers(did!, speakeasyApi, queryClient)
+      return getTrustedUsers(did!, speakeasyApi, queryClient)
+    },
+  })
+}
+
+/**
+ * Hook to fetch full profiles for trusted users
+ */
+export function useTrustedProfiles(did: string | undefined) {
+  const agent = useAgent()
+  const {data: trustedUsers} = useTrustedQuery(did)
+
+  return useQuery({
+    enabled: !!trustedUsers?.length,
+    queryKey: [...RQKEY(did || ''), 'profiles'],
+    queryFn: async () => {
+      if (!trustedUsers) return []
 
       // Fetch profile information for each trusted DID in batches of 25
-      const dids = trusted.map((t: {recipientDid: string}) => t.recipientDid)
+      const dids = trustedUsers.map(t => t.recipientDid)
       const batches = chunk(dids, 25)
       const profilePromises = batches.map(batch =>
         agent.getProfiles({actors: batch}),
       )
       const profileResults = await Promise.all(profilePromises)
-      const profiles = profileResults.flatMap(result => result.data.profiles)
-
-      return profiles
+      return profileResults.flatMap(result => result.data.profiles)
     },
   })
 }
