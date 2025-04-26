@@ -120,44 +120,16 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         .flatMap(post => [post.reply.root?.uri, post.reply.parent?.uri])
         .filter(Boolean)
 
-      const replyPosts = await Promise.all(
-        replyUris.map(uri =>
-          this.agent.getPosts({uris: [uri]}).then(res => ({
-            uri,
-            post: {
-              ...res.data.posts[0],
-              $type: 'app.bsky.feed.defs#postView',
-              author: {
-                ...res.data.posts[0].author,
-                $type: 'app.bsky.actor.defs#profileViewBasic',
-              },
-              record: {
-                ...res.data.posts[0].record,
-                $type: 'app.bsky.feed.post',
-              },
-            },
-          })),
-        ),
-      )
-      const replyPostMap = Object.fromEntries(
-        replyPosts.map(({uri, post}) => [uri, post]),
-      )
+      const replyPostMap = await fetchPostsInBatches(this.agent, replyUris)
 
       // Fetch quoted posts
       const quotedPostUris = posts
         .filter(post => post.embed?.record?.uri)
         .map(post => post.embed.record.uri)
 
-      const quotedPosts = await Promise.all(
-        quotedPostUris.map(uri =>
-          this.agent.getPosts({uris: [uri]}).then(res => ({
-            uri,
-            post: res.data.posts[0],
-          })),
-        ),
-      )
-      const quotedPostMap = Object.fromEntries(
-        quotedPosts.map(({uri, post}) => [uri, post]),
+      const quotedPostMap = await fetchPostsInBatches(
+        this.agent,
+        quotedPostUris,
       )
 
       // Convert private posts to FeedViewPost format
@@ -245,4 +217,39 @@ export class PrivatePostsFeedAPI implements FeedAPI {
     const res = await this.fetch({cursor: undefined, limit: 1})
     return res.feed[0]
   }
+}
+
+// Helper function to fetch posts in batches
+async function fetchPostsInBatches(agent: BskyAgent, uris: string[]) {
+  const batchSize = 25
+  const uriBatches = []
+  for (let i = 0; i < uris.length; i += batchSize) {
+    uriBatches.push(uris.slice(i, i + batchSize))
+  }
+
+  const posts = (
+    await Promise.all(
+      uriBatches.map(urisInBatch =>
+        agent.getPosts({uris: urisInBatch}).then(res =>
+          res.data.posts.map(post => ({
+            uri: post.uri,
+            post: {
+              ...post,
+              $type: 'app.bsky.feed.defs#postView',
+              author: {
+                ...post.author,
+                $type: 'app.bsky.actor.defs#profileViewBasic',
+              },
+              record: {
+                ...post.record,
+                $type: 'app.bsky.feed.post',
+              },
+            },
+          })),
+        ),
+      ),
+    )
+  ).flat()
+
+  return Object.fromEntries(posts.map(({uri, post}) => [uri, post]))
 }
