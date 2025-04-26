@@ -917,6 +917,7 @@ let ComposerPost = React.memo(function ComposerPost({
           onNewLink={onNewLink}
           onError={onError}
           onPressPublish={onPublish}
+          disableDrop={post.audience === 'trusted'}
           accessible={true}
           accessibilityLabel={_(msg`Write post`)}
           accessibilityHint={_(
@@ -1290,6 +1291,7 @@ function ComposerFooter({
   const images = media?.type === 'images' ? media.images : []
   const video = media?.type === 'video' ? media.video : null
   const isMaxImages = images.length >= MAX_IMAGES
+  const isTrustedPost = post.audience === 'trusted'
 
   const onImageAdd = useCallback(
     (next: ComposerImage[]) => {
@@ -1327,19 +1329,30 @@ function ComposerFooter({
           <ToolbarWrapper style={[a.flex_row, a.align_center, a.gap_xs]}>
             <SelectPhotoBtn
               size={images.length}
-              disabled={media?.type === 'images' ? isMaxImages : !!media}
+              disabled={
+                media?.type === 'images'
+                  ? isMaxImages
+                  : !!media || isTrustedPost
+              }
               onAdd={onImageAdd}
             />
             <SelectVideoBtn
               onSelectVideo={asset => onSelectVideo(post.id, asset)}
-              disabled={!!media}
+              disabled={!!media || isTrustedPost}
               setError={onError}
             />
             <OpenCameraBtn
-              disabled={media?.type === 'images' ? isMaxImages : !!media}
+              disabled={
+                media?.type === 'images'
+                  ? isMaxImages
+                  : !!media || isTrustedPost
+              }
               onAdd={onImageAdd}
             />
-            <SelectGifBtn onSelectGif={onSelectGif} disabled={!!media} />
+            <SelectGifBtn
+              onSelectGif={onSelectGif}
+              disabled={!!media || isTrustedPost}
+            />
             {!isMobile ? (
               <Button
                 onPress={onEmojiButtonPress}
