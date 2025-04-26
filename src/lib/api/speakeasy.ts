@@ -1,4 +1,4 @@
-import {BskyAgent} from '@atproto/api'
+import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {useAgent} from '#/state/session'
 
@@ -18,12 +18,12 @@ export type SpeakeasyApiCall = (options: SpeakeasyApiOptions) => Promise<any>
  * @returns The host for the Speakeasy API
  */
 export function getHost(agent: BskyAgent, endpoint: string): string {
-  if (!agent.pdsUrl?.toString().includes('localhost')) {
-    if (endpoint.startsWith('social.spkeasy.keys')) {
-      return 'https://keys.spkeasy.social'
-    }
-    return 'https://api.spkeasy.social'
-  }
+  // if (!agent.pdsUrl?.toString().includes('localhost')) {
+  //   if (endpoint.startsWith('social.spkeasy.keys')) {
+  //     return 'https://keys.spkeasy.social'
+  //   }
+  //   return 'https://api.spkeasy.social'
+  // }
 
   // Temporary, lets get an NGINX proxy running in develop
   const devHosts = [
@@ -105,4 +105,12 @@ export async function getFeatures(agent: BskyAgent): Promise<Feature[]> {
     console.error(error)
     return []
   }
+}
+
+export function isAnyPostView(v: any): v is AppBskyFeedDefs.PostView {
+  return AppBskyFeedDefs.isPostView(v) || isPrivatePostView(v)
+}
+
+export function isPrivatePostView(v: any): v is AppBskyFeedDefs.PostView {
+  return v?.$type === 'social.spkeasy.feed.defs#privatePostView'
 }

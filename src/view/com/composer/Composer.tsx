@@ -433,7 +433,7 @@ export const ComposePost = ({
         console.log('posts', posts)
 
         await callSpeakeasyApiWithAgent(agent, {
-          api: 'social.spkeasy.privatePosts.createPosts',
+          api: 'social.spkeasy.privatePost.createPosts',
           method: 'POST',
           body: {
             sessionId,

@@ -1,8 +1,10 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {getPrivateKey} from '#/lib/api/user-keys'
 import {decryptContent, decryptDEK} from '#/lib/encryption'
+import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
 
 export type EncryptedPost = {
@@ -28,19 +30,31 @@ export class PrivatePostsFeedAPI implements FeedAPI {
 
   async fetch({
     cursor,
+    audience,
     limit = 50,
   }: {
     cursor: string | undefined
+    audience?: string
     limit: number
   }): Promise<FeedAPIResponse> {
     try {
+      const baseUrl = getBaseCdnUrl(this.agent)
+
+      const query: {
+        limit: string
+        audience: string
+        cursor?: string
+        filter?: string
+      } = {
+        limit: limit.toString(),
+        audience: audience || 'trusted',
+      }
+      if (cursor) query.cursor = cursor
+      if (audience === 'following') query.filter = 'follows'
+
       const data = await callSpeakeasyApiWithAgent(this.agent, {
-        api: 'social.spkeasy.privatePosts.getPosts',
-        query: {
-          recipient: this.agent.session?.did || '',
-          ...(cursor ? {cursor} : {}),
-          limit: limit.toString(),
-        },
+        api: 'social.spkeasy.privatePost.getPosts',
+        query,
       })
 
       const {
@@ -84,60 +98,136 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         )
       ).filter(post => !!post)
 
+      console.log('posts', posts)
+
+      // Fetch author profiles for all posts
+      const authorDids = [...new Set(posts.map(post => post.authorDid))]
+      const authorProfiles = await Promise.all(
+        authorDids.map(did =>
+          this.agent.getProfile({actor: did}).then(res => ({
+            did,
+            profile: res.data,
+          })),
+        ),
+      )
+      const authorProfileMap = Object.fromEntries(
+        authorProfiles.map(({did, profile}) => [did, profile]),
+      )
+
+      // Fetch reply posts
+      const replyUris = posts
+        .filter(post => post.reply)
+        .flatMap(post => [post.reply.root?.uri, post.reply.parent?.uri])
+        .filter(Boolean)
+
+      const replyPosts = await Promise.all(
+        replyUris.map(uri =>
+          this.agent.getPosts({uris: [uri]}).then(res => ({
+            uri,
+            post: {
+              ...res.data.posts[0],
+              $type: 'app.bsky.feed.defs#postView',
+              author: {
+                ...res.data.posts[0].author,
+                $type: 'app.bsky.actor.defs#profileViewBasic',
+              },
+              record: {
+                ...res.data.posts[0].record,
+                $type: 'app.bsky.feed.post',
+              },
+            },
+          })),
+        ),
+      )
+      const replyPostMap = Object.fromEntries(
+        replyPosts.map(({uri, post}) => [uri, post]),
+      )
+
+      // Fetch quoted posts
+      const quotedPostUris = posts
+        .filter(post => post.embed?.record?.uri)
+        .map(post => post.embed.record.uri)
+
+      const quotedPosts = await Promise.all(
+        quotedPostUris.map(uri =>
+          this.agent.getPosts({uris: [uri]}).then(res => ({
+            uri,
+            post: res.data.posts[0],
+          })),
+        ),
+      )
+      const quotedPostMap = Object.fromEntries(
+        quotedPosts.map(({uri, post}) => [uri, post]),
+      )
+
       // Convert private posts to FeedViewPost format
-      const feed = posts.map((post: any) => ({
-        $type: 'app.bsky.feed.defs#feedViewPost',
-        post: {
-          $type: 'app.bsky.feed.defs#postView',
-          uri: post.uri,
-          cid: post.cid,
-          author: {
-            $type: 'app.bsky.actor.defs#profileViewBasic',
-            did: post.authorDid,
-            handle: '', // We'll need to fetch this separately if needed
-            displayName: '',
-            avatar: '',
-            viewer: {
-              muted: false,
-              blockedBy: false,
+      const feed = posts.map((post: any) => {
+        const authorProfile = authorProfileMap[post.authorDid]
+        const quotedPost = quotedPostMap[post.embed?.record?.uri]
+
+        const postView = {
+          $type: 'social.spkeasy.feed.defs#privatePostView',
+
+          post: {
+            $type: 'social.spkeasy.feed.defs#privatePostView',
+            uri: post.uri,
+            cid: post.cid,
+            author: {
+              $type: 'app.bsky.actor.defs#profileViewBasic',
+              did: post.authorDid,
+              handle: authorProfile?.handle || post.authorDid,
+              displayName: authorProfile?.displayName || post.authorDid,
+              avatar: authorProfile?.avatar || '',
+              viewer: {
+                muted: false,
+                blockedBy: false,
+              },
+              labels: [],
             },
-            labels: [],
-          },
-          record: {
-            $type: 'app.bsky.feed.post',
-            text: post.text,
-            createdAt: post.createdAt,
-            langs: [],
-          },
-          embed: undefined,
-          replyCount: 0,
-          repostCount: 0,
-          likeCount: 0,
-          indexedAt: post.createdAt,
-          labels: [],
-          viewer: {
-            repost: undefined,
-            like: undefined,
-          },
-        },
-        reply: undefined,
-        reason: {
-          $type: 'app.bsky.feed.defs#reasonRepost',
-          by: {
-            $type: 'app.bsky.actor.defs#profileViewBasic',
-            did: post.authorDid,
-            handle: '', // We'll need to fetch this separately if needed
-            displayName: '',
-            avatar: '',
-            viewer: {
-              muted: false,
-              blockedBy: false,
+            record: {
+              $type: 'app.bsky.feed.post',
+              text: post.text,
+              createdAt: post.createdAt,
+              langs: post.langs || [],
+              facets: post.facets || [],
+              embed: {
+                $type: 'app.bsky.embed.record',
+                record: {
+                  cid: 'bafyreihfhbzmr6yrvnvybqbawod7nwaamw2futez4obfwr23tvqvnuo2nu',
+                  uri: 'at://did:plc:3vb37k6vaaxmnqp4suzavywx/app.bsky.feed.post/3lnp6wodza22v',
+                },
+              },
             },
+            embed: post.embed
+              ? transformPrivateEmbed(
+                  post.embed,
+                  post.authorDid,
+                  baseUrl,
+                  quotedPost,
+                )
+              : undefined,
+            replyCount: 0,
+            repostCount: 0,
+            likeCount: 0,
+            indexedAt: post.createdAt,
             labels: [],
+            viewer: {
+              repost: undefined,
+              like: undefined,
+            },
           },
-          indexedAt: post.createdAt,
-        },
-      }))
+          reply: post.reply
+            ? {
+                root: replyPostMap[post.reply.root?.uri],
+                parent: replyPostMap[post.reply.parent?.uri],
+              }
+            : undefined,
+        }
+
+        return postView
+      })
+
+      console.log('feed', feed)
 
       return {
         cursor: data.cursor,

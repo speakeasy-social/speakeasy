@@ -143,7 +143,7 @@ export async function preparePost(
       finalText = rtPublic.text
       finalFacets = rtPublic.facets
       finalEmbed = {
-        $type: 'social.spkeasy.embed.hiddenMessage',
+        $type: 'social.spkeasy.embed.privateMessage',
         privateMessage: {
           encodedMessage: btoa(JSON.stringify(hiddenContent)),
         },
@@ -282,7 +282,7 @@ async function resolveEmbed(
   | AppBskyEmbedRecord.Main
   | AppBskyEmbedRecordWithMedia.Main
   | {
-      $type: 'social.spkeasy.embed.hiddenMessage'
+      $type: 'social.spkeasy.embed.privateMessage'
       privateMessage: {encodedMessage: string}
     }
   | undefined

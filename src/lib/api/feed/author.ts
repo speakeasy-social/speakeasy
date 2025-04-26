@@ -3,6 +3,7 @@ import {
   AppBskyFeedGetAuthorFeed as GetAuthorFeed,
   BskyAgent,
 } from '@atproto/api'
+import {isAnyPostView} from '#/lib/api/speakeasy'
 
 import {FeedAPI, FeedAPIResponse} from './types'
 
@@ -84,7 +85,7 @@ function isAuthorReplyChain(
 
   const replyParent = post.reply?.parent
 
-  if (AppBskyFeedDefs.isPostView(replyParent)) {
+  if (isAnyPostView(replyParent)) {
     // reply parent is by a different user
     if (replyParent.author.did !== actor) return false
 

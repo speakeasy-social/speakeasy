@@ -239,6 +239,9 @@ let FeedItemInner = ({
     : undefined
 
   const [hover, setHover] = useState(false)
+
+  const isPrivatePost = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+
   return (
     <Link
       testID={`feedItem-by-${post.author.handle}`}
@@ -398,6 +401,7 @@ let FeedItemInner = ({
             timestamp={post.indexedAt}
             postHref={href}
             onOpenAuthor={onOpenAuthor}
+            isPrivate={isPrivatePost}
           />
           {showReplyTo &&
             (parentAuthor || isParentBlocked || isParentNotFound) && (
