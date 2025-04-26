@@ -7,6 +7,16 @@ export class PrivatePostsWrapper implements FeedAPI {
   private wrappedFeed: FeedAPI
   private privatePosts: PrivatePostsFeedAPI
   private mergeMethod: string
+
+  private postSortIndex: (post: AppBskyFeedDefs.FeedViewPost) => number
+  private postDistance: (
+    a: AppBskyFeedDefs.FeedViewPost,
+    b: AppBskyFeedDefs.FeedViewPost,
+  ) => number
+
+  private stashedPrivatePosts: AppBskyFeedDefs.FeedViewPost[] = []
+  private stashedWrappedPosts: AppBskyFeedDefs.FeedViewPost[] = []
+
   constructor({
     wrappedFeed,
     agent,
@@ -19,6 +29,15 @@ export class PrivatePostsWrapper implements FeedAPI {
     this.wrappedFeed = wrappedFeed
     this.privatePosts = new PrivatePostsFeedAPI({agent})
     this.mergeMethod = mergeMethod
+
+    this.postSortIndex = postDate
+
+    this.postDistance = (
+      a: AppBskyFeedDefs.FeedViewPost,
+      b: AppBskyFeedDefs.FeedViewPost,
+    ) => {
+      return postDate(b) - postDate(a)
+    }
   }
 
   async peekLatest(): Promise<AppBskyFeedDefs.FeedViewPost> {
@@ -34,18 +53,14 @@ export class PrivatePostsWrapper implements FeedAPI {
     return this.privatePosts.peekLatest()
   }
 
-  async fetch({
-    cursor,
-    limit,
-  }: {
-    cursor: string | undefined
-    limit: number
-  }): Promise<FeedAPIResponse> {
+  private parseCursor(cursor: string | undefined): {
+    privateCursor: string | undefined
+    wrappedCursor: string | undefined
+  } {
     let privateCursor: string | undefined
     let wrappedCursor: string | undefined
 
     if (cursor) {
-      // Split only on the first occurrence of the pipe character
       const splitIndex = cursor.indexOf('|')
       if (splitIndex !== -1) {
         privateCursor = cursor.substring(0, splitIndex)
@@ -53,10 +68,17 @@ export class PrivatePostsWrapper implements FeedAPI {
       }
     }
 
-    const promises = []
+    return {privateCursor, wrappedCursor}
+  }
 
-    // Fetch private posts
-    promises.push(
+  private async fetchBothFeeds(
+    privateCursor: string | undefined,
+    wrappedCursor: string | undefined,
+    limit: number,
+  ) {
+    const promises = [
+      // If the cursor is the string "undefined",
+      // then we have paginated through all the private posts
       privateCursor === 'undefined'
         ? {cursor: undefined, feed: []}
         : this.privatePosts.fetch({
@@ -64,26 +86,119 @@ export class PrivatePostsWrapper implements FeedAPI {
             audience: this.mergeMethod === 'trusted' ? 'trusted' : 'following',
             limit,
           }),
-    )
-    // Then fetch wrapped feed
-    promises.push(
+      // Fetch wrapped feed
       wrappedCursor === 'undefined'
         ? {cursor: undefined, feed: []}
         : this.wrappedFeed.fetch({
             cursor: wrappedCursor,
             limit,
           }),
-    )
+    ]
 
-    const [privatePostsRes, wrappedRes] = await Promise.all(promises)
+    return Promise.all(promises)
+  }
 
-    // Combine both cursors into one string separated by |
-    const mergedCursor = `${privatePostsRes.cursor}|${wrappedRes.cursor}`
+  private mergeFeeds(
+    privatePosts: AppBskyFeedDefs.FeedViewPost[],
+    wrappedPosts: AppBskyFeedDefs.FeedViewPost[],
+    privateCursor: string | undefined,
+    wrappedCursor: string | undefined,
+  ): AppBskyFeedDefs.FeedViewPost[] {
+    const mergedFeed: AppBskyFeedDefs.FeedViewPost[] = []
 
-    // Merge the results
-    return {
-      cursor: mergedCursor,
-      feed: [...privatePostsRes.feed, ...wrappedRes.feed],
+    // Merge posts according to the sorting method
+    while (privatePosts.length && wrappedPosts.length) {
+      if (
+        this.postSortIndex(privatePosts[0]) >
+        this.postSortIndex(wrappedPosts[0])
+      ) {
+        mergedFeed.push(privatePosts.shift()!)
+      } else {
+        mergedFeed.push(wrappedPosts.shift()!)
+      }
+    }
+
+    // Calculate average distance between posts based on their sorting index
+    const averageDistance =
+      mergedFeed.length > 1
+        ? mergedFeed.reduce((acc, post, index) => {
+            const increment =
+              index === 0 ? 0 : this.postDistance(post, mergedFeed[index - 1])
+            return acc + increment
+          }, 0) /
+          (mergedFeed.length - 1)
+        : 0
+
+    const remainingPosts = privatePosts.length ? privatePosts : wrappedPosts
+    const emptiedHasMore = privatePosts.length ? wrappedCursor : privateCursor
+    // Add remaining posts if they're within the average sorting index
+    while (
+      remainingPosts.length &&
+      (!emptiedHasMore ||
+        this.postDistance(
+          remainingPosts[0],
+          mergedFeed[mergedFeed.length - 1],
+        ) < averageDistance)
+    ) {
+      mergedFeed.push(remainingPosts.shift()!)
+    }
+
+    return mergedFeed
+  }
+
+  async fetch({
+    cursor,
+    limit,
+  }: {
+    cursor: string | undefined
+    limit: number
+  }): Promise<FeedAPIResponse> {
+    try {
+      // Parse the cursor into private and wrapped components
+      const {privateCursor, wrappedCursor} = this.parseCursor(cursor)
+
+      // Fetch posts from both sources
+      const [privatePostsRes, wrappedRes] = await this.fetchBothFeeds(
+        privateCursor,
+        wrappedCursor,
+        limit,
+      )
+
+      // Combine cursors for next request
+      const mergedCursor = `${privatePostsRes.cursor}|${wrappedRes.cursor}`
+
+      // Prepare posts for merging
+      const privatePosts = [
+        ...this.stashedPrivatePosts,
+        ...privatePostsRes.feed,
+      ]
+      const wrappedPosts = [...this.stashedWrappedPosts, ...wrappedRes.feed]
+
+      // Merge the feeds
+      const mergedFeed = this.mergeFeeds(
+        privatePosts,
+        wrappedPosts,
+        privatePostsRes.cursor,
+        wrappedRes.cursor,
+      )
+
+      // Store remaining posts for next fetch
+      this.stashedPrivatePosts = privatePosts
+      this.stashedWrappedPosts = wrappedPosts
+
+      return {
+        cursor: mergedCursor,
+        feed: mergedFeed,
+      }
+    } catch (e) {
+      console.error(e)
+      throw e
     }
   }
+}
+
+function postDate(post: AppBskyFeedDefs.FeedViewPost) {
+  return new Date(
+    (post.post.indexedAt || post.post.createdAt) as string,
+  ).getTime()
 }
