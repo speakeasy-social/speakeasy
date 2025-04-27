@@ -1,5 +1,6 @@
 import {useCallback} from 'react'
 import {BskyAgent} from '@atproto/api'
+import {t} from '@lingui/macro'
 import {QueryClient, useQueryClient} from '@tanstack/react-query'
 
 import {
@@ -100,6 +101,7 @@ export async function getOrCreatePrivateSession(
   agent: BskyAgent,
   call: SpeakeasyApiCall,
   queryClient: QueryClient,
+  onStateChange: (state: string) => void,
 ) {
   let privateKey
   let publicKey
@@ -116,6 +118,8 @@ export async function getOrCreatePrivateSession(
         agent,
         call,
       ))
+
+      onStateChange(t`Creating private session...`)
       ;({sessionId, encryptedDek} = await createNewSession(
         publicKey,
         userKeyPairId,
@@ -149,7 +153,10 @@ export function usePrivateSession() {
   const queryClient = useQueryClient()
   const {call} = useSpeakeasyApi()
 
-  return useCallback(async () => {
-    return getOrCreatePrivateSession(agent, call, queryClient)
-  }, [agent, call, queryClient])
+  return useCallback(
+    async ({onStateChange}: {onStateChange: (state: string) => void}) => {
+      return getOrCreatePrivateSession(agent, call, queryClient, onStateChange)
+    },
+    [agent, call, queryClient],
+  )
 }

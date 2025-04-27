@@ -50,6 +50,7 @@ import {
 } from '@atproto/api'
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome'
 import {msg, Trans} from '@lingui/macro'
+import {t} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
@@ -407,7 +408,9 @@ export const ComposePost = ({
     try {
       // Check if this is a private post
       if (activePost.audience === 'trusted') {
-        const {sessionId, sessionKey} = await getPrivateSession()
+        const {sessionId, sessionKey} = await getPrivateSession({
+          onStateChange: setPublishingStage,
+        })
 
         const {writes, uris, cids} = await apilib.preparePost(
           agent,
@@ -424,6 +427,8 @@ export const ComposePost = ({
         console.log('writes', writes)
 
         const authorDid = agent.assertDid
+
+        setPublishingStage(t`Encrypting post...`)
 
         const posts = await apilib.formatPrivatePosts(
           apilib.combinePostGates(authorDid, writes, uris, cids),
