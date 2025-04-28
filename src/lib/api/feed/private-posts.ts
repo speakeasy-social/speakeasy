@@ -70,28 +70,26 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         }[]
       } = data
 
-      // const privateKey = await getPrivateKey(this.agent)
+      const privateKey = await getPrivateKey(options =>
+        callSpeakeasyApiWithAgent(this.agent, options),
+      )
 
       const posts = (
         await Promise.all(
           encryptedPosts.map(async (encryptedPost: any) => {
-            // const encryptedDek = encryptedSessionKeys.find(
-            //   key => key.sessionId === encryptedPost.sessionId,
-            // )?.encryptedDek
-            // // If we can't find a session to decode it, discard the post
-            // if (!encryptedDek) return null
-            // const dek = await decryptDEK(encryptedDek, privateKey)
+            const encryptedDek = encryptedSessionKeys.find(
+              key => key.sessionId === encryptedPost.sessionId,
+            )?.encryptedDek
+            // If we can't find a session to decode it, discard the post
+            if (!encryptedDek) return null
+            const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
 
-            // const post = await decryptContent(
-            //   encryptedPost.encryptedContent,
-            //   dek,
-            // )
-            // return {
-            //   ...post,
-            //   ...encryptedPost,
-            // }
+            const post = await decryptContent(
+              encryptedPost.encryptedContent,
+              dek,
+            )
             return {
-              ...JSON.parse(encryptedPost.encryptedContent),
+              ...JSON.parse(post),
               ...encryptedPost,
             }
           }),

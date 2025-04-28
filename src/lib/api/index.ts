@@ -653,10 +653,6 @@ export async function formatPrivatePosts(
         JSON.stringify(contentToEncrypt),
         sessionKey,
       )
-      // This is just here so we don't have to delete variables to
-      // clear eslint issues
-      // Remove once we're using the encryptedContent
-      console.log('encryptedContent', encryptedContent.slice(0, 10))
       return {
         rkey: formattedPost.uri.split('/').pop(),
         reply: formattedPost.record.reply
@@ -667,7 +663,7 @@ export async function formatPrivatePosts(
           : undefined,
         uri: formattedPost.uri,
         langs: formattedPost.record.langs,
-        encryptedContent: JSON.stringify(contentToEncrypt),
+        encryptedContent: encryptedContent,
       }
     }),
   )
