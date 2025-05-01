@@ -39,7 +39,7 @@ Speakeasy is an open source, proof of concept client for Bluesky's open source A
 
 ## Quick Start
 
-(See [./DEV_SETUP.md](./DEV_SETUP.md) for full development environment setup including test servers)
+(See [./FULL_DEV_SETUP.md](./FULL_DEV_SETUP.md) for full development environment setup including test servers)
 
 You'll need nvm installed to run the app.
 
