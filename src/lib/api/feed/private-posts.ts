@@ -82,12 +82,16 @@ export class PrivatePostsFeedAPI implements FeedAPI {
             )?.encryptedDek
             // If we can't find a session to decode it, discard the post
             if (!encryptedDek) return null
-            const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
+            let post
+            try {
+              const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
+              post = await decryptContent(encryptedPost.encryptedContent, dek)
+            } catch (err) {
+              // Decryption functions log errors, just bail on this post
+              // and try the next one
+              return null
+            }
 
-            const post = await decryptContent(
-              encryptedPost.encryptedContent,
-              dek,
-            )
             return {
               ...JSON.parse(post),
               ...encryptedPost,
