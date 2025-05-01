@@ -332,7 +332,7 @@ export async function decryptDEK(
       authData,
     )
 
-    if (!valid) throw new Error('Authentication failed')
+    if (!valid) throw new Error('DEK Authentication failed')
 
     // Decrypt the DEK using AES-GCM with the derived AES key and IV
     const decryptedDekBytes = await crypto.subtle.decrypt(
