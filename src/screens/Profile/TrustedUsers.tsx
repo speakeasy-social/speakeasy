@@ -7,7 +7,7 @@ import {useInitialNumToRender} from '#/lib/hooks/useInitialNumToRender'
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {cleanError} from '#/lib/strings/errors'
 import {logger} from '#/logger'
-import {useTrustedQuery} from '#/state/queries/trusted'
+import {useTrustedProfiles} from '#/state/queries/trusted'
 import {useSession} from '#/state/session'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {ProfileCardWithFollowBtn} from '#/view/com/profile/ProfileCard'
@@ -26,11 +26,11 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
 
   const [isPTRing, setIsPTRing] = React.useState(false)
   const {
-    data: trustedUsers,
+    data: trustedProfiles,
     isLoading,
     error,
     refetch,
-  } = useTrustedQuery(currentAccount?.did)
+  } = useTrustedProfiles(currentAccount?.did)
 
   const onRefresh = React.useCallback(async () => {
     setIsPTRing(true)
@@ -48,7 +48,7 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
     }, [setMinimalShellMode]),
   )
 
-  if (!trustedUsers?.length) {
+  if (!trustedProfiles?.length) {
     return (
       <Layout.Screen>
         <ViewHeader title={_(msg`Trusted Users`)} />
@@ -70,7 +70,7 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
     <Layout.Screen>
       <ViewHeader title={_(msg`Trusted Users`)} />
       <List
-        data={trustedUsers}
+        data={trustedProfiles}
         renderItem={({item: profile}) => (
           <ProfileCardWithFollowBtn
             key={profile.did}
