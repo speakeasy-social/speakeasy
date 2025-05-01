@@ -130,6 +130,7 @@ import {Gift1_Stroke2_Corner0_Rounded as Gift} from '#/components/icons/Gift1'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {TimesLarge_Stroke2_Corner0_Rounded as X} from '#/components/icons/Times'
+import {PrivatePostPill} from '#/components/PrivatePostPill'
 import * as Prompt from '#/components/Prompt'
 import {Text as NewText} from '#/components/Typography'
 import {BottomSheetPortalProvider} from '../../../../modules/bottom-sheet'
@@ -644,11 +645,11 @@ export const ComposePost = ({
     <>
       <SuggestedLanguage text={activePost.richtext.text} />
       <ComposerPills
-        isReply={!!replyTo}
-        post={activePost}
         thread={composerState.thread}
+        post={activePost}
         dispatch={composerDispatch}
         bottomBarAnimatedStyle={bottomBarAnimatedStyle}
+        isReply={!!replyTo}
       />
       <ComposerFooter
         post={activePost}
@@ -715,9 +716,8 @@ export const ComposePost = ({
             post={activePost}
             thread={thread}
             dispatch={composerDispatch}
-            isReply={!!replyTo}
           />
-          <TrustedAudienceBanner post={activePost} />
+          <PrivatePostPill />
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
@@ -766,32 +766,108 @@ export const ComposePost = ({
   )
 }
 
-function TrustedAudienceBanner({post}: {post: PostDraft}) {
-  const t = useTheme()
+function AudienceBar({
+  post,
+  thread,
+  dispatch,
+}: {
+  post: PostDraft
+  thread: ThreadDraft
+  dispatch: (action: ComposerAction) => void
+}) {
   const {_} = useLingui()
+  const theme = useTheme()
+  const groupsDialogControl = useDialogControl()
+  const {data: features = []} = useFeaturesQuery()
+  const canPostPrivate = features.some(
+    f => f.key === 'private-posts' && f.value === 'true',
+  )
 
-  if (post.audience !== 'trusted') {
-    return null
+  const onToggleAudience = useCallback(() => {
+    if (!canPostPrivate && post.audience === 'public') {
+      groupsDialogControl.open()
+    } else {
+      const newAudience = post.audience === 'public' ? 'trusted' : 'public'
+      dispatch({
+        type: 'update_post',
+        postId: post.id,
+        postAction: {
+          type: 'update_audience',
+          audience: newAudience,
+        },
+      })
+    }
+  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
+
+  const getLabel = () => {
+    switch (post.audience) {
+      case 'public':
+        return _('Public')
+      case 'trusted':
+        return _('Trusted')
+      case 'hidden':
+        return _('Hidden')
+    }
+  }
+
+  const getIcon = () => {
+    switch (post.audience) {
+      case 'public':
+        return Globe
+      case 'trusted':
+        return Lock
+      case 'hidden':
+        return Gift
+    }
   }
 
   return (
-    <View style={[a.px_lg, a.py_sm]}>
-      <View
-        style={[
-          a.px_md,
-          a.py_sm,
-          a.rounded_sm,
-          t.atoms.bg_contrast_25,
-          a.flex_row,
-          a.align_center,
-          a.gap_sm,
-        ]}>
-        <Lock size="sm" fill={t.palette.primary_500} />
-        <NewText style={[a.flex_1, a.leading_snug]}>
-          {_(msg`The post will only be visible to people that you trust`)}
-        </NewText>
+    <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureDescription={_(
+          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
+        )}
+        featureName={_(msg`Private Post to Trusted Communities`)}
+        utmParams={{
+          source: 'composer',
+          medium: 'trusted_toggle',
+          campaign: 'groups_beta',
+        }}
+      />
+      <View style={[styles.audienceBar, theme.atoms.border_contrast_medium]}>
+        <Button
+          variant="solid"
+          color="secondary"
+          onPress={onToggleAudience}
+          style={[
+            {borderRadius: 6},
+            a.py_sm,
+            {paddingLeft: 12, paddingRight: 12},
+          ]}
+          accessibilityHint={_(
+            msg`Choose to make the post visible publicly, or only to people you trust`,
+          )}
+          accessibilityLabel={getLabel()}
+          label={getLabel()}>
+          <ButtonIcon icon={getIcon()} size="sm" />
+          <ButtonText style={[a.ml_xs]}>{getLabel()}</ButtonText>
+        </Button>
+        <ThreadgateBtn
+          postgate={thread.postgate}
+          onChangePostgate={nextPostgate => {
+            dispatch({type: 'update_postgate', postgate: nextPostgate})
+          }}
+          threadgateAllowUISettings={thread.threadgate}
+          onChangeThreadgateAllowUISettings={nextThreadgate => {
+            dispatch({
+              type: 'update_threadgate',
+              threadgate: nextThreadgate,
+            })
+          }}
+        />
       </View>
-    </View>
+    </>
   )
 }
 
@@ -1224,16 +1300,18 @@ function ComposerEmbeds({
 
 function ComposerPills({
   post,
+  thread: _thread,
   dispatch,
   bottomBarAnimatedStyle,
+  isReply: _isReply,
 }: {
-  isReply: boolean
   thread: ThreadDraft
   post: PostDraft
   dispatch: (action: ComposerAction) => void
   bottomBarAnimatedStyle: StyleProp<ViewStyle>
+  isReply: boolean
 }) {
-  const t = useTheme()
+  const theme = useTheme()
   const media = post.embed.media
   const hasMedia = media?.type === 'images' || media?.type === 'video'
   const hasLink = !!post.embed.link
@@ -1245,7 +1323,7 @@ function ComposerPills({
 
   return (
     <Animated.View
-      style={[a.flex_row, a.p_sm, t.atoms.bg, bottomBarAnimatedStyle]}>
+      style={[a.flex_row, a.p_sm, theme.atoms.bg, bottomBarAnimatedStyle]}>
       <ScrollView
         contentContainerStyle={[a.gap_sm]}
         horizontal={true}
@@ -1818,113 +1896,5 @@ function VideoUploadToolbar({state}: {state: VideoState}) {
       </Animated.View>
       <NewText style={[a.font_bold, a.ml_sm]}>{text}</NewText>
     </ToolbarWrapper>
-  )
-}
-
-function AudienceBar({
-  post,
-  thread,
-  dispatch,
-  isReply,
-}: {
-  post: PostDraft
-  thread: ThreadDraft
-  dispatch: (action: ComposerAction) => void
-  isReply: boolean
-}) {
-  const {_} = useLingui()
-  const t = useTheme()
-  const groupsDialogControl = useDialogControl()
-  const {data: features = []} = useFeaturesQuery()
-  const canPostPrivate = features.some(
-    f => f.key === 'private-posts' && f.value === 'true',
-  )
-
-  const onToggleAudience = useCallback(() => {
-    if (!canPostPrivate && post.audience === 'public') {
-      groupsDialogControl.open()
-    } else {
-      const newAudience = post.audience === 'public' ? 'trusted' : 'public'
-      dispatch({
-        type: 'update_post',
-        postId: post.id,
-        postAction: {
-          type: 'update_audience',
-          audience: newAudience,
-        },
-      })
-    }
-  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
-
-  const getLabel = () => {
-    switch (post.audience) {
-      case 'public':
-        return _('Public')
-      case 'trusted':
-        return _('Trusted')
-      case 'hidden':
-        return _('Hidden')
-    }
-  }
-
-  const getIcon = () => {
-    switch (post.audience) {
-      case 'public':
-        return Globe
-      case 'trusted':
-        return Lock
-      case 'hidden':
-        return Gift
-    }
-  }
-
-  return (
-    <>
-      <LimitedBetaModal
-        control={groupsDialogControl}
-        featureDescription={_(
-          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
-        )}
-        featureName={_(msg`Private Post to Trusted Communities`)}
-        utmParams={{
-          source: 'composer',
-          medium: 'trusted_toggle',
-          campaign: 'groups_beta',
-        }}
-      />
-      <View style={[styles.audienceBar, t.atoms.border_contrast_medium]}>
-        <Button
-          variant="solid"
-          color="secondary"
-          onPress={onToggleAudience}
-          style={[
-            {borderRadius: 6},
-            a.py_sm,
-            {paddingLeft: 12, paddingRight: 12},
-          ]}
-          accessibilityHint={_(
-            msg`Choose to make the post visible publicly, or only to people you trust`,
-          )}
-          accessibilityLabel={getLabel()}
-          label={getLabel()}>
-          <ButtonIcon icon={getIcon()} size="sm" />
-          <ButtonText style={[a.ml_xs]}>{getLabel()}</ButtonText>
-        </Button>
-        <ThreadgateBtn
-          postgate={thread.postgate}
-          onChangePostgate={nextPostgate => {
-            dispatch({type: 'update_postgate', postgate: nextPostgate})
-          }}
-          threadgateAllowUISettings={thread.threadgate}
-          onChangeThreadgateAllowUISettings={nextThreadgate => {
-            dispatch({
-              type: 'update_threadgate',
-              threadgate: nextThreadgate,
-            })
-          }}
-          isReply={isReply}
-        />
-      </View>
-    </>
   )
 }
