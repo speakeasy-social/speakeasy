@@ -13,6 +13,7 @@ import {Bell2_Stroke2_Corner0_Rounded as Bell} from '#/components/icons/Bell2'
 import {BirthdayCake_Stroke2_Corner2_Rounded as BirthdayCake} from '#/components/icons/BirthdayCake'
 import {BubbleInfo_Stroke2_Corner2_Rounded as BubbleInfo} from '#/components/icons/BubbleInfo'
 import {CalendarDays_Stroke2_Corner0_Rounded as CalendarDays} from '#/components/icons/CalendarDays'
+import {Camera_Stroke2_Corner0_Rounded as Camera} from '#/components/icons/Camera'
 import {Celebrate_Stroke2_Corner0_Rounded as Celebrate} from '#/components/icons/Celebrate'
 import {ChevronLeft_Stroke2_Corner0_Rounded as ChevronLeft} from '#/components/icons/Chevron'
 import {CircleInfo_Stroke2_Corner0_Rounded as CircleInfo} from '#/components/icons/CircleInfo'
@@ -120,13 +121,13 @@ import {Wrench_Stroke2_Corner2_Rounded as Wrench} from '#/components/icons/Wrenc
 import {Zap_Stroke2_Corner0_Rounded as Zap} from '#/components/icons/Zap'
 import {Loader} from '#/components/Loader'
 import {H1} from '#/components/Typography'
-
 const allIcons = [
   {name: 'Alien', component: Alien},
   {name: 'AndroidLogo', component: AndroidLogo},
   {name: 'Apple', component: Apple},
   {name: 'ArrowTopRight', component: ArrowTopRight},
   {name: 'At', component: At},
+  {name: 'Camera', component: Camera},
   {name: 'Atom', component: Atom},
   {name: 'Bell', component: Bell},
   {name: 'BirthdayCake', component: BirthdayCake},
