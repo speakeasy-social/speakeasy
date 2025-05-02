@@ -69,6 +69,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           source: ${{ github.workspace }}/speakeasy-client.tar.gz
           target: /home/speakeasy
+          strip_components: 5
 
       - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
