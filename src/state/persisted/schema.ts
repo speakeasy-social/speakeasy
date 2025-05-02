@@ -141,7 +141,7 @@ export type Schema = z.infer<typeof schema>
 
 export const defaults: Schema = {
   colorMode: 'system',
-  darkTheme: 'dim',
+  darkTheme: 'dark',
   session: {
     accounts: [],
     currentAccount: undefined,
@@ -207,6 +207,12 @@ export function tryParse(rawData: string): Schema | undefined {
   if (!objData) {
     return undefined
   }
+
+  // Migrate dim theme to dark theme before schema validation
+  if (objData.darkTheme === 'dim') {
+    objData.darkTheme = 'dark'
+  }
+
   const parsed = schema.safeParse(objData)
   if (parsed.success) {
     return objData

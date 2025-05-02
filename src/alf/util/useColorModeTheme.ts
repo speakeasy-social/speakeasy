@@ -26,7 +26,6 @@ export function useThemeName(): ThemeName {
 function getThemeName(
   colorScheme: ColorSchemeName,
   colorMode: 'system' | 'light' | 'dark',
-  darkTheme?: ThemeName,
 ) {
   if (
     (colorMode === 'system' && colorScheme === 'light') ||
@@ -34,7 +33,7 @@ function getThemeName(
   ) {
     return 'light'
   } else {
-    return darkTheme ?? 'dim'
+    return 'dark'
   }
 }
 

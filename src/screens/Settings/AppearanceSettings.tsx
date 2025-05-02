@@ -1,7 +1,5 @@
 import React, {useCallback} from 'react'
 import Animated, {
-  FadeInUp,
-  FadeOutUp,
   LayoutAnimationConfig,
   LinearTransition,
 } from 'react-native-reanimated'
@@ -22,7 +20,6 @@ import {atoms as a, native, useAlf, useTheme} from '#/alf'
 import * as Toggle from '#/components/forms/Toggle'
 import * as ToggleButton from '#/components/forms/ToggleButton'
 import {Props as SVGIconProps} from '#/components/icons/common'
-import {Moon_Stroke2_Corner0_Rounded as MoonIcon} from '#/components/icons/Moon'
 import {Phone_Stroke2_Corner0_Rounded as PhoneIcon} from '#/components/icons/Phone'
 import {TextSize_Stroke2_Corner0_Rounded as TextSize} from '#/components/icons/TextSize'
 import {TitleCase_Stroke2_Corner0_Rounded as Aa} from '#/components/icons/TitleCase'
@@ -36,8 +33,8 @@ export function AppearanceSettingsScreen({}: Props) {
   const {fonts} = useAlf()
   const gate = useGate()
 
-  const {colorMode, darkTheme} = useThemePrefs()
-  const {setColorMode, setDarkTheme} = useSetThemePrefs()
+  const {colorMode} = useThemePrefs()
+  const {setColorMode} = useSetThemePrefs()
   const showInteractionNumbers = useShowInteractionNumbers()
   const setShowInteractionNumbers = useSetShowInteractionNumbers()
 
@@ -52,18 +49,6 @@ export function AppearanceSettingsScreen({}: Props) {
       setColorMode(appearance)
     },
     [setColorMode, colorMode],
-  )
-
-  const onChangeDarkTheme = useCallback(
-    (keys: string[]) => {
-      const theme = keys.find(key => key !== darkTheme) as
-        | 'dim'
-        | 'dark'
-        | undefined
-      if (!theme) return
-      setDarkTheme(theme)
-    },
-    [setDarkTheme, darkTheme],
   )
 
   const onChangeFontFamily = useCallback(
@@ -116,29 +101,6 @@ export function AppearanceSettingsScreen({}: Props) {
               values={[colorMode]}
               onChange={onChangeAppearance}
             />
-
-            {colorMode !== 'light' && (
-              <Animated.View
-                entering={native(FadeInUp)}
-                exiting={native(FadeOutUp)}>
-                <AppearanceToggleButtonGroup
-                  title={_(msg`Dark theme`)}
-                  icon={MoonIcon}
-                  items={[
-                    {
-                      label: _(msg`Dim`),
-                      name: 'dim',
-                    },
-                    {
-                      label: _(msg`Dark`),
-                      name: 'dark',
-                    },
-                  ]}
-                  values={[darkTheme ?? 'dim']}
-                  onChange={onChangeDarkTheme}
-                />
-              </Animated.View>
-            )}
 
             <Animated.View layout={native(LinearTransition)}>
               <SettingsList.Divider />
