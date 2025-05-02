@@ -475,32 +475,32 @@ export function usePinnedFeedsInfos() {
             savedFeed: pinnedItem,
           })
         } else if (pinnedItem.type === 'timeline') {
-          // Inject the "Friends Pics" feed
-          result.push({
-            type: 'feed',
-            displayName: 'Friends Pics',
-            uri: 'friends-pics',
-            feedDescriptor: 'friends-pics',
-            route: {
-              href: '/friends-pics',
-              name: 'Home',
-              params: {},
-            },
-            cid: '',
-            avatar: '',
-            description: new RichText({text: ''}),
-            creatorDid: '',
-            creatorHandle: '',
-            likeCount: 0,
-            likeUri: '',
-            savedFeed: {
-              id: 'friends-pics',
-              type: 'timeline',
-              value: 'friends-pics',
-              pinned: true,
-            },
-            contentMode: 'posts_with_media',
-          })
+          // // Inject the "Friends Pics" feed
+          // result.unshift({
+          //   type: 'feed',
+          //   displayName: 'Friends Pics',
+          //   uri: 'friends-pics',
+          //   feedDescriptor: 'friends-pics',
+          //   route: {
+          //     href: '/friends-pics',
+          //     name: 'Home',
+          //     params: {},
+          //   },
+          //   cid: '',
+          //   avatar: '',
+          //   description: new RichText({text: ''}),
+          //   creatorDid: '',
+          //   creatorHandle: '',
+          //   likeCount: 0,
+          //   likeUri: '',
+          //   savedFeed: {
+          //     id: 'friends-pics',
+          //     type: 'timeline',
+          //     value: 'friends-pics',
+          //     pinned: true,
+          //   },
+          //   contentMode: 'posts_with_media',
+          // })
 
           result.push({
             type: 'feed',
