@@ -5,6 +5,58 @@ import {MlKem768} from 'mlkem'
 // Utility Functions
 // =====================
 
+// Cache for tracking recent random values
+const randomValueCache = new Map<number, Uint8Array[]>()
+const MAX_CACHE_SIZE = 5
+let isRandomDisabled = false
+
+/**
+ * Secure wrapper around crypto.getRandomValues that guards against poor randomness
+ * by checking for duplicate values in recent history.
+ *
+ * @param array - The array to fill with random values
+ * @returns The same array filled with random values
+ * @throws Error if duplicate values are detected or if the function has been disabled
+ */
+function secureGetRandomValues<T extends ArrayBufferView>(array: T): T {
+  if (isRandomDisabled) {
+    throw new Error(
+      'Random value generation has been disabled due to detected poor randomness',
+    )
+  }
+
+  const result = crypto.getRandomValues(array)
+
+  // Only track Uint8Array values for simplicity
+  if (array instanceof Uint8Array) {
+    const length = array.length
+    const currentCache = randomValueCache.get(length) || []
+
+    // Check if this value exists in the cache
+    const isDuplicate = currentCache.some(
+      cached =>
+        cached.length === array.length &&
+        cached.every((val, idx) => val === array[idx]),
+    )
+
+    if (isDuplicate) {
+      isRandomDisabled = true
+      throw new Error(
+        'Duplicate random value detected - random number generation appears compromised',
+      )
+    }
+
+    // Add to cache and maintain size limit
+    currentCache.unshift(array.slice())
+    if (currentCache.length > MAX_CACHE_SIZE) {
+      currentCache.pop()
+    }
+    randomValueCache.set(length, currentCache)
+  }
+
+  return result
+}
+
 /**
  * Converts a Uint8Array to SafeText (URL-safe Base64)
  *
@@ -53,6 +105,12 @@ export async function generateKeyPair(): Promise<{
   publicKey: string
   privateKey: string
 }> {
+  // mlkem will generate it's own random values,
+  // but let's check first that the random number
+  // generator is working
+  secureGetRandomValues(new Uint8Array(32))
+  secureGetRandomValues(new Uint8Array(32))
+
   const mlkem = new MlKem768()
   const [publicKey, privateKey] = await mlkem.generateKeyPair()
 
@@ -67,7 +125,7 @@ export async function generateKeyPair(): Promise<{
  * @returns {Promise<string>} SafeText encoded 256-bit random key
  */
 export async function generateDEK(): Promise<string> {
-  const dek = crypto.getRandomValues(new Uint8Array(32))
+  const dek = secureGetRandomValues(new Uint8Array(32))
   const safe = safeBtoa(dek)
   // Attempt to wipe raw DEK from memory after conversion to prevent leakage
   secureWipe(dek)
@@ -98,8 +156,8 @@ export async function encryptDEK(
     const [ciphertext, sharedSecret] = await mlkem.encap(pubKeyBytes)
 
     // Generate salt and IV for HKDF and AES-GCM respectively
-    const salt = crypto.getRandomValues(new Uint8Array(32))
-    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const salt = secureGetRandomValues(new Uint8Array(32))
+    const iv = secureGetRandomValues(new Uint8Array(12))
 
     // Derive AES and HMAC keys using HKDF from the shared secret
     const hkdfKey = await crypto.subtle.importKey(
@@ -274,7 +332,7 @@ export async function decryptDEK(
       authData,
     )
 
-    if (!valid) throw new Error('Authentication failed')
+    if (!valid) throw new Error('DEK Authentication failed')
 
     // Decrypt the DEK using AES-GCM with the derived AES key and IV
     const decryptedDekBytes = await crypto.subtle.decrypt(
@@ -315,7 +373,7 @@ export async function encryptContent(
   const dekBytes = safeAtob(dek)
 
   try {
-    const iv = crypto.getRandomValues(new Uint8Array(12)) // Generate random IV for AES-GCM
+    const iv = secureGetRandomValues(new Uint8Array(12)) // Generate random IV for AES-GCM
 
     const key = await crypto.subtle.importKey(
       'raw',

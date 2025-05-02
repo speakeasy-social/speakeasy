@@ -27,14 +27,7 @@ export class FollowingFeedAPI implements FeedAPI {
       cursor,
       limit,
     })
-    if (res.success) {
-      return {
-        cursor: res.data.cursor,
-        feed: res.data.feed,
-      }
-    }
-    return {
-      feed: [],
-    }
+
+    return res.data
   }
 }

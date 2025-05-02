@@ -23,15 +23,12 @@ import {HomeFeedAPI} from '#/lib/api/feed/home'
 import {LikesFeedAPI} from '#/lib/api/feed/likes'
 import {ListFeedAPI} from '#/lib/api/feed/list'
 import {MergeFeedAPI} from '#/lib/api/feed/merge'
+import {PrivatePostsWrapper} from '#/lib/api/feed/private-posts-wrapper'
 import {FeedAPI, ReasonFeedSource} from '#/lib/api/feed/types'
-import {aggregateUserInterests} from '#/lib/api/feed/utils'
+import {aggregateUserInterests, getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {FeedTuner, FeedTunerFn} from '#/lib/api/feed-manip'
-import {
-  DISCOVER_FEED_URI,
-  LOCAL_DEV_CDN,
-  LOCAL_DEV_SERVICE,
-  PROD_CDN,
-} from '#/lib/constants'
+import {isAnyPostView} from '#/lib/api/speakeasy'
+import {DISCOVER_FEED_URI} from '#/lib/constants'
 import {BSKY_FEED_OWNER_DIDS} from '#/lib/constants'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {logger} from '#/logger'
@@ -148,10 +145,7 @@ export function usePostFeedQuery(
     result: InfiniteData<FeedPage>
   } | null>(null)
   const isDiscover = feedDesc.includes(DISCOVER_FEED_URI)
-  const baseUrl =
-    agent.service.toString() === `${LOCAL_DEV_SERVICE}/`
-      ? LOCAL_DEV_CDN
-      : PROD_CDN
+  const baseUrl = getBaseCdnUrl(agent)
 
   /**
    * The number of posts to fetch in a single request. Because we filter
@@ -370,7 +364,7 @@ export function usePostFeedQuery(
                         !item.post.embed &&
                         item.record.embed &&
                         item.record.embed.$type ===
-                          'app.spkeasy.embed.privateMessage'
+                          'social.spkeasy.embed.privateMessage'
                       ) {
                         const privateMessage = item.record.embed
                           .privateMessage as {
@@ -378,13 +372,13 @@ export function usePostFeedQuery(
                           publicMessage: string
                         }
                         try {
-                          const decodedContent = decodePrivateMessage(
-                            privateMessage.encodedMessage,
+                          const decodedContent = formatPrivatePostForFeed(
+                            JSON.parse(atob(privateMessage.encodedMessage)),
                             item.post.author.did, // Pass the parent post's author DID
                             selectArgs.baseUrl,
                           )
                           feedPostSliceItem.post.embed = {
-                            $type: 'app.spkeasy.embed.privateMessage',
+                            $type: 'social.spkeasy.embed.privateMessage',
                             privateMessage,
                             decodedEmbed: {
                               uri: decodedContent.uri,
@@ -513,9 +507,26 @@ function createApi({
   agent: BskyAgent
   enableFollowingToDiscoverFallback: boolean
 }) {
+  let api: FeedAPI
+
+  const privatePostSettings = [
+    {
+      feedDesc: 'following',
+      mergeMethod: 'followers',
+    },
+    {
+      feedDesc: DISCOVER_FEED_URI,
+      mergeMethod: 'trusted',
+    },
+    {
+      feedDesc: '/app.bsky.feed.generator/with-friends',
+      mergeMethod: 'follower-likes',
+    },
+  ]
+
   if (feedDesc === 'following') {
     if (feedParams.mergeFeedEnabled) {
-      return new MergeFeedAPI({
+      api = new MergeFeedAPI({
         agent,
         feedParams,
         feedTuners,
@@ -523,31 +534,46 @@ function createApi({
       })
     } else {
       if (enableFollowingToDiscoverFallback) {
-        return new HomeFeedAPI({agent, userInterests})
+        api = new HomeFeedAPI({agent, userInterests})
       } else {
-        return new FollowingFeedAPI({agent})
+        api = new FollowingFeedAPI({agent})
       }
     }
   } else if (feedDesc.startsWith('author')) {
     const [_, actor, filter] = feedDesc.split('|')
-    return new AuthorFeedAPI({agent, feedParams: {actor, filter}})
+    api = new AuthorFeedAPI({agent, feedParams: {actor, filter}})
   } else if (feedDesc.startsWith('likes')) {
     const [_, actor] = feedDesc.split('|')
-    return new LikesFeedAPI({agent, feedParams: {actor}})
+    api = new LikesFeedAPI({agent, feedParams: {actor}})
   } else if (feedDesc.startsWith('feedgen')) {
     const [_, feed] = feedDesc.split('|')
-    return new CustomFeedAPI({
+    api = new CustomFeedAPI({
       agent,
       feedParams: {feed},
       userInterests,
     })
   } else if (feedDesc.startsWith('list')) {
     const [_, list] = feedDesc.split('|')
-    return new ListFeedAPI({agent, feedParams: {list}})
+    api = new ListFeedAPI({agent, feedParams: {list}})
   } else {
     // shouldnt happen
-    return new FollowingFeedAPI({agent})
+    api = new FollowingFeedAPI({agent})
   }
+
+  const privatePostConfig = privatePostSettings.find(config =>
+    feedDesc.includes(config.feedDesc),
+  )
+
+  // Wrap the API with private posts if enabled for this feed type
+  if (privatePostConfig) {
+    api = new PrivatePostsWrapper({
+      wrappedFeed: api,
+      agent,
+      mergeMethod: privatePostConfig.mergeMethod,
+    })
+  }
+
+  return api
 }
 
 export function* findAllPostsInQueryData(
@@ -576,7 +602,7 @@ export function* findAllPostsInQueryData(
           yield embedViewRecordToPostView(quotedPost)
         }
 
-        if (AppBskyFeedDefs.isPostView(item.reply?.parent)) {
+        if (isAnyPostView(item.reply?.parent)) {
           if (didOrHandleUriMatches(atUri, item.reply.parent)) {
             yield item.reply.parent
           }
@@ -771,7 +797,10 @@ function transformRecordEmbed(embed: any): any {
     return {
       ...embed,
       $type: 'app.bsky.embed.record#view',
-      record: embed.record,
+      record: {
+        $type: 'app.bsky.embed.record#viewRecord',
+        ...embed.record,
+      },
     }
   }
   return embed
@@ -800,86 +829,96 @@ function transformRecordWithMediaEmbed(
   return embed
 }
 
-export function decodePrivateMessage(
-  message: string,
+export function transformPrivateEmbed(
+  embed: any,
+  authorDid: string,
+  baseUrl: string,
+  quotedPost?: any,
+): any {
+  // Transform any embeds into view format
+  let transformedEmbed = embed
+  if (transformedEmbed) {
+    if (transformedEmbed.$type === 'app.bsky.embed.images') {
+      transformedEmbed = transformImageEmbed(
+        transformedEmbed,
+        authorDid,
+        baseUrl,
+      )
+    } else if (transformedEmbed.$type === 'app.bsky.embed.video') {
+      transformedEmbed = transformVideoEmbed(
+        transformedEmbed,
+        authorDid,
+        baseUrl,
+      )
+    } else if (transformedEmbed.$type === 'app.bsky.embed.external') {
+      transformedEmbed = transformExternalEmbed(
+        transformedEmbed,
+        authorDid,
+        baseUrl,
+      )
+    } else if (transformedEmbed.$type === 'app.bsky.embed.record') {
+      transformedEmbed = transformRecordEmbed(transformedEmbed)
+      // If we have a quoted post, use it to enhance the record embed
+      if (quotedPost) {
+        transformedEmbed.record = {
+          ...transformedEmbed.record,
+          value: quotedPost.record,
+          author: quotedPost.author,
+          labels: quotedPost.labels,
+          indexedAt: quotedPost.indexedAt,
+          embeds: quotedPost.embed ? [quotedPost.embed] : undefined,
+        }
+      }
+    } else if (transformedEmbed.$type === 'app.bsky.embed.recordWithMedia') {
+      transformedEmbed = transformRecordWithMediaEmbed(
+        transformedEmbed,
+        authorDid,
+        baseUrl,
+      )
+      // If we have a quoted post, use it to enhance the record embed
+      if (quotedPost) {
+        transformedEmbed.record.record = {
+          ...transformedEmbed.record.record,
+          value: quotedPost.record,
+          author: quotedPost.author,
+          labels: quotedPost.labels,
+          indexedAt: quotedPost.indexedAt,
+          embeds: quotedPost.embed ? [quotedPost.embed] : undefined,
+        }
+      }
+    }
+  }
+  return transformedEmbed
+}
+
+export function formatPrivatePostForFeed(
+  post: any,
   authorDid: string,
   baseUrl: string,
 ): AppBskyFeedDefs.PostView {
   try {
-    const decoded = JSON.parse(atob(message))
-
-    const text = decoded.record?.text || decoded.text || ''
-    const facets = decoded.record?.facets || decoded.facets || []
-
-    // Transform any embeds into view format
-    let transformedEmbed = decoded.embed
-    if (transformedEmbed) {
-      if (transformedEmbed.$type === 'app.bsky.embed.images') {
-        transformedEmbed = transformImageEmbed(
-          transformedEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (transformedEmbed.$type === 'app.bsky.embed.video') {
-        transformedEmbed = transformVideoEmbed(
-          transformedEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (transformedEmbed.$type === 'app.bsky.embed.external') {
-        transformedEmbed = transformExternalEmbed(
-          transformedEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (transformedEmbed.$type === 'app.bsky.embed.record') {
-        transformedEmbed = transformRecordEmbed(transformedEmbed)
-      } else if (transformedEmbed.$type === 'app.bsky.embed.recordWithMedia') {
-        transformedEmbed = transformRecordWithMediaEmbed(
-          transformedEmbed,
-          authorDid,
-          baseUrl,
-        )
-      }
-    }
+    const text = post.record?.text || post.text || ''
+    const facets = post.record?.facets || post.facets || []
+    const transformedEmbed = transformPrivateEmbed(
+      post.embed,
+      authorDid,
+      baseUrl,
+    )
 
     // Also transform any embeds in the record
-    if (decoded.record?.embed) {
-      const recordEmbed = decoded.record.embed
-      if (recordEmbed.$type === 'app.bsky.embed.images') {
-        decoded.record.embed = transformImageEmbed(
-          recordEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (recordEmbed.$type === 'app.bsky.embed.video') {
-        decoded.record.embed = transformVideoEmbed(
-          recordEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (recordEmbed.$type === 'app.bsky.embed.external') {
-        decoded.record.embed = transformExternalEmbed(
-          recordEmbed,
-          authorDid,
-          baseUrl,
-        )
-      } else if (recordEmbed.$type === 'app.bsky.embed.record') {
-        decoded.record.embed = transformRecordEmbed(recordEmbed)
-      } else if (recordEmbed.$type === 'app.bsky.embed.recordWithMedia') {
-        decoded.record.embed = transformRecordWithMediaEmbed(
-          recordEmbed,
-          authorDid,
-          baseUrl,
-        )
-      }
+    if (post.record?.embed) {
+      post.record.embed = transformPrivateEmbed(
+        post.record.embed,
+        authorDid,
+        baseUrl,
+      )
     }
 
     // Construct a minimal PostView with just text
     const postView: AppBskyFeedDefs.PostView = {
-      uri: decoded.uri || 'at://unknown',
-      cid: decoded.cid || 'unknown',
-      author: decoded.author || {
+      uri: post.uri || `at://${authorDid}/app.bsky.feed.post/${post.rkey}`,
+      cid: post.cid || 'unknown',
+      author: post.author || {
         did: authorDid,
         handle: 'unknown',
         viewer: {muted: false, blockedBy: false},
@@ -888,12 +927,12 @@ export function decodePrivateMessage(
       record: {
         text,
         $type: 'app.bsky.feed.post',
-        createdAt: decoded.record?.createdAt || new Date().toISOString(),
-        ...(decoded.record?.embed ? {embed: decoded.record.embed} : {}),
+        createdAt: post.record?.createdAt || new Date().toISOString(),
+        ...(post.record?.embed ? {embed: post.record.embed} : {}),
         ...(facets.length > 0 ? {facets} : {}),
       } as AppBskyFeedPost.Record,
       embed: transformedEmbed,
-      indexedAt: decoded.indexedAt || new Date().toISOString(),
+      indexedAt: post.indexedAt || new Date().toISOString(),
       $type: 'app.bsky.feed.defs#postView',
       labels: [],
       likeCount: 0,

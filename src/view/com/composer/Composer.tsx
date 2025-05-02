@@ -50,12 +50,15 @@ import {
 } from '@atproto/api'
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome'
 import {msg, Trans} from '@lingui/macro'
+import {t} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
 import {createDefaultHiddenMessage} from '#/lib/api'
 import * as apilib from '#/lib/api/index'
+import {usePrivateSession} from '#/lib/api/private-sessions'
 import {EmbeddingDisabledError} from '#/lib/api/resolve'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {
   MAX_GRAPHEME_LENGTH,
@@ -84,6 +87,7 @@ import {
   useLanguagePrefs,
   useLanguagePrefsApi,
 } from '#/state/preferences/languages'
+import {useFeaturesQuery} from '#/state/queries/features'
 import {useProfileQuery} from '#/state/queries/profile'
 import {Gif} from '#/state/queries/tenor'
 import {useAgent, useSession} from '#/state/session'
@@ -374,6 +378,8 @@ export const ComposePost = ({
         ),
     )
 
+  const getPrivateSession = usePrivateSession()
+
   const onPressPublish = React.useCallback(async () => {
     if (isPublishing) {
       return
@@ -400,24 +406,69 @@ export const ComposePost = ({
 
     let postUri
     try {
-      postUri = (
-        await apilib.post(agent, queryClient, {
-          thread,
-          replyTo: replyTo?.uri,
+      // Check if this is a private post
+      if (activePost.audience === 'trusted') {
+        const {sessionId, sessionKey} = await getPrivateSession({
           onStateChange: setPublishingStage,
-          langs: toPostLanguages(langPrefs.postLanguage),
         })
-      ).uris[0]
-      try {
-        await whenAppViewReady(agent, postUri, res => {
-          const postedThread = res.data.thread
-          return AppBskyFeedDefs.isThreadViewPost(postedThread)
+
+        const {writes, uris, cids} = await apilib.preparePost(
+          agent,
+          queryClient,
+          {
+            thread,
+            replyTo: replyTo?.uri,
+            onStateChange: setPublishingStage,
+            langs: toPostLanguages(langPrefs.postLanguage),
+            collection: 'social.spkeasy.feed.privatePost',
+          },
+        )
+
+        console.log('writes', writes)
+
+        const authorDid = agent.assertDid
+
+        setPublishingStage(t`Encrypting post...`)
+
+        const posts = await apilib.formatPrivatePosts(
+          apilib.combinePostGates(authorDid, writes, uris, cids),
+          sessionKey,
+        )
+
+        console.log('posts', posts)
+
+        await callSpeakeasyApiWithAgent(agent, {
+          api: 'social.spkeasy.privatePost.createPosts',
+          method: 'POST',
+          body: {
+            sessionId,
+            encryptedPosts: posts,
+          },
         })
-      } catch (waitErr: any) {
-        logger.error(waitErr, {
-          message: `Waiting for app view failed`,
-        })
-        // Keep going because the post *was* published.
+
+        postUri = uris[0]
+      } else {
+        // Regular public post flow
+        postUri = (
+          await apilib.post(agent, queryClient, {
+            thread,
+            replyTo: replyTo?.uri,
+            onStateChange: setPublishingStage,
+            langs: toPostLanguages(langPrefs.postLanguage),
+            collection: 'app.bsky.feed.post',
+          })
+        ).uris[0]
+        try {
+          await whenAppViewReady(agent, postUri, res => {
+            const postedThread = res.data.thread
+            return AppBskyFeedDefs.isThreadViewPost(postedThread)
+          })
+        } catch (waitErr: any) {
+          logger.error(waitErr, {
+            message: `Waiting for app view failed`,
+          })
+          // Keep going because the post *was* published.
+        }
       }
     } catch (e: any) {
       logger.error(e, {
@@ -503,6 +554,8 @@ export const ComposePost = ({
     replyTo,
     setLangPrefs,
     queryClient,
+    activePost.audience,
+    getPrivateSession,
   ])
 
   // Preserves the referential identity passed to each post item.
@@ -869,6 +922,7 @@ let ComposerPost = React.memo(function ComposerPost({
           onNewLink={onNewLink}
           onError={onError}
           onPressPublish={onPublish}
+          disableDrop={post.audience === 'trusted'}
           accessible={true}
           accessibilityLabel={_(msg`Write post`)}
           accessibilityHint={_(
@@ -1242,6 +1296,7 @@ function ComposerFooter({
   const images = media?.type === 'images' ? media.images : []
   const video = media?.type === 'video' ? media.video : null
   const isMaxImages = images.length >= MAX_IMAGES
+  const isTrustedPost = post.audience === 'trusted'
 
   const onImageAdd = useCallback(
     (next: ComposerImage[]) => {
@@ -1279,19 +1334,30 @@ function ComposerFooter({
           <ToolbarWrapper style={[a.flex_row, a.align_center, a.gap_xs]}>
             <SelectPhotoBtn
               size={images.length}
-              disabled={media?.type === 'images' ? isMaxImages : !!media}
+              disabled={
+                media?.type === 'images'
+                  ? isMaxImages
+                  : !!media || isTrustedPost
+              }
               onAdd={onImageAdd}
             />
             <SelectVideoBtn
               onSelectVideo={asset => onSelectVideo(post.id, asset)}
-              disabled={!!media}
+              disabled={!!media || isTrustedPost}
               setError={onError}
             />
             <OpenCameraBtn
-              disabled={media?.type === 'images' ? isMaxImages : !!media}
+              disabled={
+                media?.type === 'images'
+                  ? isMaxImages
+                  : !!media || isTrustedPost
+              }
               onAdd={onImageAdd}
             />
-            <SelectGifBtn onSelectGif={onSelectGif} disabled={!!media} />
+            <SelectGifBtn
+              onSelectGif={onSelectGif}
+              disabled={!!media || isTrustedPost}
+            />
             {!isMobile ? (
               <Button
                 onPress={onEmojiButtonPress}
@@ -1769,21 +1835,26 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
+  const {data: features = []} = useFeaturesQuery()
+  const canPostPrivate = features.some(
+    f => f.key === 'private-posts' && f.value === 'true',
+  )
 
   const onToggleAudience = useCallback(() => {
-    if (post.audience === 'public') {
+    if (!canPostPrivate && post.audience === 'public') {
       groupsDialogControl.open()
     } else {
+      const newAudience = post.audience === 'public' ? 'trusted' : 'public'
       dispatch({
         type: 'update_post',
         postId: post.id,
         postAction: {
           type: 'update_audience',
-          audience: 'public',
+          audience: newAudience,
         },
       })
     }
-  }, [dispatch, post.id, post.audience, groupsDialogControl])
+  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
 
   const getLabel = () => {
     switch (post.audience) {

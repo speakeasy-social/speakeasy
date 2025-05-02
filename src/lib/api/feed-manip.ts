@@ -8,6 +8,7 @@ import {
   AppBskyFeedPost,
 } from '@atproto/api'
 
+import {isAnyPostView} from '#/lib/api/speakeasy'
 import {isPostInLanguage} from '../../locale/helpers'
 import {FALLBACK_MARKER_POST} from './feed/home'
 import {ReasonFeedSource} from './feed/types'
@@ -50,7 +51,7 @@ export class FeedViewPostsSlice {
     this.isIncompleteThread = false
     this.isFallbackMarker = false
     this.isOrphan = false
-    if (AppBskyFeedDefs.isPostView(reply?.root)) {
+    if (isAnyPostView(reply?.root)) {
       this.rootUri = reply.root.uri
     } else {
       this.rootUri = post.uri
