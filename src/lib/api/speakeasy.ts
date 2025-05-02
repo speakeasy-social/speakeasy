@@ -19,7 +19,7 @@ export type SpeakeasyApiCall = (options: SpeakeasyApiOptions) => Promise<any>
  */
 export function getHost(agent: BskyAgent, endpoint: string): string {
   if (!agent.pdsUrl?.toString().includes('localhost')) {
-    if (endpoint.startsWith('social.spkeasy.keys')) {
+    if (endpoint.startsWith('social.spkeasy.key')) {
       return 'https://keys.spkeasy.social'
     }
     return 'https://api.spkeasy.social'
