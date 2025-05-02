@@ -118,7 +118,7 @@ jobs:
           script: |
             docker stop speakeasy-client || true
             docker rm speakeasy-client || true
-            gunzip -f /home/runner/work/speakeasy/speakeasy/speakeasy-client.tar.gz &&
-            docker load --input /home/runner/work/speakeasy/speakeasy/speakeasy-client.tar &&
+            gunzip -f ./home/runner/work/speakeasy/speakeasy/speakeasy-client.tar.gz &&
+            docker load --input ./home/runner/work/speakeasy/speakeasy/speakeasy-client.tar &&
             docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
             
