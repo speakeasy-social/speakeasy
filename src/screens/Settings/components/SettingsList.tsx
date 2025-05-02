@@ -177,8 +177,10 @@ export function ItemIcon({
   icon: Comp,
   size = 'xl',
   color: colorProp,
+  style: styleProp,
 }: Omit<React.ComponentProps<typeof Button.ButtonIcon>, 'position'> & {
   color?: string
+  style?: StyleProp<ViewStyle>
 }) {
   const t = useTheme()
   const {destructive, withinGroup} = useContext(ItemContext)
@@ -201,7 +203,7 @@ export function ItemIcon({
 
   const content = (
     <View style={[a.z_20, {width: iconSize, height: iconSize}]}>
-      <Comp width={iconSize} style={[{color}]} />
+      <Comp width={iconSize} style={[{color}, styleProp]} />
     </View>
   )
 

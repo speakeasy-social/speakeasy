@@ -23,12 +23,12 @@ import {useTrendingConfig} from '#/state/trending-config'
 import * as SettingsList from '#/screens/Settings/components/SettingsList'
 import * as Toggle from '#/components/forms/Toggle'
 import {Bubbles_Stroke2_Corner2_Rounded as BubblesIcon} from '#/components/icons/Bubble'
-import {Camera_Stroke2_Corner0_Rounded as CameraIcon} from '#/components/icons/Camera'
 import {Hashtag_Stroke2_Corner0_Rounded as HashtagIcon} from '#/components/icons/Hashtag'
 import {Home_Stroke2_Corner2_Rounded as HomeIcon} from '#/components/icons/Home'
 import {Macintosh_Stroke2_Corner2_Rounded as MacintoshIcon} from '#/components/icons/Macintosh'
 import {Play_Stroke2_Corner2_Rounded as PlayIcon} from '#/components/icons/Play'
 import {Trending2_Stroke2_Corner2_Rounded as Graph} from '#/components/icons/Trending2'
+import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 import {Window_Stroke2_Corner2_Rounded as WindowIcon} from '#/components/icons/Window'
 import * as Layout from '#/components/Layout'
 
@@ -129,7 +129,10 @@ export function ContentAndMediaSettingsScreen({}: Props) {
             value={!gridLayoutEnabled}
             onChange={value => setGridLayoutEnabled(!value)}>
             <SettingsList.Item>
-              <SettingsList.ItemIcon icon={CameraIcon} />
+              <SettingsList.ItemIcon
+                icon={VideoClipIcon}
+                style={{transform: [{rotate: '90deg'}]}}
+              />
               <SettingsList.ItemText>
                 <Trans>Show multiple images as a slideshow</Trans>
               </SettingsList.ItemText>
