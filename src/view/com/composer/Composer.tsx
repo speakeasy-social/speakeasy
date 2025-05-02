@@ -424,8 +424,6 @@ export const ComposePost = ({
           },
         )
 
-        console.log('writes', writes)
-
         const authorDid = agent.assertDid
 
         setPublishingStage(t`Encrypting post...`)
@@ -434,8 +432,6 @@ export const ComposePost = ({
           apilib.combinePostGates(authorDid, writes, uris, cids),
           sessionKey,
         )
-
-        console.log('posts', posts)
 
         await callSpeakeasyApiWithAgent(agent, {
           api: 'social.spkeasy.privatePost.createPosts',

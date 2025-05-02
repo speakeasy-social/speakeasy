@@ -100,8 +100,6 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         )
       ).filter(post => !!post)
 
-      console.log('posts', posts)
-
       // Fetch author profiles for all posts
       const authorDids = [...new Set(posts.map(post => post.authorDid))]
       const authorProfiles = await Promise.all(
@@ -200,8 +198,6 @@ export class PrivatePostsFeedAPI implements FeedAPI {
 
         return postView
       })
-
-      console.log('feed', feed)
 
       return {
         cursor: data.cursor,

@@ -640,8 +640,6 @@ export async function formatPrivatePosts(
   posts: CombinedPost[],
   sessionKey: string,
 ) {
-  console.log('posts to format', posts)
-
   return Promise.all(
     posts.map(async formattedPost => {
       const contentToEncrypt = {
