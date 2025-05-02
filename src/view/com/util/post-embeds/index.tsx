@@ -24,6 +24,7 @@ import {
 import {HandleRef, measureHandle} from '#/lib/hooks/useHandleRef'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useLightboxControls} from '#/state/lightbox'
+import {useGridLayoutEnabled} from '#/state/preferences'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {FeedSourceCard} from '#/view/com/feeds/FeedSourceCard'
 import {atoms as a, useTheme} from '#/alf'
@@ -33,6 +34,7 @@ import {ContentHider} from '../../../../components/moderation/ContentHider'
 import {Dimensions} from '../../lightbox/ImageViewing/@types'
 import {AutoSizedImage} from '../images/AutoSizedImage'
 import {ImageCarousel} from '../images/ImageCarousel'
+import {ImageLayoutGrid} from '../images/ImageLayoutGrid'
 import {ExternalLinkEmbed} from './ExternalLinkEmbed'
 import {PrivateMessageEmbed} from './PrivateMessageEmbed'
 import {MaybeQuoteEmbed} from './QuoteEmbed'
@@ -75,6 +77,7 @@ export function PostEmbeds({
   viewContext?: PostEmbedViewContext
 }) {
   const {openLightbox} = useLightboxControls()
+  const useGridLayout = useGridLayoutEnabled()
 
   if (!embed) {
     return null
@@ -230,12 +233,21 @@ export function PostEmbeds({
       return (
         <ContentHider modui={moderation?.ui('contentMedia')}>
           <View style={[a.mt_sm, style]}>
-            <ImageCarousel
-              images={embed.images}
-              onPress={onPress}
-              onPressIn={onPressIn}
-              viewContext={viewContext}
-            />
+            {useGridLayout ? (
+              <ImageLayoutGrid
+                images={embed.images}
+                onPress={onPress}
+                onPressIn={onPressIn}
+                viewContext={viewContext}
+              />
+            ) : (
+              <ImageCarousel
+                images={embed.images}
+                onPress={onPress}
+                onPressIn={onPressIn}
+                viewContext={viewContext}
+              />
+            )}
           </View>
         </ContentHider>
       )

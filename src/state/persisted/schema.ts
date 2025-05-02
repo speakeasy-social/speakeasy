@@ -128,6 +128,7 @@ const schema = z.object({
   trendingDisabled: z.boolean().optional(),
   trendingVideoDisabled: z.boolean().optional(),
   showInteractionNumbers: z.boolean().optional(),
+  useGridLayout: z.boolean().optional(), // Preference for grid vs carousel layout for multiple images
   leaveOptions: z
     .array(
       z.object({
@@ -184,6 +185,7 @@ export const defaults: Schema = {
   trendingDisabled: false,
   trendingVideoDisabled: false,
   showInteractionNumbers: false,
+  useGridLayout: true, // Default to grid layout
   leaveOptions: [
     {title: 'Read a Book', link: 'https://bookshop.org/'},
     {

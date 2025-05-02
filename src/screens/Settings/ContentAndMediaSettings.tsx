@@ -5,7 +5,12 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack'
 import {CommonNavigatorParams} from '#/lib/routes/types'
 import {logEvent} from '#/lib/statsig/statsig'
 import {isNative} from '#/platform/detection'
-import {useAutoplayDisabled, useSetAutoplayDisabled} from '#/state/preferences'
+import {
+  useAutoplayDisabled,
+  useGridLayoutEnabled,
+  useSetAutoplayDisabled,
+  useSetGridLayoutEnabled,
+} from '#/state/preferences'
 import {
   useInAppBrowser,
   useSetInAppBrowser,
@@ -18,6 +23,7 @@ import {useTrendingConfig} from '#/state/trending-config'
 import * as SettingsList from '#/screens/Settings/components/SettingsList'
 import * as Toggle from '#/components/forms/Toggle'
 import {Bubbles_Stroke2_Corner2_Rounded as BubblesIcon} from '#/components/icons/Bubble'
+import {Camera_Stroke2_Corner0_Rounded as CameraIcon} from '#/components/icons/Camera'
 import {Hashtag_Stroke2_Corner0_Rounded as HashtagIcon} from '#/components/icons/Hashtag'
 import {Home_Stroke2_Corner2_Rounded as HomeIcon} from '#/components/icons/Home'
 import {Macintosh_Stroke2_Corner2_Rounded as MacintoshIcon} from '#/components/icons/Macintosh'
@@ -34,6 +40,8 @@ export function ContentAndMediaSettingsScreen({}: Props) {
   const {_} = useLingui()
   const autoplayDisabledPref = useAutoplayDisabled()
   const setAutoplayDisabledPref = useSetAutoplayDisabled()
+  const gridLayoutEnabled = useGridLayoutEnabled()
+  const setGridLayoutEnabled = useSetGridLayoutEnabled()
   const inAppBrowserPref = useInAppBrowser()
   const setUseInAppBrowser = useSetInAppBrowser()
   const {enabled: trendingEnabled} = useTrendingConfig()
@@ -111,6 +119,19 @@ export function ContentAndMediaSettingsScreen({}: Props) {
               <SettingsList.ItemIcon icon={PlayIcon} />
               <SettingsList.ItemText>
                 <Trans>Autoplay videos and GIFs</Trans>
+              </SettingsList.ItemText>
+              <Toggle.Platform />
+            </SettingsList.Item>
+          </Toggle.Item>
+          <Toggle.Item
+            name="use_grid_layout"
+            label={_(msg`Show multiple images as a slideshow`)}
+            value={!gridLayoutEnabled}
+            onChange={value => setGridLayoutEnabled(!value)}>
+            <SettingsList.Item>
+              <SettingsList.ItemIcon icon={CameraIcon} />
+              <SettingsList.ItemText>
+                <Trans>Show multiple images as a slideshow</Trans>
               </SettingsList.ItemText>
               <Toggle.Platform />
             </SettingsList.Item>
