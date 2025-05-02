@@ -31,7 +31,7 @@ jobs:
           push: false
           file: ./Dockerfile
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
           outputs: type=docker,dest=${{ github.workspace }}/speakeasy-client.tar
           build-args: |
             EXPO_PUBLIC_BUNDLE_IDENTIFIER=${{ steps.vars.outputs.sha_short }}
