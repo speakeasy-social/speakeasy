@@ -55,7 +55,10 @@ export function ImageCarousel({style, ...props}: ImageCarouselProps) {
 
   // Calculate consistent dimensions for all images
   const maxWidth = Math.min(windowWidth - 16, 550)
-  const containerHeight = maxWidth * (4 / 3) // 3:4 aspect ratio for portrait
+  // Was * (4/3) for 3:4 aspect ratio for portrait
+  // but images on bluesky seem to be more commonly square or
+  // landscape, so this aspect ratio looks better
+  const containerHeight = maxWidth * 1
 
   return (
     <View style={[style, a.relative, {width: '100%', maxWidth}]}>
