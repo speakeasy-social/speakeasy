@@ -14,6 +14,7 @@ import {
   ComAtprotoLabelDefs,
   ComAtprotoRepoApplyWrites,
   ComAtprotoRepoStrongRef,
+  ComAtprotoRepoUploadBlob,
   RichText,
 } from '@atproto/api'
 import {TID} from '@atproto/common-web'
@@ -43,6 +44,7 @@ import {
   ThreadDraft,
 } from '#/view/com/composer/state/composer'
 import {createGIFDescription} from '../gif-alt-text'
+import {uploadMediaToSpeakeasy} from './speakeasy'
 import {uploadBlob} from './upload-blob'
 
 export {uploadBlob}
@@ -58,7 +60,7 @@ interface PostOpts {
 export async function preparePost(
   agent: BskyAgent,
   queryClient: QueryClient,
-  opts: PostOpts,
+  opts: PostOpts & {sessionKey?: string},
 ): Promise<{
   writes: ComAtprotoRepoApplyWrites.Create[]
   uris: string[]
@@ -107,6 +109,7 @@ export async function preparePost(
       queryClient,
       draft,
       opts.onStateChange,
+      opts.sessionKey,
     )
     let labels: ComAtprotoLabelDefs.SelfLabels | undefined
     if (draft.labels.length) {
@@ -217,7 +220,7 @@ export async function preparePost(
 export async function post(
   agent: BskyAgent,
   queryClient: QueryClient,
-  opts: PostOpts,
+  opts: PostOpts & {sessionKey?: string},
 ) {
   const {writes, uris} = await preparePost(agent, queryClient, opts)
 
@@ -275,6 +278,7 @@ async function resolveEmbed(
   queryClient: QueryClient,
   draft: PostDraft,
   onStateChange: ((state: string) => void) | undefined,
+  sessionKey?: string, // Add optional sessionKey parameter for benchmarking
 ): Promise<
   | AppBskyEmbedImages.Main
   | AppBskyEmbedVideo.Main
@@ -289,7 +293,14 @@ async function resolveEmbed(
 > {
   if (draft.embed.quote) {
     const [resolvedMedia, resolvedQuote] = await Promise.all([
-      resolveMedia(agent, queryClient, draft.embed, onStateChange),
+      resolveMedia(
+        agent,
+        queryClient,
+        draft.embed,
+        onStateChange,
+        draft.audience,
+        sessionKey,
+      ),
       resolveRecord(agent, queryClient, draft.embed.quote.uri),
     ])
     if (resolvedMedia) {
@@ -312,6 +323,8 @@ async function resolveEmbed(
     queryClient,
     draft.embed,
     onStateChange,
+    draft.audience,
+    sessionKey,
   )
   if (resolvedMedia) {
     return resolvedMedia
@@ -337,6 +350,8 @@ async function resolveMedia(
   queryClient: QueryClient,
   embedDraft: EmbedDraft,
   onStateChange: ((state: string) => void) | undefined,
+  audience?: string,
+  sessionKey?: string, // Optional sessionKey for encryption benchmark
 ): Promise<
   | AppBskyEmbedExternal.Main
   | AppBskyEmbedImages.Main
@@ -354,9 +369,24 @@ async function resolveMedia(
         logger.debug(`Compressing image #${i}`)
         const {path, width, height, mime} = await compressImage(image)
         logger.debug(`Uploading image #${i}`)
-        const res = await uploadBlob(agent, path, mime)
+
+        // Use speakeasy upload for trusted/hidden audiences
+        let uploadResult
+        if (audience === 'trusted' || audience === 'hidden') {
+          // Pass session key only for the first image if it exists (for benchmarking)
+          const useSessionKey = i === 0 ? sessionKey : undefined
+          uploadResult = await uploadBlobToSpeakeasy(
+            agent,
+            path,
+            mime,
+            useSessionKey,
+          )
+        } else {
+          uploadResult = await uploadBlob(agent, path, mime)
+        }
+
         return {
-          image: res.data.blob,
+          image: uploadResult.data.blob,
           alt: image.alt,
           aspectRatio: {width, height},
         }
@@ -665,4 +695,76 @@ export async function formatPrivatePosts(
       }
     }),
   )
+}
+
+/**
+ * Upload a blob to the Speakeasy media service
+ * @param agent - The BskyAgent instance
+ * @param path - Path to the file to upload
+ * @param mime - MIME type of the file
+ * @returns Promise with the upload response
+ */
+async function uploadBlobToSpeakeasy(
+  agent: BskyAgent,
+  path: string,
+  mime: string,
+  sessionKey?: string, // Optional session key for encryption benchmarking
+): Promise<ComAtprotoRepoUploadBlob.Response> {
+  try {
+    // First convert to a blob just like the standard uploadBlob does
+    let blob: Blob
+
+    if (typeof path === 'string' && path.startsWith('file:')) {
+      // Use XMLHttpRequest for file:// URIs (especially for Android)
+      blob = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.onload = () => resolve(xhr.response)
+        xhr.onerror = () => reject(new Error('Failed to load blob'))
+        xhr.responseType = 'blob'
+        xhr.open('GET', path, true)
+        xhr.send(null)
+      })
+    } else if (typeof path === 'string' && path.startsWith('/')) {
+      // Absolute path - convert to file:// URL
+      blob = await fetch(`file://${path}`).then(r => r.blob())
+    } else if (typeof path === 'string' && path.startsWith('data:')) {
+      // Data URI
+      blob = await fetch(path).then(r => r.blob())
+    } else {
+      throw new TypeError(`Invalid uploadBlob input: ${typeof path}`)
+    }
+
+    // Benchmark encryption if session key is provided
+    if (sessionKey) {
+      console.log(
+        new Date().toISOString(),
+        '- Starting media encryption benchmark',
+      )
+      console.log(`Blob size: ${blob.size} bytes`)
+
+      // Convert blob to Base64 string for encryption
+      const arrayBuffer = await blob.arrayBuffer()
+      const base64String = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          '',
+        ),
+      )
+
+      // Encrypt the blob
+      await encryptContent(base64String, sessionKey)
+      console.log(
+        new Date().toISOString(),
+        '- Finished media encryption benchmark',
+      )
+    }
+
+    // Use the dedicated Speakeasy upload function that handles URL and host resolution
+    return uploadMediaToSpeakeasy(agent, blob, mime)
+  } catch (e: any) {
+    logger.error('Failed to upload blob to Speakeasy', {
+      safeMessage: e.message,
+    })
+    throw e
+  }
 }

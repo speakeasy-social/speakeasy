@@ -1,5 +1,10 @@
-import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
+import {
+  AppBskyFeedDefs,
+  BskyAgent,
+  ComAtprotoRepoUploadBlob,
+} from '@atproto/api'
 
+import {logger} from '#/logger'
 import {useAgent} from '#/state/session'
 
 export type SpeakeasyApiOptions = {
@@ -114,4 +119,65 @@ export function isAnyPostView(v: any): v is AppBskyFeedDefs.PostView {
 
 export function isPrivatePostView(v: any): v is AppBskyFeedDefs.PostView {
   return v?.$type === 'social.spkeasy.feed.defs#privatePostView'
+}
+
+/**
+ * Upload media to the Speakeasy media service
+ * @param agent - The BskyAgent instance
+ * @param blob - The blob to upload
+ * @param mime - MIME type of the file
+ * @returns Promise with the upload response
+ */
+export async function uploadMediaToSpeakeasy(
+  agent: BskyAgent,
+  blob: Blob,
+  mime: string,
+): Promise<ComAtprotoRepoUploadBlob.Response> {
+  try {
+    // Use the appropriate endpoint for Speakeasy uploads
+    const uploadEndpoint = 'social.spkeasy.media.upload'
+
+    // Get the host using the host resolution logic
+    const serverUrl = getHost(agent, uploadEndpoint)
+
+    // Create a FormData object
+    const formData = new FormData()
+    formData.append('file', new Blob([blob], {type: mime}), 'image')
+
+    // Send the request
+    const response = await fetch(`${serverUrl}/xrpc/${uploadEndpoint}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${agent.session?.accessJwt}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      logger.error('Failed to upload to Speakeasy API', {
+        status: response.status,
+        error: errorData,
+      })
+      throw new Error(
+        `Failed to upload media: ${errorData.message || response.statusText}`,
+      )
+    }
+
+    const result = await response.json()
+
+    // Format the response to match what uploadBlob returns
+    return {
+      success: true,
+      headers: {},
+      data: {
+        blob: result.blob,
+      },
+    }
+  } catch (e: any) {
+    logger.error('Failed to upload blob to Speakeasy', {
+      safeMessage: e.message,
+    })
+    throw e
+  }
 }
