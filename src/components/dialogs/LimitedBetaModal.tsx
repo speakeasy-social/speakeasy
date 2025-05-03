@@ -2,7 +2,7 @@ import React from 'react'
 import {TextInput, View} from 'react-native'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
-import {useMutation} from '@tanstack/react-query'
+import {useMutation, useQueryClient} from '@tanstack/react-query'
 
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {useOpenLink} from '#/lib/hooks/useOpenLink'
@@ -23,6 +23,7 @@ export interface LimitedBetaModalProps {
     medium?: string
     campaign?: string
   }
+  onSuccess?: () => void
 }
 
 export function LimitedBetaModal({
@@ -30,6 +31,7 @@ export function LimitedBetaModal({
   featureName,
   featureDescription,
   utmParams,
+  onSuccess,
 }: LimitedBetaModalProps) {
   const {_} = useLingui()
   const {gtMobile} = useBreakpoints()
@@ -41,6 +43,7 @@ export function LimitedBetaModal({
   const [showInviteCode, setShowInviteCode] = React.useState(false)
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   const applyInviteCode = useMutation({
     mutationFn: async (inviteCode: string) => {
@@ -50,6 +53,9 @@ export function LimitedBetaModal({
           method: 'POST',
           body: {code: inviteCode},
         })
+        // Refetch the features
+        await queryClient.invalidateQueries({queryKey: ['features']})
+
         return true
       } catch (err: any) {
         setError(err.message || 'Invalid invite code')
@@ -82,6 +88,9 @@ export function LimitedBetaModal({
     if (success) {
       Toast.show(_(msg`${featureName} has been activated!`))
       control.close()
+      if (onSuccess) {
+        onSuccess()
+      }
     }
   }
 
@@ -158,6 +167,8 @@ export function LimitedBetaModal({
                 onChangeText={setCode}
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoFocus={true}
+                onSubmitEditing={handleSubmit}
                 placeholder={_(msg`Enter your invite code`)}
                 placeholderTextColor={t.atoms.text_contrast_medium.color}
                 accessibilityLabel={_(msg`Invite code input`)}

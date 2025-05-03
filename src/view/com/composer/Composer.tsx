@@ -1887,6 +1887,17 @@ function AudienceBar({
           medium: 'trusted_toggle',
           campaign: 'groups_beta',
         }}
+        onSuccess={() => {
+          // Set audience to trusted since the feature was just activated
+          dispatch({
+            type: 'update_post',
+            postId: post.id,
+            postAction: {
+              type: 'update_audience',
+              audience: 'trusted',
+            },
+          })
+        }}
       />
       <View style={[styles.audienceBar, t.atoms.border_contrast_medium]}>
         <Button
