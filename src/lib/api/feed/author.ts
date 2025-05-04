@@ -3,8 +3,8 @@ import {
   AppBskyFeedGetAuthorFeed as GetAuthorFeed,
   BskyAgent,
 } from '@atproto/api'
-import {isAnyPostView} from '#/lib/api/speakeasy'
 
+import {isAnyPostView} from '#/lib/api/speakeasy'
 import {FeedAPI, FeedAPIResponse} from './types'
 
 export class AuthorFeedAPI implements FeedAPI {
