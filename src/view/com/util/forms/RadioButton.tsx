@@ -49,6 +49,12 @@ export function RadioButton({
     'default-light': {
       borderColor: theme.palette.default.borderDark,
     },
+    purple: {
+      borderColor: theme.palette.purple.text,
+    },
+    'purple-outline': {
+      borderColor: theme.palette.purple.border,
+    },
   })
   const circleFillStyle = choose<TextStyle, Record<ButtonType, TextStyle>>(
     type,
@@ -79,6 +85,12 @@ export function RadioButton({
       },
       'default-light': {
         backgroundColor: theme.palette.primary.background,
+      },
+      purple: {
+        backgroundColor: theme.palette.purple.text,
+      },
+      'purple-outline': {
+        backgroundColor: theme.palette.purple.background,
       },
     },
   )
@@ -118,6 +130,14 @@ export function RadioButton({
     'default-light': {
       color: theme.palette.default.text,
       fontWeight: theme.palette.default.isLowContrast ? '600' : undefined,
+    },
+    purple: {
+      color: theme.palette.purple.text,
+      fontWeight: theme.palette.purple.isLowContrast ? '600' : undefined,
+    },
+    'purple-outline': {
+      color: theme.palette.purple.textInverted,
+      fontWeight: theme.palette.purple.isLowContrast ? '600' : undefined,
     },
   })
   return (
