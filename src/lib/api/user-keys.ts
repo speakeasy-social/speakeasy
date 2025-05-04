@@ -3,6 +3,11 @@ import {chunk} from 'lodash'
 import {generateKeyPair} from '#/lib/encryption'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
 
+let cachedPrivateKeyPromise:
+  | Promise<{privateKey: string; userKeyPairId: string}>
+  | undefined
+let cachedPrivateKeyUserDid: string | undefined
+
 /**
  * Retrieves the encrypted session key from the Speakeasy API.
  * @param {SpeakeasyApi} speakeasyApi - The Speakeasy API client instance
@@ -67,6 +72,25 @@ export async function getPublicKeys(
   }
 
   return allPublicKeys
+}
+
+/**
+ * Retrieves and caches the private key for a given user DID.
+ * @param {string} userDid - The DID of the user
+ * @param {SpeakeasyApi} speakeasyApi - The Speakeasy API client instance
+ * @returns {Promise<{privateKey: string, userKeyPairId: string}>} The cached private key
+ */
+export async function getCachedPrivateKey(
+  userDid: string,
+  speakeasyApi: SpeakeasyApiCall,
+) {
+  if (cachedPrivateKeyUserDid === userDid && cachedPrivateKeyPromise) {
+    return cachedPrivateKeyPromise
+  }
+
+  cachedPrivateKeyUserDid = userDid
+  cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
+  return cachedPrivateKeyPromise
 }
 
 /**

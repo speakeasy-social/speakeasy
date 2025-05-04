@@ -8,6 +8,8 @@ import {SafeAreaProvider} from 'react-native-safe-area-context'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {IntentionProvider} from '#/lib/hooks/useIntention'
 import {QueryProvider} from '#/lib/react-query'
 import {Provider as StatsigProvider} from '#/lib/statsig/statsig'
@@ -40,6 +42,7 @@ import {
   useSession,
   useSessionApi,
 } from '#/state/session'
+import {useAgent} from '#/state/session'
 import {readLastActiveAccount} from '#/state/session/util'
 import {Provider as ShellStateProvider} from '#/state/shell'
 import {Provider as ComposerProvider} from '#/state/shell/composer'
@@ -75,8 +78,22 @@ function InnerApp() {
   const theme = useColorModeTheme()
   const {_} = useLingui()
   const hasCheckedReferrer = useStarterPackEntry()
+  const agent = useAgent()
 
   usePrefetchFollowers()
+
+  // Prefetch private key
+  useEffect(() => {
+    if (!currentAccount?.did) return
+
+    getCachedPrivateKey(currentAccount.did, options =>
+      callSpeakeasyApiWithAgent(agent, options),
+    ).catch(error => {
+      if (error.error !== 'NotFoundError') {
+        logger.error('Failed to prefetch private key:', error)
+      }
+    })
+  }, [currentAccount?.did, agent])
 
   // init
   useEffect(() => {

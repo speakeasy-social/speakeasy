@@ -16,6 +16,8 @@ import * as SystemUI from 'expo-system-ui'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {KeyboardControllerProvider} from '#/lib/hooks/useEnableKeyboardController'
 import {QueryProvider} from '#/lib/react-query'
 import {Provider as StatsigProvider, tryFetchGates} from '#/lib/statsig/statsig'
@@ -47,6 +49,7 @@ import {Provider as UnreadNotifsProvider} from '#/state/queries/notifications/un
 import {
   Provider as SessionProvider,
   SessionAccount,
+  useAgent,
   useSession,
   useSessionApi,
 } from '#/state/session'
@@ -96,8 +99,22 @@ function InnerApp() {
   const {_} = useLingui()
 
   const hasCheckedReferrer = useStarterPackEntry()
+  const agent = useAgent()
 
   usePrefetchFollowers()
+
+  // Prefetch private key
+  useEffect(() => {
+    if (!currentAccount?.did) return
+
+    getCachedPrivateKey(currentAccount.did, options =>
+      callSpeakeasyApiWithAgent(agent, options),
+    ).catch(error => {
+      if (error.error !== 'NotFoundError') {
+        logger.error('Failed to prefetch private key:', error)
+      }
+    })
+  }, [currentAccount?.did, agent])
 
   // init
   useEffect(() => {

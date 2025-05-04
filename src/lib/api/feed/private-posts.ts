@@ -2,7 +2,7 @@ import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getPrivateKey} from '#/lib/api/user-keys'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
@@ -83,8 +83,9 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         })
       }
 
-      const privateKey = await getPrivateKey(options =>
-        callSpeakeasyApiWithAgent(this.agent, options),
+      const privateKey = await getCachedPrivateKey(
+        this.agent.session!.did,
+        options => callSpeakeasyApiWithAgent(this.agent, options),
       )
 
       const posts = (
