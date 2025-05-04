@@ -740,6 +740,7 @@ function transformImageEmbed(
         return {
           thumb: `${baseUrl}/${mediaKey}`,
           fullsize: `${baseUrl}/${mediaKey}`,
+          mimeType: img.image.mimeType,
           alt: img.alt || '',
           aspectRatio: img.aspectRatio,
         }
