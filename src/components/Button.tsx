@@ -33,7 +33,6 @@ export type ButtonColor =
   | 'gradient_sunset'
   | 'gradient_nordic'
   | 'gradient_bonfire'
-  | 'bluesky'
 export type ButtonSize = 'tiny' | 'small' | 'large'
 export type ButtonShape = 'round' | 'square' | 'default'
 export type VariantProps = {
@@ -357,45 +356,6 @@ export const Button = React.forwardRef<View, ButtonProps>(
             })
           }
         }
-      } else if (color === 'bluesky') {
-        if (variant === 'solid') {
-          if (!disabled) {
-            baseStyles.push({
-              backgroundColor: '#0066FF',
-            })
-            hoverStyles.push({
-              backgroundColor: '#0052CC',
-            })
-          } else {
-            baseStyles.push({
-              backgroundColor: '#99B3FF',
-            })
-          }
-        } else if (variant === 'outline') {
-          baseStyles.push(a.border, t.atoms.bg, {
-            borderWidth: 1,
-          })
-
-          if (!disabled) {
-            baseStyles.push(a.border, {
-              borderColor: '#0066FF',
-            })
-            hoverStyles.push(a.border, {
-              backgroundColor: '#E6F0FF',
-            })
-          } else {
-            baseStyles.push(a.border, {
-              borderColor: '#99B3FF',
-            })
-          }
-        } else if (variant === 'ghost') {
-          if (!disabled) {
-            baseStyles.push(t.atoms.bg)
-            hoverStyles.push({
-              backgroundColor: '#E6F0FF',
-            })
-          }
-        }
       }
 
       if (shape === 'default') {
@@ -683,26 +643,6 @@ export function useSharedButtonTextStyles() {
           baseStyles.push({color: t.palette.negative_400})
         } else {
           baseStyles.push({color: t.palette.negative_400, opacity: 0.5})
-        }
-      }
-    } else if (color === 'bluesky') {
-      if (variant === 'solid' || variant === 'gradient') {
-        if (!disabled) {
-          baseStyles.push({color: '#FFFFFF'})
-        } else {
-          baseStyles.push({color: '#FFFFFF', opacity: 0.5})
-        }
-      } else if (variant === 'outline') {
-        if (!disabled) {
-          baseStyles.push({color: '#0066FF'})
-        } else {
-          baseStyles.push({color: '#99B3FF'})
-        }
-      } else if (variant === 'ghost') {
-        if (!disabled) {
-          baseStyles.push({color: '#0066FF'})
-        } else {
-          baseStyles.push({color: '#99B3FF'})
         }
       }
     } else {
