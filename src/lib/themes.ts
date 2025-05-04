@@ -64,6 +64,17 @@ export const defaultTheme: Theme = {
       borderDark: darkPalette.contrast_200,
       icon: darkPalette.contrast_500,
     },
+    purple: {
+      background: colors.purple3,
+      backgroundLight: colors.purple2,
+      text: colors.white,
+      textLight: colors.purple1,
+      textInverted: colors.purple3,
+      link: colors.purple1,
+      border: colors.purple4,
+      borderDark: colors.purple5,
+      icon: colors.purple4,
+    },
     error: {
       background: colors.red3,
       backgroundLight: colors.red2,

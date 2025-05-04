@@ -53,6 +53,12 @@ export function ToggleButton({
     'default-light': {
       borderColor: theme.palette.default.border,
     },
+    purple: {
+      borderColor: theme.palette.purple.border,
+    },
+    'purple-outline': {
+      borderColor: theme.palette.purple.border,
+    },
   })
   const circleFillStyle = choose<TextStyle, Record<ButtonType, TextStyle>>(
     type,
@@ -95,6 +101,14 @@ export function ToggleButton({
           ? theme.palette.primary.background
           : colors.gray3,
       },
+      purple: {
+        backgroundColor: theme.palette.purple.background,
+        opacity: isSelected ? 1 : 0.5,
+      },
+      'purple-outline': {
+        backgroundColor: theme.palette.purple.border,
+        opacity: isSelected ? 1 : 0.5,
+      },
     },
   )
   const labelStyle = choose<TextStyle, Record<ButtonType, TextStyle>>(type, {
@@ -133,6 +147,14 @@ export function ToggleButton({
     'default-light': {
       color: theme.palette.default.text,
       fontWeight: theme.palette.default.isLowContrast ? '600' : undefined,
+    },
+    purple: {
+      color: theme.palette.purple.text,
+      fontWeight: theme.palette.purple.isLowContrast ? '600' : undefined,
+    },
+    'purple-outline': {
+      color: theme.palette.purple.textInverted,
+      fontWeight: theme.palette.purple.isLowContrast ? '600' : undefined,
     },
   })
   return (
