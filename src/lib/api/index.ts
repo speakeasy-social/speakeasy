@@ -351,7 +351,8 @@ async function resolveMedia(
   embedDraft: EmbedDraft,
   onStateChange: ((state: string) => void) | undefined,
   audience?: string,
-  sessionKey?: string, // Optional sessionKey for encryption benchmark
+  sessionKey?: string,
+  sessionId?: string,
 ): Promise<
   | AppBskyEmbedExternal.Main
   | AppBskyEmbedImages.Main
@@ -373,13 +374,12 @@ async function resolveMedia(
         // Use speakeasy upload for trusted/hidden audiences
         let uploadResult
         if (audience === 'trusted' || audience === 'hidden') {
-          // Pass session key only for the first image if it exists (for benchmarking)
-          const useSessionKey = i === 0 ? sessionKey : undefined
           uploadResult = await uploadBlobToSpeakeasy(
             agent,
             path,
             mime,
-            useSessionKey,
+            sessionKey!,
+            sessionId!,
           )
         } else {
           uploadResult = await uploadBlob(agent, path, mime)
@@ -708,9 +708,16 @@ async function uploadBlobToSpeakeasy(
   agent: BskyAgent,
   path: string,
   mime: string,
-  sessionKey?: string, // Optional session key for encryption benchmarking
+  sessionId: string,
+  sessionKey: string,
 ): Promise<ComAtprotoRepoUploadBlob.Response> {
   try {
+    if (!sessionKey || !sessionId) {
+      throw new Error(
+        'Session key or session ID must be provided for speakeasy uploads',
+      )
+    }
+
     // First convert to a blob just like the standard uploadBlob does
     let blob: Blob
 
@@ -730,12 +737,20 @@ async function uploadBlobToSpeakeasy(
     } else if (typeof path === 'string' && path.startsWith('data:')) {
       // Data URI
       blob = await fetch(path).then(r => r.blob())
+    } else if (
+      typeof path === 'string' &&
+      (path.startsWith('http:') ||
+        path.startsWith('https:') ||
+        path.startsWith('blob:'))
+    ) {
+      // HTTP/HTTPS/Blob URL
+      blob = await fetch(path).then(r => r.blob())
     } else {
       throw new TypeError(`Invalid uploadBlob input: ${typeof path}`)
     }
 
     // Benchmark encryption if session key is provided
-    if (sessionKey) {
+    if (sessionKey === 'encryption not implemented yet') {
       console.log(
         new Date().toISOString(),
         '- Starting media encryption benchmark',
@@ -760,7 +775,7 @@ async function uploadBlobToSpeakeasy(
     }
 
     // Use the dedicated Speakeasy upload function that handles URL and host resolution
-    return uploadMediaToSpeakeasy(agent, blob, mime)
+    return await uploadMediaToSpeakeasy(agent, blob, mime, sessionId)
   } catch (e: any) {
     logger.error('Failed to upload blob to Speakeasy', {
       safeMessage: e.message,

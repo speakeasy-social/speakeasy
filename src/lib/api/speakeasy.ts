@@ -1,8 +1,4 @@
-import {
-  AppBskyFeedDefs,
-  BskyAgent,
-  ComAtprotoRepoUploadBlob,
-} from '@atproto/api'
+import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {logger} from '#/logger'
 import {useAgent} from '#/state/session'
@@ -132,7 +128,8 @@ export async function uploadMediaToSpeakeasy(
   agent: BskyAgent,
   blob: Blob,
   mime: string,
-): Promise<ComAtprotoRepoUploadBlob.Response> {
+  sessionId: string,
+): Promise<any> {
   try {
     // Use the appropriate endpoint for Speakeasy uploads
     const uploadEndpoint = 'social.spkeasy.media.upload'
@@ -140,17 +137,14 @@ export async function uploadMediaToSpeakeasy(
     // Get the host using the host resolution logic
     const serverUrl = getHost(agent, uploadEndpoint)
 
-    // Create a FormData object
-    const formData = new FormData()
-    formData.append('file', new Blob([blob], {type: mime}), 'image')
-
-    // Send the request
     const response = await fetch(`${serverUrl}/xrpc/${uploadEndpoint}`, {
       method: 'POST',
       headers: {
+        'Content-Type': mime,
         Authorization: `Bearer ${agent.session?.accessJwt}`,
+        'x-speakeasy-session-id': sessionId,
       },
-      body: formData,
+      body: blob,
     })
 
     if (!response.ok) {
@@ -168,10 +162,14 @@ export async function uploadMediaToSpeakeasy(
 
     // Format the response to match what uploadBlob returns
     return {
-      success: true,
-      headers: {},
+      mediaId: result.mediaId,
       data: {
-        blob: result.blob,
+        blob: {
+          ref: result.media.key,
+          mimeType: mime,
+          size: blob.size,
+          original: blob,
+        },
       },
     }
   } catch (e: any) {
