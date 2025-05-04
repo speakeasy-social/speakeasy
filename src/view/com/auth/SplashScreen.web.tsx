@@ -164,7 +164,7 @@ export const SplashScreen = ({
                 )}
                 size="large"
                 variant="solid"
-                color="bluesky">
+                color="primary">
                 <ButtonText>
                   <Trans>Create a Bluesky account</Trans>
                 </ButtonText>
