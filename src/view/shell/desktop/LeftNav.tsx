@@ -1,5 +1,5 @@
 import React from 'react'
-import {GestureResponderEvent,StyleSheet, View} from 'react-native'
+import {GestureResponderEvent, StyleSheet, View} from 'react-native'
 import {AppBskyActorDefs} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
@@ -373,8 +373,6 @@ function NavItem({
       ]}
       hoverStyle={t.atoms.bg_contrast_25}
       onPress={onPressWrapped}
-      href={href}
-      dataSet={{noUnderline: 1}}
       role="link"
       accessibilityLabel={label}
       accessibilityHint="">
