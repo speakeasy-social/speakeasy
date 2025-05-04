@@ -26,15 +26,18 @@ export function useThemeName(): ThemeName {
 function getThemeName(
   colorScheme: ColorSchemeName,
   colorMode: 'system' | 'light' | 'dark',
-) {
+  darkTheme: 'dim' | 'dark' | undefined,
+): ThemeName {
   if (
     (colorMode === 'system' && colorScheme === 'light') ||
     colorMode === 'light'
   ) {
     return 'light'
-  } else {
-    return 'dark'
+  } else if (colorMode === 'system' || colorMode === 'dark') {
+    return darkTheme || 'dark'
   }
+
+  return 'light'
 }
 
 function updateDocument(theme: ThemeName) {
