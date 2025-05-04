@@ -28,6 +28,7 @@ import {Provider as A11yProvider} from '#/state/a11y'
 import {Provider as MutedThreadsProvider} from '#/state/cache/thread-mutes'
 import {Provider as DialogStateProvider} from '#/state/dialogs'
 import {listenSessionDropped} from '#/state/events'
+import {usePrefetchFollowers} from '#/state/followers-cache'
 import {
   beginResolveGeolocation,
   ensureGeolocationResolved,
@@ -95,6 +96,8 @@ function InnerApp() {
   const {_} = useLingui()
 
   const hasCheckedReferrer = useStarterPackEntry()
+
+  usePrefetchFollowers()
 
   // init
   useEffect(() => {
