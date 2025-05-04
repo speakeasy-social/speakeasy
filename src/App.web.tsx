@@ -51,6 +51,7 @@ import {Provider as LoggedOutViewProvider} from '#/state/shell/logged-out'
 import {Provider as ProgressGuideProvider} from '#/state/shell/progress-guide'
 import {Provider as SelectedFeedProvider} from '#/state/shell/selected-feed'
 import {Provider as StarterPackProvider} from '#/state/shell/starter-pack'
+import {useSpeakeasyPreAuth} from '#/state/speakeasy-pre-auth'
 import {Provider as HiddenRepliesProvider} from '#/state/threadgate-hidden-replies'
 import {Provider as TrendingConfigProvider} from '#/state/trending-config'
 import {Provider as ActiveVideoProvider} from '#/view/com/util/post-embeds/ActiveVideoWebContext'
@@ -81,6 +82,7 @@ function InnerApp() {
   const agent = useAgent()
 
   usePrefetchFollowers()
+  useSpeakeasyPreAuth()
 
   // Prefetch private key
   useEffect(() => {
