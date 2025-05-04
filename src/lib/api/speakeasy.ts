@@ -165,10 +165,12 @@ export async function uploadMediaToSpeakeasy(
       mediaId: result.mediaId,
       data: {
         blob: {
+          mediaId: result.mediaId,
           ref: result.media.key,
           mimeType: mime,
           size: blob.size,
           original: blob,
+          key: result.media.key,
         },
       },
     }

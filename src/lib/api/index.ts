@@ -55,12 +55,14 @@ interface PostOpts {
   onStateChange?: (state: string) => void
   langs?: string[]
   collection: 'app.bsky.feed.post' | 'social.spkeasy.feed.privatePost'
+  sessionKey?: string
+  sessionId?: string
 }
 
 export async function preparePost(
   agent: BskyAgent,
   queryClient: QueryClient,
-  opts: PostOpts & {sessionKey?: string},
+  opts: PostOpts,
 ): Promise<{
   writes: ComAtprotoRepoApplyWrites.Create[]
   uris: string[]
@@ -110,6 +112,7 @@ export async function preparePost(
       draft,
       opts.onStateChange,
       opts.sessionKey,
+      opts.sessionId,
     )
     let labels: ComAtprotoLabelDefs.SelfLabels | undefined
     if (draft.labels.length) {
@@ -220,7 +223,7 @@ export async function preparePost(
 export async function post(
   agent: BskyAgent,
   queryClient: QueryClient,
-  opts: PostOpts & {sessionKey?: string},
+  opts: PostOpts,
 ) {
   const {writes, uris} = await preparePost(agent, queryClient, opts)
 
@@ -278,7 +281,8 @@ async function resolveEmbed(
   queryClient: QueryClient,
   draft: PostDraft,
   onStateChange: ((state: string) => void) | undefined,
-  sessionKey?: string, // Add optional sessionKey parameter for benchmarking
+  sessionKey?: string,
+  sessionId?: string,
 ): Promise<
   | AppBskyEmbedImages.Main
   | AppBskyEmbedVideo.Main
@@ -300,6 +304,7 @@ async function resolveEmbed(
         onStateChange,
         draft.audience,
         sessionKey,
+        sessionId,
       ),
       resolveRecord(agent, queryClient, draft.embed.quote.uri),
     ])
@@ -325,6 +330,7 @@ async function resolveEmbed(
     onStateChange,
     draft.audience,
     sessionKey,
+    sessionId,
   )
   if (resolvedMedia) {
     return resolvedMedia
@@ -374,12 +380,17 @@ async function resolveMedia(
         // Use speakeasy upload for trusted/hidden audiences
         let uploadResult
         if (audience === 'trusted' || audience === 'hidden') {
+          if (!sessionKey || !sessionId) {
+            throw new Error(
+              'Session key and session ID must be provided for speakeasy uploads',
+            )
+          }
           uploadResult = await uploadBlobToSpeakeasy(
             agent,
             path,
             mime,
-            sessionKey!,
-            sessionId!,
+            sessionId,
+            sessionKey,
           )
         } else {
           uploadResult = await uploadBlob(agent, path, mime)
@@ -590,6 +601,9 @@ export function createDefaultHiddenMessage(
 export type CombinedPost = {
   uri: string
   cid: string
+  media: {
+    id: string
+  }
   record: {
     reply?: AppBskyFeedPost.ReplyRef
     langs?: string[]
@@ -633,9 +647,15 @@ export function combinePostGates(
     if (write.collection === 'social.spkeasy.feed.privatePost' && write.value) {
       const postIndex = uris.indexOf(uri)
       const record = write.value as AppBskyFeedPost.Record
+      const embed = record.embed as
+        | {images?: Array<{image?: {mediaId?: string}}>}
+        | undefined
       formattedPosts.push({
         uri,
         cid: cids[postIndex],
+        media: {
+          id: embed?.images?.[0]?.image?.mediaId!,
+        },
         record: record as any,
       })
     } else if (write.collection === 'app.bsky.feed.threadgate' && write.value) {
@@ -672,6 +692,42 @@ export async function formatPrivatePosts(
 ) {
   return Promise.all(
     posts.map(async formattedPost => {
+      // Collect all media IDs from embeds
+      const mediaIds: string[] = []
+      if (formattedPost.record.embed) {
+        type ImageEmbed = {
+          $type: 'app.bsky.embed.images'
+          images: Array<{image: {mediaId: string}}>
+        }
+        type RecordWithMediaEmbed = {
+          $type: 'app.bsky.embed.recordWithMedia'
+          media: {
+            $type: 'app.bsky.embed.images'
+            images: Array<{image: {mediaId: string}}>
+          }
+        }
+        const embed = formattedPost.record.embed as
+          | ImageEmbed
+          | RecordWithMediaEmbed
+
+        if (embed.$type === 'app.bsky.embed.images') {
+          embed.images.forEach(img => {
+            if (img.image.mediaId) {
+              mediaIds.push(img.image.mediaId)
+            }
+          })
+        } else if (
+          embed.$type === 'app.bsky.embed.recordWithMedia' &&
+          embed.media.$type === 'app.bsky.embed.images'
+        ) {
+          embed.media.images.forEach(img => {
+            if (img.image.mediaId) {
+              mediaIds.push(img.image.mediaId)
+            }
+          })
+        }
+      }
+
       const contentToEncrypt = {
         ...formattedPost.record,
         postgate: formattedPost.postgate,
@@ -692,6 +748,7 @@ export async function formatPrivatePosts(
         uri: formattedPost.uri,
         langs: formattedPost.record.langs,
         encryptedContent: encryptedContent,
+        media: mediaIds,
       }
     }),
   )
@@ -714,7 +771,7 @@ async function uploadBlobToSpeakeasy(
   try {
     if (!sessionKey || !sessionId) {
       throw new Error(
-        'Session key or session ID must be provided for speakeasy uploads',
+        'Session key and session ID must be provided for speakeasy uploads',
       )
     }
 

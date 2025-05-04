@@ -421,6 +421,8 @@ export const ComposePost = ({
             onStateChange: setPublishingStage,
             langs: toPostLanguages(langPrefs.postLanguage),
             collection: 'social.spkeasy.feed.privatePost',
+            sessionId,
+            sessionKey,
           },
         )
 
@@ -918,7 +920,6 @@ let ComposerPost = React.memo(function ComposerPost({
           onNewLink={onNewLink}
           onError={onError}
           onPressPublish={onPublish}
-          disableDrop={post.audience === 'trusted'}
           accessible={true}
           accessibilityLabel={_(msg`Write post`)}
           accessibilityHint={_(
