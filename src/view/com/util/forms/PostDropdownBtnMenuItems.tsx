@@ -308,8 +308,9 @@ let PostDropdownMenuItems = ({
     }
   }, [_, quoteEmbed, post, toggleQuoteDetachment])
 
+  const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
   const canHidePostForMe = !isAuthor && !isPostHidden
-  const canEmbed = isWeb && gtMobile && !hideInPWI
+  const canEmbed = !isPrivate && isWeb && gtMobile && !hideInPWI
   const canHideReplyForEveryone =
     !isAuthor && isRootPostAuthor && !isPostHidden && isReply
   const canDetachQuote = quoteEmbed && quoteEmbed.isOwnedByViewer
@@ -373,13 +374,13 @@ let PostDropdownMenuItems = ({
           <>
             <Menu.Group>
               <Menu.Item
+                disabled={isPrivate || isPinPending}
                 testID="pinPostBtn"
                 label={
                   isPinned
                     ? _(msg`Unpin from profile`)
                     : _(msg`Pin to your profile`)
                 }
-                disabled={isPinPending}
                 onPress={onPressPin}>
                 <Menu.ItemText>
                   {isPinned
@@ -484,6 +485,7 @@ let PostDropdownMenuItems = ({
             <Menu.Divider />
             <Menu.Group>
               <Menu.Item
+                disabled={isPrivate}
                 testID="postDropdownMuteThreadBtn"
                 label={
                   isThreadMuted ? _(msg`Unmute thread`) : _(msg`Mute thread`)
@@ -499,6 +501,7 @@ let PostDropdownMenuItems = ({
               </Menu.Item>
 
               <Menu.Item
+                disabled={isPrivate}
                 testID="postDropdownMuteWordsBtn"
                 label={_(msg`Mute words & tags`)}
                 onPress={() => mutedWordsDialogControl.open()}>
