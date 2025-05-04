@@ -8,6 +8,8 @@ import {SafeAreaProvider} from 'react-native-safe-area-context'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {IntentionProvider} from '#/lib/hooks/useIntention'
 import {QueryProvider} from '#/lib/react-query'
 import {Provider as StatsigProvider} from '#/lib/statsig/statsig'
@@ -18,6 +20,7 @@ import {Provider as A11yProvider} from '#/state/a11y'
 import {Provider as MutedThreadsProvider} from '#/state/cache/thread-mutes'
 import {Provider as DialogStateProvider} from '#/state/dialogs'
 import {listenSessionDropped} from '#/state/events'
+import {usePrefetchFollowers} from '#/state/followers-cache'
 import {
   beginResolveGeolocation,
   ensureGeolocationResolved,
@@ -39,6 +42,7 @@ import {
   useSession,
   useSessionApi,
 } from '#/state/session'
+import {useAgent} from '#/state/session'
 import {readLastActiveAccount} from '#/state/session/util'
 import {Provider as ShellStateProvider} from '#/state/shell'
 import {Provider as ComposerProvider} from '#/state/shell/composer'
@@ -47,6 +51,7 @@ import {Provider as LoggedOutViewProvider} from '#/state/shell/logged-out'
 import {Provider as ProgressGuideProvider} from '#/state/shell/progress-guide'
 import {Provider as SelectedFeedProvider} from '#/state/shell/selected-feed'
 import {Provider as StarterPackProvider} from '#/state/shell/starter-pack'
+import {useSpeakeasyPreAuth} from '#/state/speakeasy-pre-auth'
 import {Provider as HiddenRepliesProvider} from '#/state/threadgate-hidden-replies'
 import {Provider as TrendingConfigProvider} from '#/state/trending-config'
 import {Provider as ActiveVideoProvider} from '#/view/com/util/post-embeds/ActiveVideoWebContext'
@@ -74,6 +79,23 @@ function InnerApp() {
   const theme = useColorModeTheme()
   const {_} = useLingui()
   const hasCheckedReferrer = useStarterPackEntry()
+  const agent = useAgent()
+
+  usePrefetchFollowers()
+  useSpeakeasyPreAuth()
+
+  // Prefetch private key
+  useEffect(() => {
+    if (!currentAccount?.did) return
+
+    getCachedPrivateKey(currentAccount.did, options =>
+      callSpeakeasyApiWithAgent(agent, options),
+    ).catch(error => {
+      if (error.error !== 'NotFoundError') {
+        logger.error('Failed to prefetch private key:', error)
+      }
+    })
+  }, [currentAccount?.did, agent])
 
   // init
   useEffect(() => {

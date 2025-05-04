@@ -2,8 +2,9 @@ import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getPrivateKey} from '#/lib/api/user-keys'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {decryptContent, decryptDEK} from '#/lib/encryption'
+import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
 
@@ -42,15 +43,12 @@ export class PrivatePostsFeedAPI implements FeedAPI {
 
       const query: {
         limit: string
-        audience: string
         cursor?: string
         filter?: string
       } = {
         limit: limit.toString(),
-        audience: audience || 'trusted',
       }
       if (cursor) query.cursor = cursor
-      if (audience === 'following') query.filter = 'follows'
 
       const data = await callSpeakeasyApiWithAgent(this.agent, {
         api: 'social.spkeasy.privatePost.getPosts',
@@ -70,13 +68,29 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         }[]
       } = data
 
-      const privateKey = await getPrivateKey(options =>
-        callSpeakeasyApiWithAgent(this.agent, options),
+      let filteredPosts = encryptedPosts
+
+      if (audience === 'following') {
+        const followerDids = await getCachedFollowerDids()
+
+        // It's too slow to filter on the server as we have to wait
+        // for the server to compile the followers list.
+        // So we compile it when the app first loads, and then
+        // filter the private posts client side.
+        // Eventually we'll fix this with a proper AppView.
+        filteredPosts = encryptedPosts.filter(post => {
+          return followerDids.includes(post.authorDid)
+        })
+      }
+
+      const privateKey = await getCachedPrivateKey(
+        this.agent.session!.did,
+        options => callSpeakeasyApiWithAgent(this.agent, options),
       )
 
       const posts = (
         await Promise.all(
-          encryptedPosts.map(async (encryptedPost: any) => {
+          filteredPosts.map(async (encryptedPost: any) => {
             const encryptedDek = encryptedSessionKeys.find(
               key => key.sessionId === encryptedPost.sessionId,
             )?.encryptedDek

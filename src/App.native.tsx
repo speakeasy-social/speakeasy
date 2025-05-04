@@ -16,6 +16,8 @@ import * as SystemUI from 'expo-system-ui'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {KeyboardControllerProvider} from '#/lib/hooks/useEnableKeyboardController'
 import {QueryProvider} from '#/lib/react-query'
 import {Provider as StatsigProvider, tryFetchGates} from '#/lib/statsig/statsig'
@@ -28,6 +30,7 @@ import {Provider as A11yProvider} from '#/state/a11y'
 import {Provider as MutedThreadsProvider} from '#/state/cache/thread-mutes'
 import {Provider as DialogStateProvider} from '#/state/dialogs'
 import {listenSessionDropped} from '#/state/events'
+import {usePrefetchFollowers} from '#/state/followers-cache'
 import {
   beginResolveGeolocation,
   ensureGeolocationResolved,
@@ -46,6 +49,7 @@ import {Provider as UnreadNotifsProvider} from '#/state/queries/notifications/un
 import {
   Provider as SessionProvider,
   SessionAccount,
+  useAgent,
   useSession,
   useSessionApi,
 } from '#/state/session'
@@ -57,6 +61,7 @@ import {Provider as LoggedOutViewProvider} from '#/state/shell/logged-out'
 import {Provider as ProgressGuideProvider} from '#/state/shell/progress-guide'
 import {Provider as SelectedFeedProvider} from '#/state/shell/selected-feed'
 import {Provider as StarterPackProvider} from '#/state/shell/starter-pack'
+import {useSpeakeasyPreAuth} from '#/state/speakeasy-pre-auth'
 import {Provider as HiddenRepliesProvider} from '#/state/threadgate-hidden-replies'
 import {Provider as TrendingConfigProvider} from '#/state/trending-config'
 import {TestCtrls} from '#/view/com/testing/TestCtrls'
@@ -95,6 +100,23 @@ function InnerApp() {
   const {_} = useLingui()
 
   const hasCheckedReferrer = useStarterPackEntry()
+  const agent = useAgent()
+
+  usePrefetchFollowers()
+  useSpeakeasyPreAuth()
+
+  // Prefetch private key
+  useEffect(() => {
+    if (!currentAccount?.did) return
+
+    getCachedPrivateKey(currentAccount.did, options =>
+      callSpeakeasyApiWithAgent(agent, options),
+    ).catch(error => {
+      if (error.error !== 'NotFoundError') {
+        logger.error('Failed to prefetch private key:', error)
+      }
+    })
+  }, [currentAccount?.did, agent])
 
   // init
   useEffect(() => {

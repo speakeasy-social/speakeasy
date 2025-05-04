@@ -21,6 +21,10 @@ import {until} from '#/lib/async/until'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
 import {Shadow} from '#/state/cache/types'
+import {
+  addCachedFollowerDid,
+  removeCachedFollowerDid,
+} from '#/state/followers-cache'
 import {STALE} from '#/state/queries'
 import {resetProfilePostsQueries} from '#/state/queries/post-feed'
 import * as userActionHistory from '#/state/userActionHistory'
@@ -239,6 +243,7 @@ export function useProfileFollowMutationQueue(
           did,
         })
         userActionHistory.follow([did])
+        addCachedFollowerDid(did)
         return uri
       } else {
         if (prevFollowingUri) {
@@ -248,6 +253,7 @@ export function useProfileFollowMutationQueue(
           })
           userActionHistory.unfollow([did])
         }
+        removeCachedFollowerDid(did)
         return undefined
       }
     },
@@ -316,7 +322,9 @@ function useProfileFollowMutation(
         followeeClout: toClout(profile.followersCount),
         followerClout: toClout(ownProfile?.followersCount),
       })
-      return await agent.follow(did)
+      const result = await agent.follow(did)
+      addCachedFollowerDid(did)
+      return result
     },
   })
 }
