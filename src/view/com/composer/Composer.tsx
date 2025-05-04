@@ -421,6 +421,8 @@ export const ComposePost = ({
             onStateChange: setPublishingStage,
             langs: toPostLanguages(langPrefs.postLanguage),
             collection: 'social.spkeasy.feed.privatePost',
+            sessionId,
+            sessionKey,
           },
         )
 
@@ -918,7 +920,6 @@ let ComposerPost = React.memo(function ComposerPost({
           onNewLink={onNewLink}
           onError={onError}
           onPressPublish={onPublish}
-          disableDrop={post.audience === 'trusted'}
           accessible={true}
           accessibilityLabel={_(msg`Write post`)}
           accessibilityHint={_(
@@ -1330,11 +1331,7 @@ function ComposerFooter({
           <ToolbarWrapper style={[a.flex_row, a.align_center, a.gap_xs]}>
             <SelectPhotoBtn
               size={images.length}
-              disabled={
-                media?.type === 'images'
-                  ? isMaxImages
-                  : !!media || isTrustedPost
-              }
+              disabled={media?.type === 'images' ? isMaxImages : !!media}
               onAdd={onImageAdd}
             />
             <SelectVideoBtn
@@ -1343,17 +1340,10 @@ function ComposerFooter({
               setError={onError}
             />
             <OpenCameraBtn
-              disabled={
-                media?.type === 'images'
-                  ? isMaxImages
-                  : !!media || isTrustedPost
-              }
+              disabled={media?.type === 'images' ? isMaxImages : !!media}
               onAdd={onImageAdd}
             />
-            <SelectGifBtn
-              onSelectGif={onSelectGif}
-              disabled={!!media || isTrustedPost}
-            />
+            <SelectGifBtn onSelectGif={onSelectGif} disabled={!!media} />
             {!isMobile ? (
               <Button
                 onPress={onEmojiButtonPress}

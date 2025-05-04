@@ -734,11 +734,13 @@ function transformImageEmbed(
       ...embed,
       $type: 'app.bsky.embed.images#view',
       images: embed.images.map((img: any) => {
-        const mimeType = img.image.mimeType.split('/')[1]
         const blobRef = img.image.ref.$link
+        // Use the media key if available, otherwise fall back to the blob ref
+        const mediaKey = img.image.key || blobRef
         return {
-          thumb: `${baseUrl}/img/feed_thumbnail/plain/${authorDid}/${blobRef}@${mimeType}`,
-          fullsize: `${baseUrl}/img/feed_fullsize/plain/${authorDid}/${blobRef}@${mimeType}`,
+          thumb: `${baseUrl}/${mediaKey}`,
+          fullsize: `${baseUrl}/${mediaKey}`,
+          mimeType: img.image.mimeType,
           alt: img.alt || '',
           aspectRatio: img.aspectRatio,
         }

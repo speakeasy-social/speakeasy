@@ -31,6 +31,6 @@ export function isBlueskyOwnedFeed(feedUri: string) {
 
 export function getBaseCdnUrl(agent: BskyAgent): string {
   return agent.service.toString() === `${LOCAL_DEV_SERVICE}/`
-    ? LOCAL_DEV_CDN
-    : PROD_CDN
+    ? `${LOCAL_DEV_CDN}/speakeasy-develop`
+    : `${PROD_CDN}/user-content`
 }
