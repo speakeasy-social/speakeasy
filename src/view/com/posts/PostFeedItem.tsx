@@ -155,8 +155,14 @@ let FeedItemInner = ({
 
   const href = useMemo(() => {
     const urip = new AtUri(post.uri)
-    return makeProfileLink(post.author, 'post', urip.rkey)
-  }, [post.uri, post.author])
+    const isPrivatePost =
+      post.$type === 'social.spkeasy.feed.defs#privatePostView'
+    return makeProfileLink(
+      post.author,
+      isPrivatePost ? 'private-post' : 'post',
+      urip.rkey,
+    )
+  }, [post.uri, post.author, post.$type])
   const {sendInteraction} = useFeedFeedbackContext()
 
   const onPressReply = React.useCallback(() => {
@@ -240,7 +246,8 @@ let FeedItemInner = ({
 
   const [hover, setHover] = useState(false)
 
-  const isPrivatePost = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const isPrivatePost =
+    post.$type === 'social.spkeasy.feed.defs#privatePostView'
 
   return (
     <Link

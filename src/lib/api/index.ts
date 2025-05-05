@@ -54,7 +54,7 @@ interface PostOpts {
   replyTo?: string
   onStateChange?: (state: string) => void
   langs?: string[]
-  collection: 'app.bsky.feed.post' | 'social.spkeasy.feed.privatePost'
+  collection: 'app.bsky.feed.post' | 'social.spkeasy.feed.private-post'
   sessionKey?: string
   sessionId?: string
 }
@@ -644,7 +644,10 @@ export function combinePostGates(
 
     const uri = `at://${authorDid}/${write.collection}/${write.rkey}`
 
-    if (write.collection === 'social.spkeasy.feed.privatePost' && write.value) {
+    if (
+      write.collection === 'social.spkeasy.feed.private-post' &&
+      write.value
+    ) {
       const postIndex = uris.indexOf(uri)
       const record = write.value as AppBskyFeedPost.Record
       const embed = record.embed as

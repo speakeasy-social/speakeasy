@@ -202,23 +202,41 @@ let PostThreadItemLoaded = ({
   )
   const {currentAccount} = useSession()
   const rootUri = record.reply?.root?.uri || post.uri
+  const isPrivatePost =
+    post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const postPathSeparator = isPrivatePost ? 'private-post' : 'post'
+
   const postHref = React.useMemo(() => {
     const urip = new AtUri(post.uri)
-    return makeProfileLink(post.author, 'post', urip.rkey)
-  }, [post.uri, post.author])
+    return makeProfileLink(
+      post.author,
+      isPrivatePost ? 'private-post' : 'post',
+      urip.rkey,
+    )
+  }, [post.uri, post.author, isPrivatePost])
   const itemTitle = _(msg`Post by ${post.author.handle}`)
   const authorHref = makeProfileLink(post.author)
   const authorTitle = post.author.handle
   const isThreadAuthor = getThreadAuthor(post, record) === currentAccount?.did
   const likesHref = React.useMemo(() => {
     const urip = new AtUri(post.uri)
-    return makeProfileLink(post.author, 'post', urip.rkey, 'liked-by')
-  }, [post.uri, post.author])
+    return makeProfileLink(
+      post.author,
+      postPathSeparator,
+      urip.rkey,
+      'liked-by',
+    )
+  }, [post.uri, post.author, postPathSeparator])
   const likesTitle = _(msg`Likes on this post`)
   const repostsHref = React.useMemo(() => {
     const urip = new AtUri(post.uri)
-    return makeProfileLink(post.author, 'post', urip.rkey, 'reposted-by')
-  }, [post.uri, post.author])
+    return makeProfileLink(
+      post.author,
+      postPathSeparator,
+      urip.rkey,
+      'reposted-by',
+    )
+  }, [post.uri, post.author, postPathSeparator])
   const repostsTitle = _(msg`Reposts of this post`)
   const threadgateHiddenReplies = useMergedThreadgateHiddenReplies({
     threadgateRecord,
@@ -238,8 +256,8 @@ let PostThreadItemLoaded = ({
   }, [post, currentAccount?.did, threadgateHiddenReplies, rootUri])
   const quotesHref = React.useMemo(() => {
     const urip = new AtUri(post.uri)
-    return makeProfileLink(post.author, 'post', urip.rkey, 'quotes')
-  }, [post.uri, post.author])
+    return makeProfileLink(post.author, postPathSeparator, urip.rkey, 'quotes')
+  }, [post.uri, post.author, postPathSeparator])
   const quotesTitle = _(msg`Quotes of this post`)
 
   const translatorUrl = getTranslatorLink(
