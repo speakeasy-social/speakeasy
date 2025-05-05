@@ -11,8 +11,8 @@ import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {niceDate} from '#/lib/strings/time'
 import {isAndroid} from '#/platform/detection'
 import {precacheProfile} from '#/state/queries/profile'
+import {PrivatePostPill} from '#/view/com/util/PrivatePostPill'
 import {atoms as a, useTheme, web} from '#/alf'
-import {Lock_Stroke2_Corner0_Rounded as LockIcon} from '#/components/icons/Lock'
 import {WebOnlyInlineLinkText} from '#/components/Link'
 import {ProfileHoverCard} from '#/components/ProfileHoverCard'
 import {Text} from '#/components/Typography'
@@ -120,15 +120,7 @@ let PostMeta = (opts: PostMetaOpts): React.ReactNode => {
         )}
       </TimeElapsed>
 
-      {opts.isPrivate && (
-        <LockIcon
-          style={{color: t.atoms.text_contrast_medium.color}}
-          width={14}
-          height={14}
-          title={_(msg`Private post`)}
-          aria-label={_(msg`Private post`)}
-        />
-      )}
+      {opts.isPrivate && <PrivatePostPill />}
     </View>
   )
 }
