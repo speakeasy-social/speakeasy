@@ -130,7 +130,6 @@ import {Gift1_Stroke2_Corner0_Rounded as Gift} from '#/components/icons/Gift1'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {TimesLarge_Stroke2_Corner0_Rounded as X} from '#/components/icons/Times'
-import {PrivatePostPill} from '#/components/PrivatePostPill'
 import * as Prompt from '#/components/Prompt'
 import {Text as NewText} from '#/components/Typography'
 import {BottomSheetPortalProvider} from '../../../../modules/bottom-sheet'
@@ -717,7 +716,6 @@ export const ComposePost = ({
             thread={thread}
             dispatch={composerDispatch}
           />
-          <PrivatePostPill />
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
