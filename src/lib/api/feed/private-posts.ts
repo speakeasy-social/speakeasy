@@ -66,11 +66,14 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         filterFollowers: audience === 'following',
       })
 
-      const feed = await decryptAndHydratePosts(
-        this.agent,
-        encryptedPosts,
-        encryptedSessionKeys,
-      )
+      const {posts, authorProfileMap} =
+        await decryptPostsAndAttachAuthorProfiles(
+          this.agent,
+          encryptedPosts,
+          encryptedSessionKeys,
+        )
+
+      const feed = await formatPostsForFeed(this.agent, posts, authorProfileMap)
 
       return {
         cursor: newCursor,
@@ -214,7 +217,7 @@ export async function fetchEncryptedPosts(
   }: {
     cursor?: string
     limit?: number
-    filterFollowers: boolean
+    filterFollowers?: boolean
   },
 ): Promise<{
   cursor: string
@@ -272,6 +275,51 @@ export async function fetchEncryptedPosts(
   }
 }
 
+export async function fetchEncryptedPostThread(
+  agent: BskyAgent,
+  uri: string,
+  {
+    limit = 50,
+  }: {
+    limit?: number
+  },
+): Promise<{
+  cursor: string
+  encryptedPost: EncryptedPost
+  encryptedReplyPosts: EncryptedPost[]
+  encryptedParentPost?: EncryptedPost
+  parentPost?: AppBskyFeedDefs.FeedViewPost
+  encryptedSessionKeys: {
+    sessionId: string
+    encryptedDek: string
+    recipientDid: string
+  }[]
+}> {
+  const query: {
+    limit: string
+    uri: string
+  } = {
+    limit: limit.toString(),
+    uri: uri,
+  }
+  // Fetch posts, private key, and follower dids (if needed)
+  const promises = [
+    callSpeakeasyApiWithAgent(agent, {
+      api: 'social.spkeasy.privatePost.getPostThread',
+      query,
+    }),
+
+    // Ensure private key is cached
+    getCachedPrivateKey(agent.session!.did, options =>
+      callSpeakeasyApiWithAgent(agent, options),
+    ),
+  ]
+
+  const [data] = await Promise.all(promises)
+
+  return data
+}
+
 /**
  * Decrypts encrypted posts and hydrates and formats them to fit the FeedViewPost format
  * @param agent - The BskyAgent instance to use for API calls
@@ -279,7 +327,7 @@ export async function fetchEncryptedPosts(
  * @param encryptedSessionKeys - Array of session keys for decryption
  * @returns Promise resolving to an array of hydrated FeedViewPost objects
  */
-export async function decryptAndHydratePosts(
+export async function decryptPostsAndAttachAuthorProfiles(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
   encryptedSessionKeys: {
@@ -287,12 +335,15 @@ export async function decryptAndHydratePosts(
     encryptedDek: string
     recipientDid: string
   }[],
-): Promise<AppBskyFeedDefs.FeedViewPost[]> {
-  const baseUrl = getBaseCdnUrl(agent)
-
+): Promise<{
+  posts: AppBskyFeedDefs.FeedViewPost[]
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
+}> {
   const privateKey = await getCachedPrivateKey(agent.session!.did, options =>
     callSpeakeasyApiWithAgent(agent, options),
   )
+
+  encryptedPosts.push(...encryptedPosts)
 
   /** Decrypt the posts and fetch author profiles */
   const authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
@@ -322,6 +373,17 @@ export async function decryptAndHydratePosts(
     }),
   ])
 
+  return {posts: decryptedPosts, authorProfileMap}
+}
+
+async function formatPostsForFeed(
+  agent: BskyAgent,
+  decryptedPosts: any[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+): Promise<AppBskyFeedDefs.FeedViewPost[]> {
+  const baseUrl = getBaseCdnUrl(agent)
+
+  // Discard any posts that failed to decrypt
   const posts = decryptedPosts.filter(post => !!post)
 
   /** fetch supporting posts for replies or embeds **/
