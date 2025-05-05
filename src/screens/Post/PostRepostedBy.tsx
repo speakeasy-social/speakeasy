@@ -9,7 +9,10 @@ import {useSetMinimalShellMode} from '#/state/shell'
 import {PostRepostedBy as PostRepostedByComponent} from '#/view/com/post-thread/PostRepostedBy'
 import * as Layout from '#/components/Layout'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'PostRepostedBy'>
+type Props = NativeStackScreenProps<
+  CommonNavigatorParams,
+  'PostRepostedBy' | 'PrivatePostRepostedBy'
+>
 export const PostRepostedByScreen = ({route}: Props) => {
   const {name, rkey} = route.params
   const uri = makeRecordUri(name, 'app.bsky.feed.post', rkey)

@@ -9,7 +9,10 @@ import {useSetMinimalShellMode} from '#/state/shell'
 import {PostQuotes as PostQuotesComponent} from '#/view/com/post-thread/PostQuotes'
 import * as Layout from '#/components/Layout'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'PostQuotes'>
+type Props = NativeStackScreenProps<
+  CommonNavigatorParams,
+  'PostQuotes' | 'PrivatePostQuotes'
+>
 export const PostQuotesScreen = ({route}: Props) => {
   const setMinimalShellMode = useSetMinimalShellMode()
   const {name, rkey} = route.params
