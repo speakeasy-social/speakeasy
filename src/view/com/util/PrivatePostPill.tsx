@@ -6,11 +6,7 @@ import {atoms as a, useTheme} from '#/alf'
 import {Lock_Stroke2_Corner0_Rounded as LockIcon} from '#/components/icons/Lock'
 import {Text} from '#/components/Typography'
 
-interface PrivatePostPillProps {
-  noBg?: boolean
-}
-
-export function PrivatePostPill({noBg = false}: PrivatePostPillProps) {
+export function PrivatePostPill() {
   const t = useTheme()
   const {_} = useLingui()
 
@@ -20,7 +16,7 @@ export function PrivatePostPill({noBg = false}: PrivatePostPillProps) {
         a.flex_row,
         a.align_center,
         a.rounded_xs,
-        !noBg && t.atoms.bg_contrast_50,
+        t.atoms.bg_contrast_50,
         t.atoms.border_contrast_medium,
         {gap: 3},
         {paddingLeft: 4, paddingRight: 3, paddingVertical: 3},
