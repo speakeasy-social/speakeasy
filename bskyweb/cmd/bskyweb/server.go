@@ -297,6 +297,11 @@ func serve(cctx *cli.Context) error {
 	e.GET("/profile/:handleOrDID/post/:rkey/reposted-by", server.WebGeneric)
 	e.GET("/profile/:handleOrDID/post/:rkey/quotes", server.WebGeneric)
 
+	e.GET("/profile/:handleOrDID/private-post/:rkey", server.WebPost)
+	e.GET("/profile/:handleOrDID/private-post/:rkey/liked-by", server.WebGeneric)
+	e.GET("/profile/:handleOrDID/private-post/:rkey/reposted-by", server.WebGeneric)
+	e.GET("/profile/:handleOrDID/private-post/:rkey/quotes", server.WebGeneric)
+
 	// starter packs
 	e.GET("/starter-pack/:handleOrDID/:rkey", server.WebStarterPack)
 	e.GET("/starter-pack-short/:code", server.WebGeneric)
