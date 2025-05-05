@@ -85,9 +85,11 @@ export async function getCachedPrivateKey(
   speakeasyApi: SpeakeasyApiCall,
 ) {
   if (cachedPrivateKeyUserDid === userDid && cachedPrivateKeyPromise) {
+    console.log('returning private key promise')
     return cachedPrivateKeyPromise
   }
 
+  console.log('getting private key')
   cachedPrivateKeyUserDid = userDid
   cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
   return cachedPrivateKeyPromise
@@ -105,6 +107,7 @@ export async function getPrivateKey(
     api: 'social.spkeasy.key.getPrivateKey',
   })
 
+  console.log('private key fetched', data)
   return data
 }
 

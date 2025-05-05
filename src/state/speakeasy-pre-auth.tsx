@@ -10,6 +10,7 @@ export function useSpeakeasyPreAuth() {
   useEffect(() => {
     if (!did) return
 
+    console.log('Speakeasy pre-auth')
     // Send pre-auth request. This enables Speakeasy to briefly cache the
     // session authorisation and subsequent initial requests for
     // private posts, etc. will be faster.
