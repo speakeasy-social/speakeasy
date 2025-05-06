@@ -163,6 +163,7 @@ export function usePostThreadQuery(uri: string | undefined) {
 
         return {
           thread,
+          // FIXME
           threadgate: undefined,
         }
       }
