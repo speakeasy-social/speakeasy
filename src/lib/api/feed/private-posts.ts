@@ -1,8 +1,14 @@
-import {AppBskyActorDefs, AppBskyFeedDefs, BskyAgent} from '@atproto/api'
+import {
+  AppBskyActorDefs,
+  AppBskyEmbedRecordWithMedia,
+  AppBskyFeedDefs,
+  AppBskyRichtextFacet,
+  BskyAgent,
+} from '@atproto/api'
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getCachedPrivateKey} from '#/lib/api/user-keys'
+import {getCachedPrivateKey, SpeakeasyPrivateKey} from '#/lib/api/user-keys'
 import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
@@ -18,7 +24,7 @@ export type EncryptedPost = {
   encryptedContent: string
   createdAt: string
   sessionId: string
-  reply: {
+  reply?: {
     root: string | null
     parent: string | null
   }
@@ -60,20 +66,40 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         encryptedPosts,
         encryptedSessionKeys,
         cursor: newCursor,
-      } = await fetchEncryptedPosts(this.agent, {
+      } = await fetchAndFilterEncryptedPosts(this.agent, {
         cursor,
         limit,
         filterFollowers: audience === 'following',
       })
 
       const {posts, authorProfileMap} =
-        await decryptPostsAndAttachAuthorProfiles(
+        await decryptPostsAndFetchAuthorProfiles(
           this.agent,
           encryptedPosts,
           encryptedSessionKeys,
         )
 
-      const feed = await formatPostsForFeed(this.agent, posts, authorProfileMap)
+      /** fetch supporting posts for replies or embeds **/
+      // Fetch reply posts
+      const postMap = await createNestedPostMapFromPosts(
+        this.agent,
+        posts,
+        authorProfileMap,
+      )
+
+      const feed = await formatPostsForFeed(
+        this.agent,
+        posts,
+        postMap,
+        authorProfileMap,
+      )
+
+      // DO NOT COMMIT THIS
+      feed.forEach(post => {
+        if (post.reply) delete post.reply
+      })
+
+      console.log('private feed', feed)
 
       return {
         cursor: newCursor,
@@ -184,6 +210,71 @@ async function fetchPostsWithinBatch(agent: BskyAgent, uris: string[]) {
 }
 
 /**
+ * Fetches both Speakeasy and Bluesky posts for a list of URIs
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param uris - Array of post URIs to fetch
+ * @param authorProfileMap - Map of author DIDs to their profile information
+ * @returns Promise resolving to a Map of URI to PostView
+ */
+async function fetchMixedPosts(
+  agent: BskyAgent,
+  uris: string[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+): Promise<Map<string, AppBskyFeedDefs.PostView>> {
+  const speakeasyUris = []
+  const bskyUris = []
+
+  // Split the uris into spkeasy and bsky uris
+  for (const uri of uris) {
+    if (uri.includes('/social.spkeasy')) {
+      speakeasyUris.push(uri)
+    } else {
+      bskyUris.push(uri)
+    }
+  }
+
+  const bskyPostsPromise = fetchPosts(agent, bskyUris)
+
+  const {encryptedPosts, encryptedSessionKeys} = await fetchEncryptedPosts(
+    agent,
+    {
+      uris: speakeasyUris,
+    },
+  )
+
+  const {posts: decryptedPosts, authorProfileMap: newAuthorProfileMap} =
+    await decryptPostsAndFetchAuthorProfiles(
+      agent,
+      encryptedPosts,
+      encryptedSessionKeys,
+      authorProfileMap,
+    )
+
+  const formattedPrivatePosts = await formatPostsForFeed(
+    agent,
+    decryptedPosts,
+    new Map<string, AppBskyFeedDefs.PostView>(),
+    newAuthorProfileMap,
+  )
+
+  const bskyPosts = await bskyPostsPromise
+
+  const mappedSpeakeasyPosts = new Map(
+    formattedPrivatePosts.map(post => [
+      post.uri as string,
+      post as unknown as AppBskyFeedDefs.PostView,
+    ]),
+  )
+
+  const posts = new Map<string, AppBskyFeedDefs.PostView>([
+    ...bskyPosts,
+    ...mappedSpeakeasyPosts,
+  ])
+
+  return posts
+}
+
+/**
  * Fetches a batch of profiles and formats them for consumption by fetchInBatches
  * @param agent - The BskyAgent instance to use for API calls
  * @param dids - Array of DIDs to fetch profiles for
@@ -200,6 +291,30 @@ async function fetchProfilesWithinBatch(agent: BskyAgent, dids: string[]) {
   return profiles
 }
 
+type FetchEncryptedPostsResponse = {
+  encryptedPosts: EncryptedPost[]
+  encryptedSessionKeys: EncryptedSessionKey[]
+  cursor: string
+}
+
+export async function fetchEncryptedPosts(
+  agent: BskyAgent,
+  query: {
+    uris?: string[]
+    authors?: string[]
+    replyTo?: string
+    limit?: number
+    cursor?: string
+    filter?: string
+  },
+): Promise<FetchEncryptedPostsResponse> {
+  const res = await callSpeakeasyApiWithAgent(agent, {
+    api: 'social.spkeasy.privatePost.getPosts',
+    query,
+  })
+  return res
+}
+
 /**
  * Fetch encrypted posts from speakeasy
  * @param agent - The BskyAgent instance to use for API calls
@@ -208,7 +323,7 @@ async function fetchProfilesWithinBatch(agent: BskyAgent, dids: string[]) {
  * @param filterFollowers - If true, the returned posts will be filtered by the users followers
  * @returns Promise resolving to encrypted posts, session keys, and cursor
  */
-export async function fetchEncryptedPosts(
+export async function fetchAndFilterEncryptedPosts(
   agent: BskyAgent,
   {
     cursor,
@@ -229,20 +344,17 @@ export async function fetchEncryptedPosts(
   }[]
 }> {
   const query: {
-    limit: string
     cursor?: string
     filter?: string
+    limit?: number
   } = {
-    limit: limit.toString(),
+    limit,
   }
   if (cursor) query.cursor = cursor
 
   // Fetch posts, private key, and follower dids (if needed)
   const promises = [
-    callSpeakeasyApiWithAgent(agent, {
-      api: 'social.spkeasy.privatePost.getPosts',
-      query,
-    }),
+    fetchEncryptedPosts(agent, query),
     filterFollowers ? getCachedFollowerDids() : [],
 
     // Ensure private key is cached
@@ -251,7 +363,11 @@ export async function fetchEncryptedPosts(
     ),
   ]
 
-  const [data, followerDids] = await Promise.all(promises)
+  const [data, followerDids] = (await Promise.all(promises)) as [
+    FetchEncryptedPostsResponse,
+    string[],
+    SpeakeasyPrivateKey,
+  ]
 
   const encryptedPosts: EncryptedPost[] = data.encryptedPosts
 
@@ -288,7 +404,7 @@ export async function fetchEncryptedPostThread(
   encryptedPost: EncryptedPost
   encryptedReplyPosts: EncryptedPost[]
   encryptedParentPost?: EncryptedPost
-  parentPost?: AppBskyFeedDefs.FeedViewPost
+  encryptedRootPost?: EncryptedPost
   encryptedSessionKeys: {
     sessionId: string
     encryptedDek: string
@@ -320,6 +436,74 @@ export async function fetchEncryptedPostThread(
   return data
 }
 
+export type DecryptedPost = {
+  $type: 'social.spkeasy.feed.privatePost'
+  createdAt: string
+  text: string
+  langs: string[]
+  uri: string
+  rkey: string
+  authorDid: string
+  encryptedContent: string
+  sessionId: string
+  reply: {
+    root: string | null
+    parent: string | null
+  }
+  facets: AppBskyRichtextFacet.Main[]
+  embed:
+    | AppBskyEmbedRecordWithMedia.View
+    | SocialSpkeasyEmbedExternal
+    | SocialSpkeasyEmbedImage
+    | SocialSpkeasyEmbedRecord
+}
+
+export type SocialSpkeasyEmbedImage = {
+  // $type: 'social.spkeasy.embed.images'
+  images: {
+    image: {
+      ref: string
+      mimeType: string
+      size: number
+      key: string
+    }
+    alt: string
+    aspectRatio: {
+      width: number
+      height: number
+    }
+  }[]
+}
+
+export type SocialSpkeasyEmbedExternal = {
+  // $type: 'social.spkeasy.embed.external'
+  external: {
+    uri: string
+    title: string
+    description: string
+    thumb: {
+      $type: 'blob'
+      key: string
+      mimeType: string
+      size: number
+    }
+  }
+}
+
+export type SocialSpkeasyEmbedRecord = {
+  // $type: 'social.spkeasy.embed.record'
+  record: {
+    uri: string
+    cid: string
+  }
+}
+
+export type EncryptedSessionKey = {
+  sessionId: string
+  encryptedDek: string
+  recipientDid: string
+}
+
 /**
  * Decrypts encrypted posts and hydrates and formats them to fit the FeedViewPost format
  * @param agent - The BskyAgent instance to use for API calls
@@ -327,30 +511,55 @@ export async function fetchEncryptedPostThread(
  * @param encryptedSessionKeys - Array of session keys for decryption
  * @returns Promise resolving to an array of hydrated FeedViewPost objects
  */
-export async function decryptPostsAndAttachAuthorProfiles(
+export async function decryptPostsAndFetchAuthorProfiles(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
-  encryptedSessionKeys: {
-    sessionId: string
-    encryptedDek: string
-    recipientDid: string
-  }[],
+  encryptedSessionKeys: EncryptedSessionKey[],
+  authorProfileMap?: Map<string, AppBskyActorDefs.ProfileViewBasic>,
 ): Promise<{
-  posts: AppBskyFeedDefs.FeedViewPost[]
+  posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
   const privateKey = await getCachedPrivateKey(agent.session!.did, options =>
     callSpeakeasyApiWithAgent(agent, options),
   )
 
-  encryptedPosts.push(...encryptedPosts)
-
   /** Decrypt the posts and fetch author profiles */
-  const authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
+  let authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
 
-  const [authorProfileMap, ...decryptedPosts] = await Promise.all([
+  // Subtract already known post authors from the list of authors to fetch
+  if (authorProfileMap) {
+    authorDids = authorDids.filter(did => !authorProfileMap.has(did))
+  }
+
+  const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    ...encryptedPosts.map(async (encryptedPost: any) => {
+    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey),
+  ])
+
+  const mergedAuthorProfileMap = authorProfileMap
+    ? new Map([...newAuthorProfileMap, ...authorProfileMap])
+    : newAuthorProfileMap
+
+  return {posts: decryptedPosts, authorProfileMap: mergedAuthorProfileMap}
+}
+
+/**
+ * Decrypts a list of encrypted posts using the provided session keys and private key
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param encryptedPosts - Array of encrypted posts to decrypt
+ * @param encryptedSessionKeys - Array of session keys for decryption
+ * @param privateKey - The private key to use for decryption
+ * @returns Promise resolving to an array of decrypted posts
+ */
+async function decryptPosts(
+  agent: BskyAgent,
+  encryptedPosts: EncryptedPost[],
+  encryptedSessionKeys: EncryptedSessionKey[],
+  privateKey: SpeakeasyPrivateKey,
+): Promise<DecryptedPost[]> {
+  return Promise.all(
+    encryptedPosts.map(async (encryptedPost: any) => {
       const encryptedDek = encryptedSessionKeys.find(
         key => key.sessionId === encryptedPost.sessionId,
       )?.encryptedDek
@@ -371,34 +580,27 @@ export async function decryptPostsAndAttachAuthorProfiles(
         ...encryptedPost,
       }
     }),
-  ])
-
-  return {posts: decryptedPosts, authorProfileMap}
+  )
 }
 
+/**
+ * Formats decrypted posts into the FeedViewPost format for display
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param decryptedPosts - Array of decrypted posts to format
+ * @param postMap - Map of post URIs to their PostView objects
+ * @param authorProfileMap - Map of author DIDs to their profile information
+ * @returns Promise resolving to an array of formatted FeedViewPost objects
+ */
 async function formatPostsForFeed(
   agent: BskyAgent,
   decryptedPosts: any[],
+  postMap: Map<string, AppBskyFeedDefs.PostView>,
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
 ): Promise<AppBskyFeedDefs.FeedViewPost[]> {
   const baseUrl = getBaseCdnUrl(agent)
 
   // Discard any posts that failed to decrypt
   const posts = decryptedPosts.filter(post => !!post)
-
-  /** fetch supporting posts for replies or embeds **/
-  // Fetch reply posts
-  const replyUris = posts
-    .filter(post => post.reply)
-    .flatMap(post => [post.reply.root?.uri, post.reply.parent?.uri])
-    .filter(Boolean)
-
-  // Fetch quoted posts
-  const quotedPostUris = posts
-    .filter(post => post.embed?.record?.uri)
-    .map(post => post.embed.record.uri)
-
-  const postMap = await fetchPosts(agent, [...replyUris, ...quotedPostUris])
 
   // Convert private posts to FeedViewPost format
   const feed = posts.map((post: any) => {
@@ -412,18 +614,7 @@ async function formatPostsForFeed(
         $type: 'social.spkeasy.feed.defs#privatePostView',
         uri: post.uri,
         cid: post.cid,
-        author: {
-          $type: 'app.bsky.actor.defs#profileViewBasic',
-          did: post.authorDid,
-          handle: authorProfile?.handle || post.authorDid,
-          displayName: authorProfile?.displayName || post.authorDid,
-          avatar: authorProfile?.avatar || '',
-          viewer: {
-            muted: false,
-            blockedBy: false,
-          },
-          labels: [],
-        },
+        author: profileToAuthorView(post.authorDid, authorProfile),
         record: {
           $type: 'app.bsky.feed.post',
           text: post.text,
@@ -439,14 +630,15 @@ async function formatPostsForFeed(
             },
           },
         },
-        embed: post.embed
-          ? transformPrivateEmbed(
-              post.embed,
-              post.authorDid,
-              baseUrl,
-              quotedPost,
-            )
-          : undefined,
+        embed:
+          post.embed && quotedPost
+            ? transformPrivateEmbed(
+                post.embed,
+                post.authorDid,
+                baseUrl,
+                quotedPost,
+              )
+            : undefined,
         replyCount: 0,
         repostCount: 0,
         likeCount: 0,
@@ -477,4 +669,69 @@ async function formatPostsForFeed(
   })
 
   return feed
+}
+
+/**
+ * Converts a profile to the author view format used in feed posts
+ * @param authorDid - The DID of the author
+ * @param profile - Optional profile information for the author
+ * @returns Author view object for use in feed posts
+ */
+export function profileToAuthorView(
+  authorDid: string,
+  profile?: AppBskyActorDefs.ProfileViewBasic,
+): AppBskyFeedDefs.FeedViewPost['author'] {
+  return {
+    $type: 'app.bsky.actor.defs#profileViewBasic',
+    did: profile?.did || authorDid,
+    handle: profile?.handle || authorDid,
+    avatar: profile?.avatar || '',
+    displayName: profile?.displayName || authorDid,
+    viewer: {
+      muted: false,
+      blockedBy: false,
+    },
+    labels: [],
+  }
+}
+
+/**
+ * Speakeasy reply objects are simply the uri
+ * While Bsky is { uri, cid }
+ * @param reply
+ */
+function replyUri(reply: any): string {
+  if (typeof reply === 'string') return reply
+  return reply.uri
+}
+
+/**
+ * Creates a map of nested posts (replies and quoted posts) from a list of posts
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param posts - Array of decrypted posts to process
+ * @param authorProfileMap - Map of author DIDs to their profile information
+ * @returns Promise resolving to a Map of post URIs to their PostView objects
+ */
+async function createNestedPostMapFromPosts(
+  agent: BskyAgent,
+  posts: DecryptedPost[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+): Promise<Map<string, AppBskyFeedDefs.PostView>> {
+  const replyUris = posts
+    .filter(post => post.reply)
+    .flatMap(post => [replyUri(post.reply.root), replyUri(post.reply)])
+    .filter(Boolean)
+
+  // Fetch quoted posts
+  const quotedPostUris = posts
+    .map(post => (post.embed as any)?.record?.uri)
+    .filter(Boolean)
+
+  const postMap = await fetchMixedPosts(
+    agent,
+    [...replyUris, ...quotedPostUris],
+    authorProfileMap,
+  )
+
+  return postMap
 }
