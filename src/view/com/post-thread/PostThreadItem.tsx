@@ -587,6 +587,9 @@ let PostThreadItemLoaded = ({
                 showAvatar={isThreadedChild}
                 avatarSize={24}
                 style={[a.pb_xs]}
+                isPrivate={
+                  post.$type === 'social.spkeasy.feed.defs#privatePostView'
+                }
               />
               <LabelsOnMyPost post={post} style={[a.pb_xs]} />
               <PostAlerts
