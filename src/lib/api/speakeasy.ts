@@ -5,7 +5,7 @@ import {useAgent} from '#/state/session'
 
 export type SpeakeasyApiOptions = {
   api: string
-  query?: Record<string, string>
+  query?: Record<string, any>
   body?: Record<string, unknown>
   method?: 'GET' | 'POST'
 }
@@ -45,7 +45,16 @@ export async function callSpeakeasyApiWithAgent(
   {api, query = {}, body, method = 'GET'}: Omit<SpeakeasyApiOptions, 'agent'>,
 ) {
   const serverUrl = getHost(agent, api)
-  const queryString = new URLSearchParams(query).toString()
+  const queryString = Object.entries(query)
+    .map(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value
+          .map(v => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`)
+          .join('&')
+      }
+      return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    })
+    .join('&')
   const url = `${serverUrl}/xrpc/${api}${queryString ? `?${queryString}` : ''}`
 
   const response = await fetch(url, {
