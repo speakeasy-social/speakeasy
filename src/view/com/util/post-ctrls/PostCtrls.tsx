@@ -96,6 +96,9 @@ let PostCtrls = ({
       post.author.viewer?.blockingByList,
   )
 
+  const isPrivatePost =
+    post.$type === 'social.spkeasy.feed.defs#privatePostView'
+
   const shouldShowLoggedOutWarning = React.useMemo(() => {
     return (
       post.author.did !== currentAccount?.did &&
@@ -220,7 +223,9 @@ let PostCtrls = ({
 
   const onShare = useCallback(() => {
     const urip = new AtUri(post.uri)
-    const href = makeProfileLink(post.author, 'post', urip.rkey)
+    const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+    const postPath = isPrivate ? 'private-post' : 'post'
+    const href = makeProfileLink(post.author, postPath, urip.rkey)
     const url = toShareUrl(href)
     shareUrl(url)
     sendInteraction({
@@ -228,7 +233,7 @@ let PostCtrls = ({
       event: 'app.bsky.feed.defs#interactionShare',
       feedContext,
     })
-  }, [post.uri, post.author, sendInteraction, feedContext])
+  }, [post.uri, post.author, sendInteraction, feedContext, post.$type])
 
   const btnStyle = React.useCallback(
     ({pressed, hovered}: PressableStateCallbackType) => [
@@ -302,11 +307,18 @@ let PostCtrls = ({
       <View style={big ? a.align_center : [a.flex_1, a.align_start]}>
         <Pressable
           testID="likeBtn"
-          style={btnStyle}
-          onPress={() => requireAuth(() => onPressToggleLike())}
+          style={({pressed, hovered}) => [
+            btnStyle({pressed, hovered}),
+            isPrivatePost && {opacity: 0.5},
+          ]}
+          onPress={() =>
+            !isPrivatePost && requireAuth(() => onPressToggleLike())
+          }
           accessibilityRole="button"
           accessibilityLabel={
-            post.viewer?.like
+            isPrivatePost
+              ? _(msg`Likes not yet implemented for private posts`)
+              : post.viewer?.like
               ? _(
                   msg`Unlike (${plural(post.likeCount || 0, {
                     one: '# like',
