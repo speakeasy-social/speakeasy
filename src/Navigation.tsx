@@ -216,10 +216,24 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         })}
       />
       <Stack.Screen
+        name="PrivatePostThread"
+        getComponent={() => PostThreadScreen}
+        options={({route}) => ({
+          title: title(msg`Private Post by @${route.params.name}`),
+        })}
+      />
+      <Stack.Screen
         name="PostLikedBy"
         getComponent={() => PostLikedByScreen}
         options={({route}) => ({
           title: title(msg`Post by @${route.params.name}`),
+        })}
+      />
+      <Stack.Screen
+        name="PrivatePostLikedBy"
+        getComponent={() => PostLikedByScreen}
+        options={({route}) => ({
+          title: title(msg`Private Post by @${route.params.name}`),
         })}
       />
       <Stack.Screen
@@ -230,10 +244,24 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         })}
       />
       <Stack.Screen
+        name="PrivatePostRepostedBy"
+        getComponent={() => PostRepostedByScreen}
+        options={({route}) => ({
+          title: title(msg`Private Post by @${route.params.name}`),
+        })}
+      />
+      <Stack.Screen
         name="PostQuotes"
         getComponent={() => PostQuotesScreen}
         options={({route}) => ({
           title: title(msg`Post by @${route.params.name}`),
+        })}
+      />
+      <Stack.Screen
+        name="PrivatePostQuotes"
+        getComponent={() => PostQuotesScreen}
+        options={({route}) => ({
+          title: title(msg`Private Post by @${route.params.name}`),
         })}
       />
       <Stack.Screen

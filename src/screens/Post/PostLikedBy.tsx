@@ -9,7 +9,10 @@ import {useSetMinimalShellMode} from '#/state/shell'
 import {PostLikedBy as PostLikedByComponent} from '#/view/com/post-thread/PostLikedBy'
 import * as Layout from '#/components/Layout'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'PostLikedBy'>
+type Props = NativeStackScreenProps<
+  CommonNavigatorParams,
+  'PostLikedBy' | 'PrivatePostLikedBy'
+>
 export const PostLikedByScreen = ({route}: Props) => {
   const setMinimalShellMode = useSetMinimalShellMode()
   const {name, rkey} = route.params

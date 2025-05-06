@@ -24,6 +24,10 @@ export type CommonNavigatorParams = {
   PostLikedBy: {name: string; rkey: string}
   PostRepostedBy: {name: string; rkey: string}
   PostQuotes: {name: string; rkey: string}
+  PrivatePostThread: {name: string; rkey: string}
+  PrivatePostLikedBy: {name: string; rkey: string}
+  PrivatePostRepostedBy: {name: string; rkey: string}
+  PrivatePostQuotes: {name: string; rkey: string}
   ProfileFeed: {
     name: string
     rkey: string

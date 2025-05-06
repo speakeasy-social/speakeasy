@@ -7,12 +7,20 @@ import {useSetMinimalShellMode} from '#/state/shell'
 import {PostThread as PostThreadComponent} from '#/view/com/post-thread/PostThread'
 import * as Layout from '#/components/Layout'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'PostThread'>
+type Props = NativeStackScreenProps<
+  CommonNavigatorParams,
+  'PostThread' | 'PrivatePostThread'
+>
 export function PostThreadScreen({route}: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
 
   const {name, rkey} = route.params
-  const uri = makeRecordUri(name, 'app.bsky.feed.post', rkey)
+  const isPrivatePost = route.name === 'PrivatePostThread'
+  const uri = makeRecordUri(
+    name,
+    isPrivatePost ? 'social.spkeasy.private-post' : 'app.bsky.feed.post',
+    rkey,
+  )
 
   useFocusEffect(
     React.useCallback(() => {

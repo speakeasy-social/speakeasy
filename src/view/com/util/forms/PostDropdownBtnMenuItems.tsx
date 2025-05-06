@@ -161,8 +161,12 @@ let PostDropdownMenuItems = ({
 
   const href = React.useMemo(() => {
     const urip = new AtUri(postUri)
-    return makeProfileLink(postAuthor, 'post', urip.rkey)
-  }, [postUri, postAuthor])
+    const postPath =
+      post.$type === 'social.spkeasy.feed.defs#privatePostView'
+        ? 'private-post'
+        : 'post'
+    return makeProfileLink(postAuthor, postPath, urip.rkey)
+  }, [postUri, postAuthor, post])
 
   const translatorUrl = getTranslatorLink(
     record.text,
@@ -308,8 +312,9 @@ let PostDropdownMenuItems = ({
     }
   }, [_, quoteEmbed, post, toggleQuoteDetachment])
 
+  const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
   const canHidePostForMe = !isAuthor && !isPostHidden
-  const canEmbed = isWeb && gtMobile && !hideInPWI
+  const canEmbed = !isPrivate && isWeb && gtMobile && !hideInPWI
   const canHideReplyForEveryone =
     !isAuthor && isRootPostAuthor && !isPostHidden && isReply
   const canDetachQuote = quoteEmbed && quoteEmbed.isOwnedByViewer
@@ -373,13 +378,13 @@ let PostDropdownMenuItems = ({
           <>
             <Menu.Group>
               <Menu.Item
+                disabled={isPrivate || isPinPending}
                 testID="pinPostBtn"
                 label={
                   isPinned
                     ? _(msg`Unpin from profile`)
                     : _(msg`Pin to your profile`)
                 }
-                disabled={isPinPending}
                 onPress={onPressPin}>
                 <Menu.ItemText>
                   {isPinned
@@ -484,6 +489,7 @@ let PostDropdownMenuItems = ({
             <Menu.Divider />
             <Menu.Group>
               <Menu.Item
+                disabled={isPrivate}
                 testID="postDropdownMuteThreadBtn"
                 label={
                   isThreadMuted ? _(msg`Unmute thread`) : _(msg`Mute thread`)
@@ -499,6 +505,7 @@ let PostDropdownMenuItems = ({
               </Menu.Item>
 
               <Menu.Item
+                disabled={isPrivate}
                 testID="postDropdownMuteWordsBtn"
                 label={_(msg`Mute words & tags`)}
                 onPress={() => mutedWordsDialogControl.open()}>
@@ -638,6 +645,7 @@ let PostDropdownMenuItems = ({
                     <Menu.ItemIcon icon={Gear} position="right" />
                   </Menu.Item>
                   <Menu.Item
+                    disabled={isPrivate}
                     testID="postDropdownDeleteBtn"
                     label={_(msg`Delete post`)}
                     onPress={() => deletePromptControl.open()}>

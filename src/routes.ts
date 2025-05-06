@@ -27,6 +27,13 @@ export const router = new Router({
   ProfileFeed: '/profile/:name/feed/:rkey',
   ProfileFeedLikedBy: '/profile/:name/feed/:rkey/liked-by',
   ProfileLabelerLikedBy: '/profile/:name/labeler/liked-by',
+
+  // Private posts
+  PrivatePostThread: '/profile/:name/private-post/:rkey',
+  PrivatePostLikedBy: '/profile/:name/private-post/:rkey/liked-by',
+  PrivatePostRepostedBy: '/profile/:name/private-post/:rkey/reposted-by',
+  PrivatePostQuotes: '/profile/:name/private-post/:rkey/quotes',
+
   // debug
   Debug: '/sys/debug',
   DebugMod: '/sys/debug-mod',

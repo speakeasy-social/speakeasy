@@ -74,6 +74,11 @@ export async function getPublicKeys(
   return allPublicKeys
 }
 
+export type SpeakeasyPrivateKey = {
+  privateKey: string
+  userKeyPairId: string
+}
+
 /**
  * Retrieves and caches the private key for a given user DID.
  * @param {string} userDid - The DID of the user
@@ -102,7 +107,7 @@ export async function getCachedPrivateKey(
  */
 export async function getPrivateKey(
   speakeasyApi: SpeakeasyApiCall,
-): Promise<{privateKey: string; userKeyPairId: string}> {
+): Promise<SpeakeasyPrivateKey> {
   const data = await speakeasyApi({
     api: 'social.spkeasy.key.getPrivateKey',
   })

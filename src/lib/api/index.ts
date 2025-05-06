@@ -44,6 +44,7 @@ import {
   ThreadDraft,
 } from '#/view/com/composer/state/composer'
 import {createGIFDescription} from '../gif-alt-text'
+import {fetchEncryptedPosts} from './feed/private-posts'
 import {uploadMediaToSpeakeasy} from './speakeasy'
 import {uploadBlob} from './upload-blob'
 
@@ -258,7 +259,36 @@ async function resolveRT(agent: BskyAgent, richtext: RichText) {
   return rt
 }
 
-async function resolveReply(agent: BskyAgent, replyTo: string) {
+async function resolveReply(
+  agent: BskyAgent,
+  replyTo: string,
+): Promise<
+  | {
+      root: {uri: string; cid: string}
+      parent: {uri: string; cid: string}
+    }
+  | undefined
+> {
+  // Resolve Speakeasy private posts
+  if (replyTo.includes('/social.spkeasy.feed.privatePost/')) {
+    const encryptedPosts = await fetchEncryptedPosts(agent, {
+      uris: [replyTo],
+    })
+    if (encryptedPosts.encryptedPosts.length === 0) {
+      throw new Error(t`Post not found`)
+    }
+    const encryptedPost = encryptedPosts.encryptedPosts[0]
+    return {
+      root: {
+        uri: encryptedPost.uri,
+        cid: 'fixme-calculate-cid',
+      },
+      parent: {
+        uri: encryptedPost.reply?.root.uri || encryptedPost.uri,
+        cid: 'fixme-calculate-cid',
+      },
+    }
+  }
   const replyToUrip = new AtUri(replyTo)
   const parentPost = await agent.getPost({
     repo: replyToUrip.host,

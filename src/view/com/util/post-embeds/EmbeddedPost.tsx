@@ -252,6 +252,10 @@ export function EmbeddedPost({
                       showAvatar
                       postHref={itemHref}
                       timestamp={post.indexedAt}
+                      isPrivate={
+                        post.$type ===
+                        'social.spkeasy.feed.defs#privatePostView'
+                      }
                     />
                   </View>
                   {moderation ? (
