@@ -5,6 +5,10 @@ import {
   AppBskyRichtextFacet,
   BskyAgent,
 } from '@atproto/api'
+import {
+  FeedViewPost,
+  PostView,
+} from '@atproto/api/dist/client/types/app/bsky/feed/defs'
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
@@ -620,67 +624,10 @@ async function formatPostsForFeed(
     const authorProfile = authorProfileMap.get(post.authorDid)
     const quotedPost = postMap.get(post.embed?.record?.uri)
 
-    const postView = {
+    const postView: FeedViewPost = {
       $type: 'social.spkeasy.feed.defs#privatePostView',
 
-      post: {
-        $type: 'social.spkeasy.feed.defs#privatePostView',
-        uri: post.uri,
-        cid: post.cid,
-        author: profileToAuthorView(post.authorDid, authorProfile),
-        record: {
-          $type: 'app.bsky.feed.post',
-          text: post.text,
-          createdAt: post.createdAt,
-          langs: post.langs || [],
-          facets: post.facets || [],
-
-          // Weird hack, but it works.
-          // Lots of things break when embed
-          // is representative of what the record
-          // actually contains
-          // but putting something innocuous like this here
-          // causes everything to display fine
-          embed: {
-            $type: 'app.bsky.embed.record',
-            record: {
-              cid: 'bafyreihfhbzmr6yrvnvybqbawod7nwaamw2futez4obfwr23tvqvnuo2nu',
-              uri: 'at://did:plc:3vb37k6vaaxmnqp4suzavywx/app.bsky.feed.post/3lnp6wodza22v',
-            },
-          },
-          reply: post.reply
-            ? {
-                root: {
-                  uri: post.reply.root.uri,
-                  // FIXME, should be the post's cid, but any valid cid will do
-                  cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
-                },
-                parent: {
-                  uri: post.reply.parent.uri,
-                  // FIXME, should be the post's cid, but any valid cid will do
-                  cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
-                },
-              }
-            : undefined,
-        },
-        embed: post.embed
-          ? transformPrivateEmbed(
-              post.embed,
-              post.authorDid,
-              baseUrl,
-              quotedPost,
-            )
-          : undefined,
-        replyCount: 0,
-        repostCount: 0,
-        likeCount: 0,
-        indexedAt: post.createdAt,
-        labels: [],
-        viewer: {
-          repost: undefined,
-          like: undefined,
-        },
-      },
+      post: formatPostView(post, authorProfile, baseUrl, quotedPost),
       reply: post.reply
         ? {
             root: postMap.get(post.reply.root?.uri) || {
@@ -701,6 +648,67 @@ async function formatPostsForFeed(
   })
 
   return feed
+}
+
+export function formatPostView(
+  post: DecryptedPost,
+  authorProfile: AppBskyActorDefs.ProfileViewBasic | undefined,
+  baseUrl: string,
+  quotedPost: PostView | undefined,
+): PostView {
+  return {
+    $type: 'social.spkeasy.feed.defs#privatePostView',
+    uri: post.uri,
+    cid: post.cid,
+    author: profileToAuthorView(post.authorDid, authorProfile),
+    record: {
+      $type: 'app.bsky.feed.post',
+      text: post.text,
+      createdAt: post.createdAt,
+      langs: post.langs || [],
+      facets: post.facets || [],
+
+      // Weird hack, but it works.
+      // Lots of things break when embed
+      // is representative of what the record
+      // actually contains
+      // but putting something innocuous like this here
+      // causes everything to display fine
+      embed: {
+        $type: 'app.bsky.embed.record',
+        record: {
+          cid: 'bafyreihfhbzmr6yrvnvybqbawod7nwaamw2futez4obfwr23tvqvnuo2nu',
+          uri: 'at://did:plc:3vb37k6vaaxmnqp4suzavywx/app.bsky.feed.post/3lnp6wodza22v',
+        },
+      },
+      reply: post.reply
+        ? {
+            root: {
+              uri: post.reply.root.uri,
+              // FIXME, should be the post's cid, but any valid cid will do
+              cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+            },
+            parent: {
+              uri: post.reply.parent.uri,
+              // FIXME, should be the post's cid, but any valid cid will do
+              cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+            },
+          }
+        : undefined,
+    },
+    embed: post.embed
+      ? transformPrivateEmbed(post.embed, post.authorDid, baseUrl, quotedPost)
+      : undefined,
+    replyCount: 0,
+    repostCount: 0,
+    likeCount: 0,
+    indexedAt: post.createdAt,
+    labels: [],
+    viewer: {
+      repost: undefined,
+      like: undefined,
+    },
+  }
 }
 
 /**
