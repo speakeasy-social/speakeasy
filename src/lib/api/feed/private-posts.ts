@@ -297,6 +297,12 @@ type FetchEncryptedPostsResponse = {
   cursor: string
 }
 
+/**
+ * Fetches encrypted posts from the Speakeasy API
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param query - Query parameters for fetching posts including optional uris, authors, replyTo, limit, cursor, and filter
+ * @returns Promise resolving to encrypted posts, session keys, and cursor
+ */
 export async function fetchEncryptedPosts(
   agent: BskyAgent,
   query: {
@@ -391,6 +397,13 @@ export async function fetchAndFilterEncryptedPosts(
   }
 }
 
+/**
+ * Fetches an encrypted post thread including replies and parent posts
+ * @param agent - The BskyAgent instance to use for API calls
+ * @param uri - The URI of the post to fetch the thread for
+ * @param options - Optional parameters including limit for number of posts to fetch
+ * @returns Promise resolving to the encrypted post thread data including replies, parent posts, and session keys
+ */
 export async function fetchEncryptedPostThread(
   agent: BskyAgent,
   uri: string,
@@ -699,7 +712,7 @@ async function formatPostsForFeed(
 export function profileToAuthorView(
   authorDid: string,
   profile?: AppBskyActorDefs.ProfileViewBasic,
-): AppBskyFeedDefs.FeedViewPost['author'] {
+): AppBskyActorDefs.ProfileViewBasic {
   return {
     $type: 'app.bsky.actor.defs#profileViewBasic',
     did: profile?.did || authorDid,
