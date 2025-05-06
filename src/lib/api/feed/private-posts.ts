@@ -447,8 +447,8 @@ export type DecryptedPost = {
   encryptedContent: string
   sessionId: string
   reply?: {
-    root: {uri: string}
-    parent: {uri: string}
+    root: {uri: string; cid: string}
+    parent: {uri: string; cid: string}
   }
   facets: AppBskyRichtextFacet.Main[]
   embed:
