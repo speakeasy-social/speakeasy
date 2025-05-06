@@ -74,7 +74,7 @@ export class FeedViewPostsSlice {
     const isParentBlocked = AppBskyFeedDefs.isBlockedPost(parent)
     const isParentNotFound = AppBskyFeedDefs.isNotFoundPost(parent)
     let parentAuthor: AppBskyActorDefs.ProfileViewBasic | undefined
-    if (AppBskyFeedDefs.isPostView(parent)) {
+    if (isAnyPostView(parent)) {
       parentAuthor = parent.author
     }
     this.items.push({
@@ -96,7 +96,7 @@ export class FeedViewPostsSlice {
       return
     }
     if (
-      !AppBskyFeedDefs.isPostView(parent) ||
+      !isAnyPostView(parent) ||
       !AppBskyFeedPost.isRecord(parent.record) ||
       !AppBskyFeedPost.validateRecord(parent.record).success
     ) {
@@ -105,7 +105,7 @@ export class FeedViewPostsSlice {
     }
     const root = reply.root
     const rootIsView =
-      AppBskyFeedDefs.isPostView(root) ||
+      isAnyPostView(root) ||
       AppBskyFeedDefs.isBlockedPost(root) ||
       AppBskyFeedDefs.isNotFoundPost(root)
     /*
@@ -138,7 +138,7 @@ export class FeedViewPostsSlice {
       // de-deduping
     }
     if (
-      !AppBskyFeedDefs.isPostView(root) ||
+      !isAnyPostView(root) ||
       !AppBskyFeedPost.isRecord(root.record) ||
       !AppBskyFeedPost.validateRecord(root.record).success
     ) {
@@ -205,13 +205,13 @@ export class FeedViewPostsSlice {
     let grandparentAuthor: AppBskyActorDefs.ProfileViewBasic | undefined
     let rootAuthor: AppBskyActorDefs.ProfileViewBasic | undefined
     if (feedPost.reply) {
-      if (AppBskyFeedDefs.isPostView(feedPost.reply.parent)) {
+      if (isAnyPostView(feedPost.reply.parent)) {
         parentAuthor = feedPost.reply.parent.author
       }
       if (feedPost.reply.grandparentAuthor) {
         grandparentAuthor = feedPost.reply.grandparentAuthor
       }
-      if (AppBskyFeedDefs.isPostView(feedPost.reply.root)) {
+      if (isAnyPostView(feedPost.reply.root)) {
         rootAuthor = feedPost.reply.root.author
       }
     }
