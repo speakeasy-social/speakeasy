@@ -25,8 +25,8 @@ export type EncryptedPost = {
   createdAt: string
   sessionId: string
   reply?: {
-    root: string | null
-    parent: string | null
+    root: {uri: string}
+    parent: {uri: string}
   }
   langs: string[]
 }
@@ -72,10 +72,12 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         filterFollowers: audience === 'following',
       })
 
+      const truncatedPosts = encryptedPosts
+
       const {posts, authorProfileMap} =
         await decryptPostsAndFetchAuthorProfiles(
           this.agent,
-          encryptedPosts,
+          truncatedPosts,
           encryptedSessionKeys,
         )
 
@@ -87,17 +89,15 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         authorProfileMap,
       )
 
+      console.log('speakeasy feed postMap', postMap)
+      console.log('speakeasy feed posts', posts)
+
       const feed = await formatPostsForFeed(
         this.agent,
         posts,
         postMap,
         authorProfileMap,
       )
-
-      // DO NOT COMMIT THIS
-      feed.forEach(post => {
-        if (post.reply) delete post.reply
-      })
 
       console.log('private feed', feed)
 
@@ -261,8 +261,8 @@ async function fetchMixedPosts(
 
   const mappedSpeakeasyPosts = new Map(
     formattedPrivatePosts.map(post => [
-      post.uri as string,
-      post as unknown as AppBskyFeedDefs.PostView,
+      post.post.uri as string,
+      post.post as AppBskyFeedDefs.PostView,
     ]),
   )
 
@@ -446,9 +446,9 @@ export type DecryptedPost = {
   authorDid: string
   encryptedContent: string
   sessionId: string
-  reply: {
-    root: string | null
-    parent: string | null
+  reply?: {
+    root: {uri: string}
+    parent: {uri: string}
   }
   facets: AppBskyRichtextFacet.Main[]
   embed:
@@ -621,24 +621,43 @@ async function formatPostsForFeed(
           createdAt: post.createdAt,
           langs: post.langs || [],
           facets: post.facets || [],
+
+          // Weird hack, but it works.
+          // Lots of things break when embed
+          // is representative of what the record
+          // actually contains
+          // but putting something innocuous like this here
+          // causes everything to display fine
           embed: {
-            // FIXME
             $type: 'app.bsky.embed.record',
             record: {
               cid: 'bafyreihfhbzmr6yrvnvybqbawod7nwaamw2futez4obfwr23tvqvnuo2nu',
               uri: 'at://did:plc:3vb37k6vaaxmnqp4suzavywx/app.bsky.feed.post/3lnp6wodza22v',
             },
           },
-        },
-        embed:
-          post.embed && quotedPost
-            ? transformPrivateEmbed(
-                post.embed,
-                post.authorDid,
-                baseUrl,
-                quotedPost,
-              )
+          reply: post.reply
+            ? {
+                root: {
+                  uri: post.reply.root.uri,
+                  // FIXME, should be the post's cid, but any valid cid will do
+                  cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+                },
+                parent: {
+                  uri: post.reply.parent.uri,
+                  // FIXME, should be the post's cid, but any valid cid will do
+                  cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+                },
+              }
             : undefined,
+        },
+        embed: post.embed
+          ? transformPrivateEmbed(
+              post.embed,
+              post.authorDid,
+              baseUrl,
+              quotedPost,
+            )
+          : undefined,
         replyCount: 0,
         repostCount: 0,
         likeCount: 0,
@@ -696,16 +715,6 @@ export function profileToAuthorView(
 }
 
 /**
- * Speakeasy reply objects are simply the uri
- * While Bsky is { uri, cid }
- * @param reply
- */
-function replyUri(reply: any): string {
-  if (typeof reply === 'string') return reply
-  return reply.uri
-}
-
-/**
  * Creates a map of nested posts (replies and quoted posts) from a list of posts
  * @param agent - The BskyAgent instance to use for API calls
  * @param posts - Array of decrypted posts to process
@@ -719,7 +728,7 @@ async function createNestedPostMapFromPosts(
 ): Promise<Map<string, AppBskyFeedDefs.PostView>> {
   const replyUris = posts
     .filter(post => post.reply)
-    .flatMap(post => [replyUri(post.reply.root), replyUri(post.reply)])
+    .flatMap(post => [post.reply?.root.uri, post.reply?.parent.uri])
     .filter(Boolean)
 
   // Fetch quoted posts

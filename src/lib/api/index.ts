@@ -259,7 +259,16 @@ async function resolveRT(agent: BskyAgent, richtext: RichText) {
   return rt
 }
 
-async function resolveReply(agent: BskyAgent, replyTo: string) {
+async function resolveReply(
+  agent: BskyAgent,
+  replyTo: string,
+): Promise<
+  | {
+      root: {uri: string; cid: string}
+      parent: {uri: string; cid: string}
+    }
+  | undefined
+> {
   // Resolve Speakeasy private posts
   if (replyTo.includes('/social.spkeasy.feed.privatePost/')) {
     const encryptedPosts = await fetchEncryptedPosts(agent, {
@@ -275,7 +284,7 @@ async function resolveReply(agent: BskyAgent, replyTo: string) {
         cid: 'fixme-calculate-cid',
       },
       parent: {
-        uri: encryptedPost.reply?.root || encryptedPost.uri,
+        uri: encryptedPost.reply?.root.uri || encryptedPost.uri,
         cid: 'fixme-calculate-cid',
       },
     }
