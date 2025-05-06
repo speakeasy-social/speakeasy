@@ -3,6 +3,10 @@ import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 import {PrivatePostsFeedAPI} from './private-posts'
 import {FeedAPI, FeedAPIResponse} from './types'
 
+/**
+ * A wrapper class that merges private posts with another feed implementation.
+ * Implements the FeedAPI interface to provide a unified feed experience.
+ */
 export class PrivatePostsWrapper implements FeedAPI {
   private wrappedFeed: FeedAPI
   private privatePosts: PrivatePostsFeedAPI
@@ -17,6 +21,13 @@ export class PrivatePostsWrapper implements FeedAPI {
   private stashedPrivatePosts: AppBskyFeedDefs.FeedViewPost[] = []
   private stashedWrappedPosts: AppBskyFeedDefs.FeedViewPost[] = []
 
+  /**
+   * Creates a new instance of PrivatePostsWrapper.
+   * @param {Object} params - The initialization parameters
+   * @param {FeedAPI} params.wrappedFeed - The feed implementation to wrap
+   * @param {BskyAgent} params.agent - The Bluesky agent instance
+   * @param {string} params.mergeMethod - The method to use for merging feeds ('trusted' or other)
+   */
   constructor({
     wrappedFeed,
     agent,
@@ -40,6 +51,10 @@ export class PrivatePostsWrapper implements FeedAPI {
     }
   }
 
+  /**
+   * Attempts to peek at the latest post from either the wrapped feed or private posts.
+   * @returns {Promise<AppBskyFeedDefs.FeedViewPost>} The latest post from either feed
+   */
   async peekLatest(): Promise<AppBskyFeedDefs.FeedViewPost> {
     // Try to get public posts first, fall back to wrapped feed
     try {
@@ -53,6 +68,10 @@ export class PrivatePostsWrapper implements FeedAPI {
     return this.privatePosts.peekLatest()
   }
 
+  /**
+   * Parses a combined cursor string into separate cursors for private and wrapped feeds.
+   * @param {string | undefined} cursor - The combined cursor string in format "privateCursor|wrappedCursor"
+   */
   private parseCursor(cursor: string | undefined): {
     privateCursor: string | undefined
     wrappedCursor: string | undefined
@@ -71,6 +90,13 @@ export class PrivatePostsWrapper implements FeedAPI {
     return {privateCursor, wrappedCursor}
   }
 
+  /**
+   * Fetches posts from both private and wrapped feeds concurrently.
+   * @param {string | undefined} privateCursor - Cursor for private posts pagination
+   * @param {string | undefined} wrappedCursor - Cursor for wrapped feed pagination
+   * @param {number} limit - Maximum number of posts to fetch from each feed
+   * @returns {Promise<Array<{cursor: string | undefined, feed: AppBskyFeedDefs.FeedViewPost[]}>>} Array containing results from both feeds
+   */
   private async fetchBothFeeds(
     privateCursor: string | undefined,
     wrappedCursor: string | undefined,
@@ -84,7 +110,11 @@ export class PrivatePostsWrapper implements FeedAPI {
         : this.privatePosts.fetch({
             cursor: privateCursor,
             audience: this.mergeMethod === 'trusted' ? 'trusted' : 'following',
-            limit,
+
+            // Fetching private posts and then any quotes / replies
+            // is slow. So fetch just enough to fill the page on
+            // first fetch
+            limit: privateCursor ? limit : 4,
           }),
       // Fetch wrapped feed
       wrappedCursor === 'undefined'
@@ -98,13 +128,25 @@ export class PrivatePostsWrapper implements FeedAPI {
     return Promise.all(promises)
   }
 
+  /**
+   * Merges posts from private and wrapped feeds based on their sorting index.
+   * @param {AppBskyFeedDefs.FeedViewPost[]} privatePosts - Posts from private feed
+   * @param {AppBskyFeedDefs.FeedViewPost[]} wrappedPosts - Posts from wrapped feed
+   * @param {string | undefined} privateCursor - Cursor for private posts
+   * @param {string | undefined} wrappedCursor - Cursor for wrapped feed
+   * @returns {AppBskyFeedDefs.FeedViewPost[]} Merged and sorted array of posts
+   */
   private mergeFeeds(
-    privatePosts: AppBskyFeedDefs.FeedViewPost[],
-    wrappedPosts: AppBskyFeedDefs.FeedViewPost[],
+    newPrivatePosts: AppBskyFeedDefs.FeedViewPost[],
+    newWrappedPosts: AppBskyFeedDefs.FeedViewPost[],
     privateCursor: string | undefined,
     wrappedCursor: string | undefined,
   ): AppBskyFeedDefs.FeedViewPost[] {
     const mergedFeed: AppBskyFeedDefs.FeedViewPost[] = []
+
+    // Prepare posts for merging
+    const privatePosts = [...this.stashedPrivatePosts, ...newPrivatePosts]
+    const wrappedPosts = [...this.stashedWrappedPosts, ...newWrappedPosts]
 
     // Merge posts according to the sorting method
     while (privatePosts.length && wrappedPosts.length) {
@@ -118,34 +160,31 @@ export class PrivatePostsWrapper implements FeedAPI {
       }
     }
 
-    // Calculate average distance between posts based on their sorting index
-    const averageDistance =
-      mergedFeed.length > 1
-        ? mergedFeed.reduce((acc, post, index) => {
-            const increment =
-              index === 0 ? 0 : this.postDistance(post, mergedFeed[index - 1])
-            return acc + increment
-          }, 0) /
-          (mergedFeed.length - 1)
-        : 0
-
     const remainingPosts = privatePosts.length ? privatePosts : wrappedPosts
     const emptiedHasMore = privatePosts.length ? wrappedCursor : privateCursor
-    // Add remaining posts if they're within the average sorting index
-    while (
-      remainingPosts.length &&
-      (!emptiedHasMore ||
-        this.postDistance(
-          remainingPosts[0],
-          mergedFeed[mergedFeed.length - 1],
-        ) < averageDistance)
-    ) {
-      mergedFeed.push(remainingPosts.shift()!)
+
+    // If one of the feeds has run out, then we don't
+    // need to merge anymore
+    if (!emptiedHasMore) {
+      mergedFeed.push(...remainingPosts)
+      this.stashedPrivatePosts = []
+      this.stashedWrappedPosts = []
+    } else {
+      // Store remaining posts for next fetch
+      this.stashedPrivatePosts = privatePosts
+      this.stashedWrappedPosts = wrappedPosts
     }
 
     return mergedFeed
   }
 
+  /**
+   * Fetches and merges posts from both private and wrapped feeds.
+   * @param {Object} params - The fetch parameters
+   * @param {string | undefined} params.cursor - Combined cursor for pagination
+   * @param {number} params.limit - Maximum number of posts to fetch
+   * @returns {Promise<FeedAPIResponse>} Response containing merged feed and next cursor
+   */
   async fetch({
     cursor,
     limit,
@@ -167,24 +206,13 @@ export class PrivatePostsWrapper implements FeedAPI {
       // Combine cursors for next request
       const mergedCursor = `${privatePostsRes.cursor}|${wrappedRes.cursor}`
 
-      // Prepare posts for merging
-      const privatePosts = [
-        ...this.stashedPrivatePosts,
-        ...privatePostsRes.feed,
-      ]
-      const wrappedPosts = [...this.stashedWrappedPosts, ...wrappedRes.feed]
-
       // Merge the feeds
       const mergedFeed = this.mergeFeeds(
-        privatePosts,
-        wrappedPosts,
+        privatePostsRes.feed,
+        wrappedRes.feed,
         privatePostsRes.cursor,
         wrappedRes.cursor,
       )
-
-      // Store remaining posts for next fetch
-      this.stashedPrivatePosts = privatePosts
-      this.stashedWrappedPosts = wrappedPosts
 
       return {
         cursor: mergedCursor,
@@ -197,6 +225,11 @@ export class PrivatePostsWrapper implements FeedAPI {
   }
 }
 
+/**
+ * Gets the timestamp of a post for sorting purposes.
+ * @param {AppBskyFeedDefs.FeedViewPost} post - The post to get the timestamp for
+ * @returns {number} The timestamp in milliseconds
+ */
 function postDate(post: AppBskyFeedDefs.FeedViewPost) {
   return new Date(
     (post.post.indexedAt || post.post.createdAt) as string,
