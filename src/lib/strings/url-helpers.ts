@@ -2,7 +2,7 @@ import {AtUri} from '@atproto/api'
 import psl from 'psl'
 import TLDs from 'tlds'
 
-import {BSKY_SERVICE} from '#/lib/constants'
+import {BSKY_SERVICE, SPEAKEASY_SERVICE} from '#/lib/constants'
 import {isInvalidHandle} from '#/lib/strings/handles'
 import {startUriToStarterPackUri} from '#/lib/strings/starter-pack'
 import {logger} from '#/logger'
@@ -55,6 +55,9 @@ export function toNiceDomain(url: string): string {
     if (`https://${urlp.host}` === BSKY_SERVICE) {
       return 'Bluesky Social'
     }
+    if (`https://${urlp.host}` === SPEAKEASY_SERVICE) {
+      return 'Speakeasy Social'
+    }
     return urlp.host ? urlp.host : url
   } catch (e) {
     return url
@@ -80,7 +83,7 @@ export function toShortUrl(url: string): string {
 
 export function toShareUrl(url: string): string {
   if (!url.startsWith('https')) {
-    const urlp = new URL('https://bsky.app')
+    const urlp = new URL('https://spkeasy.social')
     urlp.pathname = url
     url = urlp.toString()
   }
@@ -95,6 +98,10 @@ export function isBskyAppUrl(url: string): boolean {
   return url.startsWith('https://bsky.app/')
 }
 
+export function isSpeakeasyAppUrl(url: string): boolean {
+  return url.startsWith('https://spkeasy.social/')
+}
+
 export function isRelativeUrl(url: string): boolean {
   return /^\/[^/]/.test(url)
 }
@@ -107,7 +114,8 @@ export function isBskyRSSUrl(url: string): boolean {
 }
 
 export function isExternalUrl(url: string): boolean {
-  const external = !isBskyAppUrl(url) && url.startsWith('http')
+  const external =
+    !isBskyAppUrl(url) && !isSpeakeasyAppUrl(url) && url.startsWith('http')
   const rss = isBskyRSSUrl(url)
   return external || rss
 }
@@ -117,7 +125,7 @@ export function isTrustedUrl(url: string): boolean {
 }
 
 export function isBskyPostUrl(url: string): boolean {
-  if (isBskyAppUrl(url)) {
+  if (isSpeakeasyAppUrl(url)) {
     try {
       const urlp = new URL(url)
       return /profile\/(?<name>[^/]+)\/post\/(?<rkey>[^/]+)/i.test(

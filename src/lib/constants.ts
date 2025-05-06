@@ -8,6 +8,7 @@ export const LOCAL_DEV_CDN =
 export const PROD_CDN = 'https://media.spkeasy.social'
 export const STAGING_SERVICE = 'https://magnetic.spkeasy.social'
 export const BSKY_SERVICE = 'https://bsky.social'
+export const SPEAKEASY_SERVICE = 'https://about.spkeasy.social'
 export const PUBLIC_BSKY_SERVICE = 'https://public.api.bsky.app'
 export const DEFAULT_SERVICE = BSKY_SERVICE
 const HELP_DESK_LANG = 'en-us'

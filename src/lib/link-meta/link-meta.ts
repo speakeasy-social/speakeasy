@@ -3,7 +3,7 @@ import {BskyAgent} from '@atproto/api'
 import {LINK_META_PROXY} from '#/lib/constants'
 import {getGiphyMetaUri} from '#/lib/strings/embed-player'
 import {parseStarterPackUri} from '#/lib/strings/starter-pack'
-import {isBskyAppUrl} from '../strings/url-helpers'
+import {isSpeakeasyAppUrl} from '../strings/url-helpers'
 
 export enum LikelyType {
   HTML,
@@ -29,7 +29,7 @@ export async function getLinkMeta(
   url: string,
   timeout = 15e3,
 ): Promise<LinkMeta> {
-  if (isBskyAppUrl(url) && !parseStarterPackUri(url)) {
+  if (isSpeakeasyAppUrl(url) && !parseStarterPackUri(url)) {
     return {
       likelyType: LikelyType.AtpData,
       url,
