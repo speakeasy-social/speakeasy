@@ -93,17 +93,12 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         authorProfileMap,
       )
 
-      console.log('speakeasy feed postMap', postMap)
-      console.log('speakeasy feed posts', posts)
-
       const feed = await formatPostsForFeed(
         this.agent,
         posts,
         postMap,
         authorProfileMap,
       )
-
-      console.log('private feed', feed)
 
       return {
         cursor: newCursor,

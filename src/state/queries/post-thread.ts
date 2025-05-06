@@ -176,7 +176,6 @@ export function usePostThreadQuery(uri: string | undefined) {
       // TODO get private replies
       if (res.success) {
         const thread = responseToThreadNodes(res.data.thread)
-        console.log('regular thread', thread)
         annotateSelfThread(thread)
         return {
           thread,
