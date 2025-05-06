@@ -5,11 +5,20 @@ import {
   AppBskyFeedGetPostThread,
   AppBskyFeedPost,
   AtUri,
+  BskyAgent,
   ModerationDecision,
   ModerationOpts,
 } from '@atproto/api'
 import {QueryClient, useQuery, useQueryClient} from '@tanstack/react-query'
 
+import {
+  DecryptedPost,
+  decryptPostsAndFetchAuthorProfiles,
+  fetchEncryptedPostThread,
+  formatPostView,
+  profileToAuthorView,
+} from '#/lib/api/feed/private-posts'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {findAllPostsInQueryData as findAllPostsInQuoteQueryData} from '#/state/queries/post-quotes'
 import {UsePreferencesQueryResponse} from '#/state/queries/preferences/types'
@@ -97,12 +106,76 @@ export function usePostThreadQuery(uri: string | undefined) {
     gcTime: 0,
     queryKey: RQKEY(uri || ''),
     async queryFn() {
+      if (!uri) {
+        return {thread: {type: 'unknown', uri: ''} as ThreadUnknown}
+      }
+
+      // Check if this is a private post
+      const isPrivatePost = uri.includes('/social.spkeasy.private-post/')
+      if (isPrivatePost) {
+        const {
+          cursor,
+          encryptedPost,
+          encryptedParentPost,
+          encryptedRootPost,
+          encryptedReplyPosts,
+          encryptedSessionKeys,
+        } = await fetchEncryptedPostThread(agent, uri, {})
+
+        // FIXME if encryptedPost has bsky parent or root,
+        // we need to fetch them
+
+        const allEncryptedPosts = [encryptedPost, ...encryptedReplyPosts]
+        if (encryptedParentPost) {
+          allEncryptedPosts.push(encryptedParentPost)
+        }
+        if (encryptedRootPost) {
+          allEncryptedPosts.push(encryptedRootPost)
+        }
+
+        const {posts: allPosts, authorProfileMap} =
+          await decryptPostsAndFetchAuthorProfiles(
+            agent,
+            allEncryptedPosts,
+            encryptedSessionKeys,
+          )
+
+        let rootPost = encryptedRootPost ? allPosts.pop() : null
+        let parentPost = encryptedParentPost ? allPosts.pop() : null
+
+        const threadPost = allPosts.shift()
+
+        if (!threadPost) {
+          return {thread: {type: 'unknown', uri} as ThreadUnknown}
+        }
+
+        const replyPosts = allPosts
+
+        const thread = await formatPostsForThread(
+          agent,
+          threadPost,
+          parentPost || undefined,
+          rootPost || undefined,
+          replyPosts,
+          authorProfileMap,
+          cursor,
+        )
+
+        return {
+          thread,
+          threadgate: undefined,
+        }
+      }
+
+      // If not a private post or private post fetch failed, use the regular thread API
       const res = await agent.getPostThread({
-        uri: uri!,
+        uri,
         depth: REPLY_TREE_DEPTH,
       })
+      // TODO get private replies
       if (res.success) {
         const thread = responseToThreadNodes(res.data.thread)
+        console.log('regular thread', thread)
         annotateSelfThread(thread)
         return {
           thread,
@@ -111,7 +184,7 @@ export function usePostThreadQuery(uri: string | undefined) {
             | undefined,
         }
       }
-      return {thread: {type: 'unknown', uri: uri!}}
+      return {thread: {type: 'unknown', uri} as ThreadUnknown}
     },
     enabled: !!uri,
     placeholderData: () => {
@@ -140,6 +213,93 @@ export function fillThreadModerationCache(
         fillThreadModerationCache(cache, reply, moderationOpts)
       }
     }
+  }
+}
+
+export async function formatPostsForThread(
+  agent: BskyAgent,
+  threadPost: DecryptedPost,
+  parentPost: DecryptedPost | undefined,
+  rootPost: DecryptedPost | undefined,
+  replyPosts: DecryptedPost[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  hasMore: string | boolean,
+) {
+  const baseUrl = getBaseCdnUrl(agent)
+
+  // FIXME
+  const quotedPost = undefined
+
+  const author = authorProfileMap.get(threadPost.authorDid)
+
+  // Convert the private post to a thread node
+  const thread: ThreadPost = {
+    $type: 'social.spkeasy.feed.defs#privatePostView',
+    type: 'post',
+    _reactKey: threadPost.uri,
+    uri: threadPost.uri,
+
+    post: formatPostView(threadPost, author, baseUrl, quotedPost),
+    record: threadPost,
+    parent: parentPost
+      ? formatThreadNode(agent, parentPost, authorProfileMap, -1)
+      : undefined,
+    replies: replyPosts.map(reply =>
+      formatThreadNode(agent, reply, authorProfileMap, 1),
+    ),
+    ctx: {
+      depth: 0,
+      isHighlightedPost: true,
+      hasMore: Boolean(hasMore),
+      isSelfThread: false,
+      hasMoreSelfThread: false,
+    },
+  }
+
+  return thread
+}
+
+function formatThreadNode(
+  agent: BskyAgent,
+  post: DecryptedPost,
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  depth: number,
+): ThreadNode {
+  const profile = authorProfileMap.get(post.authorDid)
+  const author = profileToAuthorView(post.authorDid, profile)
+  const quotedPost = undefined
+  const baseUrl = getBaseCdnUrl(agent)
+
+  return {
+    type: 'post',
+    uri: post.uri,
+    // FIXME
+    cid: 'bafyreifrt5aofp6ofqrn4wgfmpyx554rem22dp6mbnhpmevmxgaasbo5bm',
+    author: author,
+    record: post,
+    _reactKey: post.uri,
+    post: formatPostView(post, author, baseUrl, quotedPost),
+
+    embed: undefined,
+
+    replyCount: 0,
+    repostCount: 0,
+    quoteCount: 0,
+    indexedAt: post.createdAt,
+    viewer: {
+      threadMuted: false,
+      embeddingDisabled: false,
+    },
+    labels: [],
+
+    // FIXME
+    ctx: {
+      depth,
+      isHighlightedPost: false,
+      hasMore: false,
+      isSelfThread: false,
+      hasMoreSelfThread: false,
+    },
   }
 }
 
