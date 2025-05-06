@@ -161,8 +161,12 @@ let PostDropdownMenuItems = ({
 
   const href = React.useMemo(() => {
     const urip = new AtUri(postUri)
-    return makeProfileLink(postAuthor, 'post', urip.rkey)
-  }, [postUri, postAuthor])
+    const postPath =
+      post.$type === 'social.spkeasy.feed.defs#privatePostView'
+        ? 'private-post'
+        : 'post'
+    return makeProfileLink(postAuthor, postPath, urip.rkey)
+  }, [postUri, postAuthor, post])
 
   const translatorUrl = getTranslatorLink(
     record.text,
