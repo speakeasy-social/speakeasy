@@ -420,7 +420,7 @@ export const ComposePost = ({
             replyTo: replyTo?.uri,
             onStateChange: setPublishingStage,
             langs: toPostLanguages(langPrefs.postLanguage),
-            collection: 'social.spkeasy.feed.private-post',
+            collection: 'social.spkeasy.feed.privatePost',
             sessionId,
             sessionKey,
           },
