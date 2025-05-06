@@ -859,9 +859,9 @@ export function transformPrivateEmbed(
         baseUrl,
       )
     } else if (transformedEmbed.$type === 'app.bsky.embed.record') {
-      transformedEmbed = transformRecordEmbed(transformedEmbed)
       // If we have a quoted post, use it to enhance the record embed
       if (quotedPost) {
+        transformedEmbed = transformRecordEmbed(transformedEmbed)
         transformedEmbed.record = {
           ...transformedEmbed.record,
           value: quotedPost.record,
