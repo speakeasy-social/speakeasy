@@ -7,6 +7,7 @@ import {isInvalidHandle} from '#/lib/strings/handles'
 import {startUriToStarterPackUri} from '#/lib/strings/starter-pack'
 import {logger} from '#/logger'
 
+export const SPEAKEASY_APP_HOST = 'https://spkeasy.social'
 export const BSKY_APP_HOST = 'https://bsky.app'
 const BSKY_TRUSTED_HOSTS = [
   'bsky\\.app',
@@ -90,8 +91,8 @@ export function toShareUrl(url: string): string {
   return url
 }
 
-export function toBskyAppUrl(url: string): string {
-  return new URL(url, BSKY_APP_HOST).toString()
+export function toSpkeasyAppUrl(url: string): string {
+  return new URL(url, SPEAKEASY_APP_HOST).toString()
 }
 
 export function isBskyAppUrl(url: string): boolean {
@@ -241,7 +242,9 @@ export function postUriToRelativePath(
       options?.handle && !isInvalidHandle(options.handle)
         ? options.handle
         : hostname
-    return `/profile/${handleOrDid}/post/${rkey}`
+    const isPrivate = uri.includes('/social.spkeasy')
+    const pathSplitter = isPrivate ? 'private-post' : 'post'
+    return `/profile/${handleOrDid}/${pathSplitter}/${rkey}`
   } catch {
     return undefined
   }

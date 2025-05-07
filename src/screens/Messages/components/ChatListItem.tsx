@@ -17,8 +17,8 @@ import {logEvent} from '#/lib/statsig/statsig'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {
   postUriToRelativePath,
-  toBskyAppUrl,
   toShortUrl,
+  toSpkeasyAppUrl,
 } from '#/lib/strings/url-helpers'
 import {isNative} from '#/platform/detection'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
@@ -147,7 +147,7 @@ function ChatListItemReady({
               const path = postUriToRelativePath(record.uri, {
                 handle: record.author.handle,
               })
-              const href = path ? toBskyAppUrl(path) : undefined
+              const href = path ? toSpkeasyAppUrl(path) : undefined
               const short = href
                 ? toShortUrl(href)
                 : defaultEmbeddedContentMessage

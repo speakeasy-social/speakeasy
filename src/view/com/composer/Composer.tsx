@@ -1823,12 +1823,19 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
+  const privateQuoteDialogControl = useDialogControl()
   const {data: features = []} = useFeaturesQuery()
   const canPostPrivate = features.some(
     f => f.key === 'private-posts' && f.value === 'true',
   )
 
+  const hasPrivateQuote = post.embed.quote?.uri && post.audience === 'trusted'
+
   const onToggleAudience = useCallback(() => {
+    if (hasPrivateQuote) {
+      privateQuoteDialogControl.open()
+      return
+    }
     if (!canPostPrivate && post.audience === 'public') {
       groupsDialogControl.open()
     } else {
@@ -1842,7 +1849,15 @@ function AudienceBar({
         },
       })
     }
-  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
+  }, [
+    canPostPrivate,
+    dispatch,
+    post.id,
+    post.audience,
+    groupsDialogControl,
+    hasPrivateQuote,
+    privateQuoteDialogControl,
+  ])
 
   const getLabel = () => {
     switch (post.audience) {
@@ -1890,6 +1905,15 @@ function AudienceBar({
             },
           })
         }}
+      />
+      <Prompt.Basic
+        control={privateQuoteDialogControl}
+        title={_(msg`Private Quote Required`)}
+        description={_(
+          msg`Posts that quote private posts must also be private.`,
+        )}
+        confirmButtonCta={_(msg`Got it`)}
+        onConfirm={() => {}}
       />
       <View style={[styles.audienceBar, t.atoms.border_contrast_medium]}>
         <Button
