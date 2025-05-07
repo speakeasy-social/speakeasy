@@ -627,7 +627,7 @@ async function formatPostsForFeed(
       const postView: FeedViewPost = {
         post: postMap.get(post.embed?.record?.uri)!,
         reason: {
-          $type: 'app.bsky.feed.defs#reasonRepost',
+          $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
           by: authorProfileMap.get(post.authorDid)!,
           indexedAt: post.createdAt,
         },
