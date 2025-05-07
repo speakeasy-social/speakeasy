@@ -97,6 +97,9 @@ export async function getCachedPrivateKey(
   console.log('getting private key')
   cachedPrivateKeyUserDid = userDid
   cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
+  cachedPrivateKeyPromise.catch(() => {
+    cachedPrivateKeyPromise = undefined
+  })
   return cachedPrivateKeyPromise
 }
 
