@@ -405,9 +405,11 @@ export const ComposePost = ({
     setIsPublishing(true)
 
     let postUri
+
+    const isPrivatePost = activePost.audience === 'trusted'
     try {
       // Check if this is a private post
-      if (activePost.audience === 'trusted') {
+      if (isPrivatePost) {
         const {sessionId, sessionKey} = await getPrivateSession({
           onStateChange: setPublishingStage,
         })
@@ -515,7 +517,7 @@ export const ComposePost = ({
       emitPostCreated()
     }
     setLangPrefs.savePostLanguageToHistory()
-    if (initQuote) {
+    if (initQuote && !isPrivatePost) {
       // We want to wait for the quote count to update before we call `onPost`, which will refetch data
       whenAppViewReady(agent, initQuote.uri, res => {
         const quotedThread = res.data.thread
@@ -1821,12 +1823,20 @@ function AudienceBar({
   const {_} = useLingui()
   const t = useTheme()
   const groupsDialogControl = useDialogControl()
+  const privateQuoteDialogControl = useDialogControl()
   const {data: features = []} = useFeaturesQuery()
   const canPostPrivate = features.some(
     f => f.key === 'private-posts' && f.value === 'true',
   )
 
+  const hasPrivateQuote =
+    post.embed.quote?.uri && post.embed.quote?.uri.includes('/private-post')
+
   const onToggleAudience = useCallback(() => {
+    if (hasPrivateQuote) {
+      privateQuoteDialogControl.open()
+      return
+    }
     if (!canPostPrivate && post.audience === 'public') {
       groupsDialogControl.open()
     } else {
@@ -1840,7 +1850,15 @@ function AudienceBar({
         },
       })
     }
-  }, [canPostPrivate, dispatch, post.id, post.audience, groupsDialogControl])
+  }, [
+    canPostPrivate,
+    dispatch,
+    post.id,
+    post.audience,
+    groupsDialogControl,
+    hasPrivateQuote,
+    privateQuoteDialogControl,
+  ])
 
   const getLabel = () => {
     switch (post.audience) {
@@ -1888,6 +1906,15 @@ function AudienceBar({
             },
           })
         }}
+      />
+      <Prompt.Basic
+        control={privateQuoteDialogControl}
+        title={_(msg`Private Quote Required`)}
+        description={_(
+          msg`Posts that quote private posts must also be private.`,
+        )}
+        confirmButtonCta={_(msg`Got it`)}
+        onConfirm={() => {}}
       />
       <View style={[styles.audienceBar, t.atoms.border_contrast_medium]}>
         <Button

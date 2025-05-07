@@ -8,7 +8,7 @@ import {shortenLinks} from '#/lib/strings/rich-text-manip'
 import {
   isBskyPostUrl,
   postUriToRelativePath,
-  toBskyAppUrl,
+  toSpkeasyAppUrl,
 } from '#/lib/strings/url-helpers'
 import {ComposerImage, createInitialImages} from '#/state/gallery'
 import {createPostgateRecord} from '#/state/queries/postgate/util'
@@ -519,8 +519,11 @@ export function createComposerState({
     if (path) {
       quote = {
         type: 'link',
-        uri: toBskyAppUrl(path),
+        uri: toSpkeasyAppUrl(path),
       }
+    }
+    if (path?.includes('/private-post')) {
+      initAudience = 'trusted'
     }
   }
   const initRichText = new RichText({
