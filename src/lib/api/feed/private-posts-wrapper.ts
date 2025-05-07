@@ -176,9 +176,9 @@ export class PrivatePostsWrapper implements FeedAPI {
       this.stashedPrivatePosts = []
       this.stashedWrappedPosts = []
     } else {
-      // If we must return data, take the first 9 posts
+      // If we must return data, take the first 4 posts
       if (mustReturnData) {
-        mergedFeed.push(...remainingPosts.splice(0, 9))
+        mergedFeed.push(...remainingPosts.splice(0, 4))
       }
 
       // Store remaining posts for next fetch
@@ -206,7 +206,7 @@ export class PrivatePostsWrapper implements FeedAPI {
     let mergedCursor
     let mergedFeed
 
-    let mustReturnData = false
+    let mustReturnData = !cursor
 
     do {
       try {
@@ -243,9 +243,8 @@ export class PrivatePostsWrapper implements FeedAPI {
       // Sometimes the merge will return 0 posts
       // because it needs to fetch more data to merge
       // in which case, loop again
-      // But only do this at most once, then we need to send
-      // some data
-      mustReturnData = true
+      // If this is the first fetch, we need to return some data
+      // to avoid hanging for too long
     } while (mergedFeed.length === 0 && mergedCursor)
     return {
       cursor: mergedCursor,
