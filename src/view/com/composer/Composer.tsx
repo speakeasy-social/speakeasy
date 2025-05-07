@@ -405,9 +405,11 @@ export const ComposePost = ({
     setIsPublishing(true)
 
     let postUri
+
+    const isPrivatePost = activePost.audience === 'trusted'
     try {
       // Check if this is a private post
-      if (activePost.audience === 'trusted') {
+      if (isPrivatePost) {
         const {sessionId, sessionKey} = await getPrivateSession({
           onStateChange: setPublishingStage,
         })
@@ -515,7 +517,7 @@ export const ComposePost = ({
       emitPostCreated()
     }
     setLangPrefs.savePostLanguageToHistory()
-    if (initQuote) {
+    if (initQuote && !isPrivatePost) {
       // We want to wait for the quote count to update before we call `onPost`, which will refetch data
       whenAppViewReady(agent, initQuote.uri, res => {
         const quotedThread = res.data.thread
