@@ -1,12 +1,14 @@
+import {BskyAgent} from '@atproto/api'
 import {chunk} from 'lodash'
 
 import {generateKeyPair} from '#/lib/encryption'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
 
 let cachedPrivateKeyPromise:
-  | Promise<{privateKey: string; userKeyPairId: string}>
+  | Promise<SpeakeasyPrivateKey | undefined>
   | undefined
 let cachedPrivateKeyUserDid: string | undefined
+let handledPrivateKeyPromise: Promise<SpeakeasyPrivateKey | void>
 
 /**
  * Retrieves the encrypted session key from the Speakeasy API.
@@ -88,16 +90,28 @@ export type SpeakeasyPrivateKey = {
 export async function getCachedPrivateKey(
   userDid: string,
   speakeasyApi: SpeakeasyApiCall,
+  ignoreError = false,
 ) {
-  if (cachedPrivateKeyUserDid === userDid && cachedPrivateKeyPromise) {
-    console.log('returning private key promise')
-    return cachedPrivateKeyPromise
-  }
+  if (!userDid) return
 
-  console.log('getting private key')
+  if (!(cachedPrivateKeyUserDid === userDid && cachedPrivateKeyPromise)) {
+    console.log('getting private key')
+    cachedPrivateKeyUserDid = userDid
+    cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
+    handledPrivateKeyPromise = cachedPrivateKeyPromise.catch(() => {
+      cachedPrivateKeyPromise = undefined
+    })
+  }
+  return ignoreError ? handledPrivateKeyPromise : cachedPrivateKeyPromise
+}
+
+export async function cachePrivateKey(
+  userDid: string,
+  privateKey: SpeakeasyPrivateKey,
+) {
   cachedPrivateKeyUserDid = userDid
-  cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
-  return cachedPrivateKeyPromise
+  cachedPrivateKeyPromise = Promise.resolve(privateKey)
+  handledPrivateKeyPromise = cachedPrivateKeyPromise
 }
 
 /**
@@ -129,6 +143,7 @@ interface KeyPair {
  */
 export async function updateUserKeyPair(
   {privateKey, publicKey}: KeyPair,
+  agent: BskyAgent,
   speakeasyApi: SpeakeasyApiCall,
 ): Promise<{userKeyPairId: string}> {
   const data = await speakeasyApi({
@@ -139,6 +154,12 @@ export async function updateUserKeyPair(
       publicKey,
     },
   })
+  // Save the private key for decryption
+  cachePrivateKey(agent.did!, {
+    privateKey,
+    userKeyPairId: data.userKeyPairId,
+  })
+
   return {userKeyPairId: data.userKeyPairId}
 }
 
@@ -148,7 +169,7 @@ export async function updateUserKeyPair(
  * @param {any} call - The API call function
  * @returns {Promise<{publicKey: string, privateKey: string}>} The public and private key pair
  */
-export async function getOrCreatePublicKey(agent: any, call: any) {
+export async function getOrCreatePublicKey(agent: BskyAgent, call: any) {
   let publicKey: string
   let privateKey: string | null = null
   let userKeyPairId: string
@@ -160,6 +181,7 @@ export async function getOrCreatePublicKey(agent: any, call: any) {
       ;({publicKey, privateKey} = await generateKeyPair())
       ;({userKeyPairId} = await updateUserKeyPair(
         {publicKey, privateKey},
+        agent,
         call,
       ))
     } else {

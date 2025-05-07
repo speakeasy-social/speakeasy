@@ -88,8 +88,10 @@ function InnerApp() {
   useEffect(() => {
     if (!currentAccount?.did) return
 
-    getCachedPrivateKey(currentAccount.did, options =>
-      callSpeakeasyApiWithAgent(agent, options),
+    getCachedPrivateKey(
+      currentAccount.did,
+      options => callSpeakeasyApiWithAgent(agent, options),
+      true,
     ).catch(error => {
       if (error.error !== 'NotFoundError') {
         logger.error('Failed to prefetch private key:', error)

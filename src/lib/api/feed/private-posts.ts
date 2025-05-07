@@ -360,13 +360,16 @@ export async function fetchAndFilterEncryptedPosts(
   // Fetch posts, private key, and follower dids (if needed)
   const promises = [
     fetchEncryptedPosts(agent, query),
-    filterFollowers ? getCachedFollowerDids() : [],
-
-    // Ensure private key is cached
-    getCachedPrivateKey(agent.session!.did, options =>
-      callSpeakeasyApiWithAgent(agent, options),
-    ),
+    filterFollowers ? getCachedFollowerDids(agent, agent.session!.did) : [],
   ]
+
+  // We don't need the result of this, subsequent calls will use the value
+  // We call it here to ensure it's cached in advance
+  getCachedPrivateKey(
+    agent.session!.did,
+    options => callSpeakeasyApiWithAgent(agent, options),
+    true,
+  )
 
   const [data, followerDids] = (await Promise.all(promises)) as [
     FetchEncryptedPostsResponse,
@@ -438,8 +441,10 @@ export async function fetchEncryptedPostThread(
     }),
 
     // Ensure private key is cached
-    getCachedPrivateKey(agent.session!.did, options =>
-      callSpeakeasyApiWithAgent(agent, options),
+    getCachedPrivateKey(
+      agent.session!.did,
+      options => callSpeakeasyApiWithAgent(agent, options),
+      true,
     ),
   ]
 
@@ -532,8 +537,10 @@ export async function decryptPostsAndFetchAuthorProfiles(
   posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
-  const privateKey = await getCachedPrivateKey(agent.session!.did, options =>
-    callSpeakeasyApiWithAgent(agent, options),
+  const privateKey = await getCachedPrivateKey(
+    agent.session!.did,
+    options => callSpeakeasyApiWithAgent(agent, options),
+    false,
   )
 
   /** Decrypt the posts and fetch author profiles */
@@ -546,7 +553,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 
   const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey),
+    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey!),
   ])
 
   const mergedAuthorProfileMap = authorProfileMap
