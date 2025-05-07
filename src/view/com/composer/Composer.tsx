@@ -1829,7 +1829,8 @@ function AudienceBar({
     f => f.key === 'private-posts' && f.value === 'true',
   )
 
-  const hasPrivateQuote = post.embed.quote?.uri && post.audience === 'trusted'
+  const hasPrivateQuote =
+    post.embed.quote?.uri && post.embed.quote?.uri.includes('/private-post')
 
   const onToggleAudience = useCallback(() => {
     if (hasPrivateQuote) {

@@ -522,6 +522,9 @@ export function createComposerState({
         uri: toSpkeasyAppUrl(path),
       }
     }
+    if (path?.includes('/private-post')) {
+      initAudience = 'trusted'
+    }
   }
   const initRichText = new RichText({
     text: initText
