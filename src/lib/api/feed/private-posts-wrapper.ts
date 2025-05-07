@@ -105,19 +105,24 @@ export class PrivatePostsWrapper implements FeedAPI {
     const promises = [
       // If the cursor is the string "undefined",
       // then we have paginated through all the private posts
-      privateCursor === 'undefined'
+      privateCursor === 'EOF'
         ? {cursor: undefined, feed: []}
-        : this.privatePosts.fetch({
-            cursor: privateCursor,
-            audience: this.mergeMethod === 'trusted' ? 'trusted' : 'following',
+        : awaitWithTimeout(
+            this.privatePosts.fetch({
+              cursor: privateCursor,
+              audience:
+                this.mergeMethod === 'trusted' ? 'trusted' : 'following',
 
-            // Fetching private posts and then any quotes / replies
-            // is slow. So fetch just enough to fill the page on
-            // first fetch
-            limit: privateCursor ? limit : 4,
-          }),
+              // Fetching private posts and then any quotes / replies
+              // is slow. So fetch just enough to fill the page on
+              // first fetch
+              limit: privateCursor ? limit : 4,
+            }),
+            privateCursor,
+            5,
+          ),
       // Fetch wrapped feed
-      wrappedCursor === 'undefined'
+      wrappedCursor === 'EOF'
         ? {cursor: undefined, feed: []}
         : this.wrappedFeed.fetch({
             cursor: wrappedCursor,
@@ -141,6 +146,7 @@ export class PrivatePostsWrapper implements FeedAPI {
     newWrappedPosts: AppBskyFeedDefs.FeedViewPost[],
     privateCursor: string | undefined,
     wrappedCursor: string | undefined,
+    mustReturnData: boolean,
   ): AppBskyFeedDefs.FeedViewPost[] {
     const mergedFeed: AppBskyFeedDefs.FeedViewPost[] = []
 
@@ -170,6 +176,11 @@ export class PrivatePostsWrapper implements FeedAPI {
       this.stashedPrivatePosts = []
       this.stashedWrappedPosts = []
     } else {
+      // If we must return data, take the first 9 posts
+      if (mustReturnData) {
+        mergedFeed.push(...remainingPosts.splice(0, 9))
+      }
+
       // Store remaining posts for next fetch
       this.stashedPrivatePosts = privatePosts
       this.stashedWrappedPosts = wrappedPosts
@@ -192,35 +203,53 @@ export class PrivatePostsWrapper implements FeedAPI {
     cursor: string | undefined
     limit: number
   }): Promise<FeedAPIResponse> {
-    try {
-      // Parse the cursor into private and wrapped components
-      const {privateCursor, wrappedCursor} = this.parseCursor(cursor)
+    let mergedCursor
+    let mergedFeed
 
-      // Fetch posts from both sources
-      const [privatePostsRes, wrappedRes] = await this.fetchBothFeeds(
-        privateCursor,
-        wrappedCursor,
-        limit,
-      )
+    let mustReturnData = false
 
-      // Combine cursors for next request
-      const mergedCursor = `${privatePostsRes.cursor}|${wrappedRes.cursor}`
+    do {
+      try {
+        // Parse the cursor into private and wrapped components
+        const {privateCursor, wrappedCursor} = this.parseCursor(cursor)
 
-      // Merge the feeds
-      const mergedFeed = this.mergeFeeds(
-        privatePostsRes.feed,
-        wrappedRes.feed,
-        privatePostsRes.cursor,
-        wrappedRes.cursor,
-      )
+        // Fetch posts from both sources
+        const [privatePostsRes, wrappedRes] = await this.fetchBothFeeds(
+          privateCursor,
+          wrappedCursor,
+          limit,
+        )
 
-      return {
-        cursor: mergedCursor,
-        feed: mergedFeed,
+        // Combine cursors for next request
+        mergedCursor = `${privatePostsRes.cursor || 'EOF'}|${
+          wrappedRes.cursor || 'EOF'
+        }`
+
+        if (mergedCursor === 'EOF|EOF') mergedCursor = undefined
+
+        // Merge the feeds
+        mergedFeed = this.mergeFeeds(
+          privatePostsRes.feed,
+          wrappedRes.feed,
+          privatePostsRes.cursor,
+          wrappedRes.cursor,
+          mustReturnData,
+        )
+      } catch (e) {
+        console.error('merge fetch failed', e)
+        throw e
       }
-    } catch (e) {
-      console.error(e)
-      throw e
+
+      // Sometimes the merge will return 0 posts
+      // because it needs to fetch more data to merge
+      // in which case, loop again
+      // But only do this at most once, then we need to send
+      // some data
+      mustReturnData = true
+    } while (mergedFeed.length === 0 && mergedCursor)
+    return {
+      cursor: mergedCursor,
+      feed: mergedFeed,
     }
   }
 }
@@ -234,4 +263,38 @@ function postDate(post: AppBskyFeedDefs.FeedViewPost) {
   return new Date(
     (post.post.indexedAt || post.post.createdAt) as string,
   ).getTime()
+}
+
+let shouldContinue = true
+
+/**
+ * Private keys server is occasionally very slow to respond and hangs
+ * the whole feed
+ * Until we resolve it, set a timeout on fetching private feed
+ * so as not to completely ruin the UX
+ * @param promise
+ * @param cursor
+ * @param seconds
+ * @returns
+ */
+function awaitWithTimeout(
+  promise: Promise<any>,
+  cursor: string | undefined,
+  seconds: number,
+) {
+  return Promise.race([
+    promise,
+    new Promise(resolve =>
+      setTimeout(() => {
+        if (shouldContinue) {
+          resolve({cursor, feed: []})
+        } else {
+          resolve({cursor: 'EOF', feed: []})
+        }
+        // Try again first time this happens
+        // second time give up
+        shouldContinue = !shouldContinue
+      }, seconds * 1000),
+    ),
+  ])
 }
