@@ -377,6 +377,40 @@ async function resolveEmbed(
         record: resolvedLink.record,
       }
     }
+    if (resolvedLink.type === 'external') {
+      let blob: BlobRef | undefined
+      if (resolvedLink.thumb) {
+        onStateChange?.(t`Uploading link thumbnail...`)
+        const {path, mime} = resolvedLink.thumb.source
+        let response
+        if (draft.audience === 'trusted' || draft.audience === 'hidden') {
+          if (!sessionKey || !sessionId) {
+            throw new Error(
+              'Session key and session ID must be provided for speakeasy uploads',
+            )
+          }
+          response = await uploadBlobToSpeakeasy(
+            agent,
+            path,
+            mime,
+            sessionId,
+            sessionKey,
+          )
+        } else {
+          response = await uploadBlob(agent, path, mime)
+        }
+        blob = response.data.blob
+      }
+      return {
+        $type: 'app.bsky.embed.external',
+        external: {
+          uri: resolvedLink.uri,
+          title: resolvedLink.title,
+          description: resolvedLink.description,
+          thumb: blob,
+        },
+      }
+    }
   }
   return undefined
 }
@@ -475,7 +509,23 @@ async function resolveMedia(
     if (resolvedGif.thumb) {
       onStateChange?.(t`Uploading link thumbnail...`)
       const {path, mime} = resolvedGif.thumb.source
-      const response = await uploadBlob(agent, path, mime)
+      let response
+      if (audience === 'trusted' || audience === 'hidden') {
+        if (!sessionKey || !sessionId) {
+          throw new Error(
+            'Session key and session ID must be provided for speakeasy uploads',
+          )
+        }
+        response = await uploadBlobToSpeakeasy(
+          agent,
+          path,
+          mime,
+          sessionId,
+          sessionKey,
+        )
+      } else {
+        response = await uploadBlob(agent, path, mime)
+      }
       blob = response.data.blob
     }
     return {
@@ -486,31 +536,6 @@ async function resolveMedia(
         description: createGIFDescription(resolvedGif.title, gifDraft.alt),
         thumb: blob,
       },
-    }
-  }
-  if (embedDraft.link) {
-    const resolvedLink = await fetchResolveLinkQuery(
-      queryClient,
-      agent,
-      embedDraft.link.uri,
-    )
-    if (resolvedLink.type === 'external') {
-      let blob: BlobRef | undefined
-      if (resolvedLink.thumb) {
-        onStateChange?.(t`Uploading link thumbnail...`)
-        const {path, mime} = resolvedLink.thumb.source
-        const response = await uploadBlob(agent, path, mime)
-        blob = response.data.blob
-      }
-      return {
-        $type: 'app.bsky.embed.external',
-        external: {
-          uri: resolvedLink.uri,
-          title: resolvedLink.title,
-          description: resolvedLink.description,
-          thumb: blob,
-        },
-      }
     }
   }
   return undefined
