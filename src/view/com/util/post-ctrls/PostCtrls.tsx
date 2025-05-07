@@ -221,9 +221,10 @@ let PostCtrls = ({
     isBlocked,
   ])
 
+  const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+
   const onShare = useCallback(() => {
     const urip = new AtUri(post.uri)
-    const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
     const postPath = isPrivate ? 'private-post' : 'post'
     const href = makeProfileLink(post.author, postPath, urip.rkey)
     const url = toShareUrl(href)
@@ -233,7 +234,7 @@ let PostCtrls = ({
       event: 'app.bsky.feed.defs#interactionShare',
       feedContext,
     })
-  }, [post.uri, post.author, sendInteraction, feedContext, post.$type])
+  }, [post.uri, post.author, sendInteraction, feedContext, isPrivate])
 
   const btnStyle = React.useCallback(
     ({pressed, hovered}: PressableStateCallbackType) => [
@@ -302,6 +303,8 @@ let PostCtrls = ({
           onQuote={onQuote}
           big={big}
           embeddingDisabled={Boolean(post.viewer?.embeddingDisabled)}
+          isPrivatePost={isPrivate}
+          post={post}
         />
       </View>
       <View style={big ? a.align_center : [a.flex_1, a.align_start]}>

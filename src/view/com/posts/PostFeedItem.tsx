@@ -17,7 +17,11 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
-import {isReasonFeedSource, ReasonFeedSource} from '#/lib/api/feed/types'
+import {
+  isReasonFeedSource,
+  isReasonPrivateRepost,
+  ReasonFeedSource,
+} from '#/lib/api/feed/types'
 import {MAX_POST_LINES} from '#/lib/constants'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {makeProfileLink} from '#/lib/routes/links'
@@ -234,6 +238,9 @@ let FeedItemInner = ({
     AppBskyFeedDefs.isReasonRepost(reason) &&
     reason.by.did === currentAccount?.did
 
+  const isPrivateRepost = isReasonPrivateRepost(reason)
+  const repostText = isPrivateRepost ? 'Privately reposted' : 'Reposted'
+
   /**
    * If `post[0]` in this slice is the actual root post (not an orphan thread),
    * then we may have a threadgate record to reference
@@ -302,15 +309,15 @@ let FeedItemInner = ({
                 </Trans>
               </Text>
             </Link>
-          ) : AppBskyFeedDefs.isReasonRepost(reason) ? (
+          ) : AppBskyFeedDefs.isReasonRepost(reason) || isPrivateRepost ? (
             <Link
               style={styles.includeReason}
               href={makeProfileLink(reason.by)}
               title={
                 isOwner
-                  ? _(msg`Reposted by you`)
+                  ? _(msg`${repostText} by you`)
                   : _(
-                      msg`Reposted by ${sanitizeDisplayName(
+                      msg`${repostText} by ${sanitizeDisplayName(
                         reason.by.displayName || reason.by.handle,
                       )}`,
                     )
@@ -327,10 +334,10 @@ let FeedItemInner = ({
                 lineHeight={1.2}
                 numberOfLines={1}>
                 {isOwner ? (
-                  <Trans>Reposted by you</Trans>
+                  <Trans>{repostText} by you</Trans>
                 ) : (
                   <Trans>
-                    Reposted by{' '}
+                    {repostText} by{' '}
                     <ProfileHoverCard inline did={reason.by.did}>
                       <TextLinkOnWebOnly
                         type="sm-bold"

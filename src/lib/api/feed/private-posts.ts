@@ -623,6 +623,18 @@ async function formatPostsForFeed(
 
   // Convert private posts to FeedViewPost format
   const feed = posts.map((post: any) => {
+    if (post.$type === 'social.spkeasy.feed.repost') {
+      const postView: FeedViewPost = {
+        post: postMap.get(post.embed?.record?.uri)!,
+        reason: {
+          $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
+          by: authorProfileMap.get(post.authorDid)!,
+          indexedAt: post.createdAt,
+        },
+      }
+      return postView
+    }
+
     const authorProfile = authorProfileMap.get(post.authorDid)
     const quotedPost = postMap.get(post.embed?.record?.uri)
 

@@ -3,8 +3,10 @@ import {Pressable, View} from 'react-native'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {useRequireAuth} from '#/state/session'
-import {useSession} from '#/state/session'
+import {putPrivateRepost} from '#/lib/api/private-repost'
+import {usePrivateSession} from '#/lib/api/private-sessions'
+import {useAgent, useRequireAuth, useSession} from '#/state/session'
+import * as Toast from '#/view/com/util/Toast'
 import {atoms as a, useTheme} from '#/alf'
 import {Button} from '#/components/Button'
 import {CloseQuote_Stroke2_Corner1_Rounded as Quote} from '#/components/icons/Quote'
@@ -21,6 +23,12 @@ interface Props {
   onQuote: () => void
   big?: boolean
   embeddingDisabled: boolean
+  isPrivatePost: boolean
+  post: {
+    uri: string
+    cid: string
+    langs?: string[]
+  }
 }
 
 export const RepostButton = ({
@@ -30,11 +38,15 @@ export const RepostButton = ({
   onQuote,
   big,
   embeddingDisabled,
+  isPrivatePost,
+  post,
 }: Props) => {
   const t = useTheme()
   const {_} = useLingui()
   const {hasSession} = useSession()
   const requireAuth = useRequireAuth()
+  const agent = useAgent()
+  const getPrivateSession = usePrivateSession()
 
   const color = React.useMemo(
     () => ({
@@ -42,6 +54,19 @@ export const RepostButton = ({
     }),
     [t, isReposted],
   )
+
+  const onRepostPrivate = React.useCallback(async () => {
+    try {
+      const {sessionId, sessionKey} = await getPrivateSession({
+        onStateChange: () => {},
+      })
+      await putPrivateRepost(agent, post, sessionId, sessionKey)
+      Toast.show(_(msg`Reposted to trusted`))
+    } catch (err) {
+      console.error('Failed to repost', err)
+      Toast.show(_(msg`Failed to repost`), 'exclamation-circle')
+    }
+  }, [agent, post, getPrivateSession, _])
 
   return hasSession ? (
     <EventStopper onKeyDown={false}>
@@ -68,12 +93,23 @@ export const RepostButton = ({
           }}
         </Menu.Trigger>
         <Menu.Outer style={{minWidth: 170}}>
+          {!isPrivatePost && (
+            <Menu.Item
+              label={isReposted ? _(msg`Undo repost`) : _(msg`Repost`)}
+              testID="repostDropdownRepostBtn"
+              onPress={onRepost}>
+              <Menu.ItemText>
+                {isReposted ? _(msg`Undo repost`) : _(msg`Repost`)}
+              </Menu.ItemText>
+              <Menu.ItemIcon icon={Repost} position="right" />
+            </Menu.Item>
+          )}
           <Menu.Item
-            label={isReposted ? _(msg`Undo repost`) : _(msg`Repost`)}
+            label={isReposted ? _(msg`Undo repost`) : _(msg`Repost to Trusted`)}
             testID="repostDropdownRepostBtn"
-            onPress={onRepost}>
+            onPress={onRepostPrivate}>
             <Menu.ItemText>
-              {isReposted ? _(msg`Undo repost`) : _(msg`Repost`)}
+              {isReposted ? _(msg`Undo repost`) : _(msg`Repost to Trusted`)}
             </Menu.ItemText>
             <Menu.ItemIcon icon={Repost} position="right" />
           </Menu.Item>

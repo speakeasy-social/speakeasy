@@ -30,3 +30,16 @@ export function isReasonFeedSource(v: unknown): v is ReasonFeedSource {
     v.$type === 'reasonFeedSource'
   )
 }
+
+export function isReasonPrivateRepost(v: unknown): v is {
+  $type: 'social.spkeasy.feed.defs#reasonPrivateRepost'
+  by: any
+  indexedAt: string
+} {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    '$type' in v &&
+    v.$type === 'social.spkeasy.feed.defs#reasonPrivateRepost'
+  )
+}
