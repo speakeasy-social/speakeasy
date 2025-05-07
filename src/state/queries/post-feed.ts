@@ -784,9 +784,9 @@ function transformExternalEmbed(
         title: embed.external.title,
         description: embed.external.description,
         thumb: embed.external.thumb
-          ? `${baseUrl}/img/feed_thumbnail/plain/${authorDid}/${
-              embed.external.thumb.ref.$link
-            }@${embed.external.thumb.mimeType.split('/')[1]}`
+          ? `${baseUrl}/${
+              embed.external.thumb.key || embed.external.thumb.ref.$link
+            }`
           : undefined,
       },
     }
