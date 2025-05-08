@@ -177,6 +177,7 @@ export function composerReducer(
           link: undefined,
         },
         audience: 'public',
+        realTalk: undefined,
       })
       return {
         ...state,
