@@ -459,6 +459,7 @@ export type DecryptedPost = {
   text: string
   langs: string[]
   uri: string
+  cid: string
   rkey: string
   authorDid: string
   encryptedContent: string
