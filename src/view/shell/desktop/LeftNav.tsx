@@ -1,5 +1,5 @@
 import React from 'react'
-import {GestureResponderEvent, StyleSheet, View} from 'react-native'
+import {StyleSheet, View} from 'react-native'
 import {AppBskyActorDefs} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
@@ -341,16 +341,17 @@ function NavItem({
       : isTab(currentRouteInfo.name, pathName)
   const {onPress: linkOnPress} = useLinkProps({to: href})
   const onPressWrapped = React.useCallback(
-    (e: GestureResponderEvent) => {
-      if ('ctrlKey' in e || 'metaKey' in e || 'altKey' in e) {
+    (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
         return
       }
-      e.preventDefault?.()
+      e.preventDefault()
       if (onPress) {
         onPress()
       } else if (isCurrent) {
         emitSoftReset()
       } else {
+        // Set intention based on route
         if (['Profile', 'Notifications', 'Settings'].includes(pathName)) {
           setIntention(pathName)
         }
@@ -373,6 +374,8 @@ function NavItem({
       ]}
       hoverStyle={t.atoms.bg_contrast_25}
       onPress={onPressWrapped}
+      href={href}
+      dataSet={{noUnderline: 1}}
       role="link"
       accessibilityLabel={label}
       accessibilityHint="">
