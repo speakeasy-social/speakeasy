@@ -128,6 +128,8 @@ const IntentScreen = () => {
 
   const onIntentionPress = (feature: string, intent?: string) => {
     setIntention(intent || feature)
+    // FIXME typing should be better but it works
+    // @ts-ignore
     navigate(feature)
   }
 
@@ -172,6 +174,8 @@ const IntentScreen = () => {
             label="Post"
             onPress={() => {
               if (hasSession) {
+                // FIXME typing should be better but it works
+                // @ts-ignore
                 openComposer('default')
               } else {
                 setShowLoggedOut(true)

@@ -72,6 +72,7 @@ export type CommonNavigatorParams = {
   VideoFeed: VideoFeedSourceContext
   FeedTab: undefined
   Intent: undefined
+  Feed: undefined
 }
 
 export type BottomTabNavigatorParams = CommonNavigatorParams & {
