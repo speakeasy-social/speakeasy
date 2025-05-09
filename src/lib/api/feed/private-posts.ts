@@ -475,6 +475,9 @@ export type DecryptedPost = {
     | SocialSpkeasyEmbedImage
     | SocialSpkeasyEmbedRecord
   )
+  viewer: {
+    like: boolean
+  }
 }
 
 export type SocialSpkeasyEmbedImage = {
@@ -643,7 +646,13 @@ async function formatPostsForFeed(
     const postView: FeedViewPost = {
       $type: 'social.spkeasy.feed.defs#privatePostView',
 
-      post: formatPostView(post, authorProfile, baseUrl, quotedPost),
+      post: formatPostView(
+        post,
+        authorProfile,
+        baseUrl,
+        quotedPost,
+        agent.session!.did,
+      ),
       reply: post.reply
         ? {
             root: postMap.get(post.reply.root?.uri) || {
@@ -671,6 +680,7 @@ export function formatPostView(
   authorProfile: AppBskyActorDefs.ProfileViewBasic | undefined,
   baseUrl: string,
   quotedPost: PostView | undefined,
+  userDid: string,
 ): PostView {
   return {
     $type: 'social.spkeasy.feed.defs#privatePostView',
@@ -722,7 +732,9 @@ export function formatPostView(
     labels: [],
     viewer: {
       repost: undefined,
-      like: undefined,
+      like: post.viewer.like
+        ? `at://${userDid}/social.spkeasy.feed.like/${post.rkey}`
+        : undefined,
     },
   }
 }
