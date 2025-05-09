@@ -646,13 +646,7 @@ async function formatPostsForFeed(
     const postView: FeedViewPost = {
       $type: 'social.spkeasy.feed.defs#privatePostView',
 
-      post: formatPostView(
-        post,
-        authorProfile,
-        baseUrl,
-        quotedPost,
-        agent.session!.did,
-      ),
+      post: formatPostView(post, authorProfile, baseUrl, quotedPost),
       reply: post.reply
         ? {
             root: postMap.get(post.reply.root?.uri) || {
@@ -680,7 +674,6 @@ export function formatPostView(
   authorProfile: AppBskyActorDefs.ProfileViewBasic | undefined,
   baseUrl: string,
   quotedPost: PostView | undefined,
-  userDid: string,
 ): PostView {
   return {
     $type: 'social.spkeasy.feed.defs#privatePostView',
@@ -732,9 +725,7 @@ export function formatPostView(
     labels: [],
     viewer: {
       repost: undefined,
-      like: post.viewer.like
-        ? `at://${userDid}/social.spkeasy.feed.like/${post.rkey}`
-        : undefined,
+      like: post.viewer.like ? post.uri : undefined,
     },
   }
 }

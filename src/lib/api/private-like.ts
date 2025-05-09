@@ -11,3 +11,13 @@ export async function likePrivatePost(agent: BskyAgent, postUri: string) {
     },
   })
 }
+
+export async function unlikePrivatePost(agent: BskyAgent, postUri: string) {
+  return callSpeakeasyApiWithAgent(agent, {
+    api: 'social.spkeasy.reaction.deleteReaction',
+    method: 'POST',
+    body: {
+      uri: postUri,
+    },
+  })
+}
