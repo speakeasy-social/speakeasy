@@ -160,7 +160,7 @@ async function fetchInBatches<T>(
  * @param uris - Array of profile URIs to fetch
  * @returns Promise resolving to a Map of did to ProfileViewBasic
  */
-async function fetchProfiles(
+export async function fetchProfiles(
   agent: BskyAgent,
   uris: string[],
 ): Promise<Map<string, AppBskyActorDefs.ProfileViewBasic>> {

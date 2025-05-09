@@ -13,6 +13,10 @@ import {
 import {QueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
+import {
+  listPrivateNotifications,
+  PrivateNotification,
+} from '#/lib/api/private-notifications'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
 import {FeedNotification, FeedPage, NotificationType} from './types'
@@ -44,23 +48,40 @@ export async function fetchPage({
   page: FeedPage
   indexedAt: string | undefined
 }> {
-  const res = await agent.listNotifications({
-    limit,
-    cursor,
-    reasons,
-  })
+  // Fetch both regular and private notifications
+  const [regularRes, privateRes] = await Promise.all([
+    agent.listNotifications({
+      limit,
+      cursor,
+      reasons,
+    }),
+    listPrivateNotifications(agent),
+  ])
 
-  const indexedAt = res.data.notifications[0]?.indexedAt
+  const indexedAt = regularRes.data.notifications[0]?.indexedAt
 
-  // filter out notifs by mod rules
-  const notifs = res.data.notifications.filter(
+  // Filter out notifs by mod rules
+  const regularNotifs = regularRes.data.notifications.filter(
     notif => !shouldFilterNotif(notif, moderationOpts),
   )
 
-  // group notifications which are essentially similar (follows, likes on a post)
-  let notifsGrouped = groupNotifications(notifs)
+  // Convert private notifications to the same format as regular notifications
+  const privateNotifs = privateRes.notifications.map(
+    (notif: PrivateNotification) => ({
+      ...notif,
+      isPrivate: true,
+    }),
+  )
 
-  // we fetch subjects of notifications (usually posts) now instead of lazily
+  // Combine and sort notifications by date
+  const allNotifs = [...regularNotifs, ...privateNotifs].sort(
+    (a, b) => new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime(),
+  )
+
+  // Group notifications which are essentially similar (follows, likes on a post)
+  let notifsGrouped = groupNotifications(allNotifs)
+
+  // We fetch subjects of notifications (usually posts) now instead of lazily
   // in the UI to avoid relayouts
   if (fetchAdditionalData) {
     const subjects = await fetchSubjects(agent, notifsGrouped)
@@ -83,17 +104,19 @@ export async function fetchPage({
     }
   }
 
-  let seenAt = res.data.seenAt ? new Date(res.data.seenAt) : new Date()
+  let seenAt = regularRes.data.seenAt
+    ? new Date(regularRes.data.seenAt)
+    : new Date()
   if (Number.isNaN(seenAt.getTime())) {
     seenAt = new Date()
   }
 
   return {
     page: {
-      cursor: res.data.cursor,
+      cursor: regularRes.data.cursor,
       seenAt,
       items: notifsGrouped,
-      priority: res.data.priority ?? false,
+      priority: regularRes.data.priority ?? false,
     },
     indexedAt,
   }
