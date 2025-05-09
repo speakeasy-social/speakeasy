@@ -6,13 +6,17 @@ import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 export type PrivateNotification = {
   authorDid: string
   createdAt: string
-  isRead: boolean
-  author: AppBskyNotificationListNotifications.Notification['author']
   indexedAt: string
+  readAt: string
+  isRead: boolean
   uri: string
   cid: string
   reason: string
+  reasonSubject: string
+  reasonSubjectUri: string
   record: any
+
+  author: AppBskyNotificationListNotifications.Notification['author']
 }
 
 type PrivateNotificationResponse = {
@@ -34,6 +38,8 @@ export async function listPrivateNotifications(
   // Transform notifications with proper author details
   res.notifications.forEach((notif: PrivateNotification) => {
     const profile = profileMap.get(notif.authorDid)
+
+    notif.isRead = !!notif.readAt
     notif.author = profileToAuthorView(notif.authorDid, profile)
     notif.indexedAt = notif.createdAt
   })

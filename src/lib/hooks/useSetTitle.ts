@@ -3,11 +3,11 @@ import {useNavigation} from '@react-navigation/native'
 
 import {NavigationProp} from '#/lib/routes/types'
 import {bskyTitle} from '#/lib/strings/headings'
-import {useTotalUnreadNotifications} from '#/state/queries/notifications/unread'
+import {useUnreadNotifications} from '#/state/queries/notifications/unread'
 
 export function useSetTitle(title?: string) {
   const navigation = useNavigation<NavigationProp>()
-  const numUnread = useTotalUnreadNotifications()
+  const numUnread = useUnreadNotifications()
   useEffect(() => {
     if (title) {
       navigation.setOptions({title: bskyTitle(title, numUnread)})
