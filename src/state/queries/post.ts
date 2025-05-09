@@ -2,6 +2,7 @@ import {useCallback} from 'react'
 import {AppBskyActorDefs, AppBskyFeedDefs, AtUri} from '@atproto/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 
+import {likePrivatePost} from '#/lib/api/private-like'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
 import {updatePostShadow} from '#/state/cache/post-shadow'
@@ -120,10 +121,15 @@ export function usePostLikeMutationQueue(
         return likeUri
       } else {
         if (prevLikeUri) {
-          await unlikeMutation.mutateAsync({
-            postUri: postUri,
-            likeUri: prevLikeUri,
-          })
+          if (post.$type === 'social.spkeasy.feed.defs#privatePostView') {
+            // For private posts, we don't need to delete the like since it's handled by the server
+            return undefined
+          } else {
+            await unlikeMutation.mutateAsync({
+              postUri: postUri,
+              likeUri: prevLikeUri,
+            })
+          }
           userActionHistory.unlike([postUri])
         }
         return undefined
@@ -169,7 +175,7 @@ function usePostLikeMutation(
     Error,
     {uri: string; cid: string} // the post's uri and cid
   >({
-    mutationFn: ({uri, cid}) => {
+    mutationFn: async ({uri, cid}) => {
       let ownProfile: AppBskyActorDefs.ProfileViewDetailed | undefined
       if (currentAccount) {
         ownProfile = findProfileQueryData(queryClient, currentAccount.did)
@@ -190,7 +196,14 @@ function usePostLikeMutation(
             ? toClout(post.likeCount + post.repostCount + post.replyCount)
             : undefined,
       })
-      return agent.like(uri, cid)
+
+      if (post.$type === 'social.spkeasy.feed.defs#privatePostView') {
+        await likePrivatePost(agent, uri)
+        // For private posts, we don't get a like URI back, so we'll use a placeholder
+        return {uri: 'private-like'}
+      } else {
+        return agent.like(uri, cid)
+      }
     },
   })
 }

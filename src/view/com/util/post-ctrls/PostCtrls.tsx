@@ -96,9 +96,6 @@ let PostCtrls = ({
       post.author.viewer?.blockingByList,
   )
 
-  const isPrivatePost =
-    post.$type === 'social.spkeasy.feed.defs#privatePostView'
-
   const shouldShowLoggedOutWarning = React.useMemo(() => {
     return (
       post.author.did !== currentAccount?.did &&
@@ -310,18 +307,11 @@ let PostCtrls = ({
       <View style={big ? a.align_center : [a.flex_1, a.align_start]}>
         <Pressable
           testID="likeBtn"
-          style={({pressed, hovered}) => [
-            btnStyle({pressed, hovered}),
-            isPrivatePost && {opacity: 0.5},
-          ]}
-          onPress={() =>
-            !isPrivatePost && requireAuth(() => onPressToggleLike())
-          }
+          style={({pressed, hovered}) => [btnStyle({pressed, hovered})]}
+          onPress={() => requireAuth(() => onPressToggleLike())}
           accessibilityRole="button"
           accessibilityLabel={
-            isPrivatePost
-              ? _(msg`Likes not yet implemented for private posts`)
-              : post.viewer?.like
+            post.viewer?.like
               ? _(
                   msg`Unlike (${plural(post.likeCount || 0, {
                     one: '# like',
