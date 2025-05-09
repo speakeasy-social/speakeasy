@@ -1,11 +1,11 @@
 import {RichText} from '@atproto/api'
 
-import {parseEmbedPlayerFromUrl} from 'lib/strings/embed-player'
+import {parseEmbedPlayerFromUrl} from '#/lib/strings/embed-player'
 import {
   createStarterPackGooglePlayUri,
   createStarterPackLinkFromAndroidReferrer,
   parseStarterPackUri,
-} from 'lib/strings/starter-pack'
+} from '#/lib/strings/starter-pack'
 import {cleanError} from '../../src/lib/strings/errors'
 import {createFullHandle, makeValidHandle} from '../../src/lib/strings/handles'
 import {enforceLen} from '../../src/lib/strings/helpers'
@@ -243,15 +243,15 @@ describe('toNiceDomain', () => {
 
 describe('toShortUrl', () => {
   const inputs = [
-    'https://bsky.app',
-    'https://bsky.app/3jk7x4irgv52r',
+    'https://spkeasy.social',
+    'https://spkeasy.social/3jk7x4irgv52r',
     'https://bsky.app/3jk7x4irgv52r2313y182h9',
     'https://very-long-domain-name.com/foo',
     'https://very-long-domain-name.com/foo?bar=baz#andsomemore',
   ]
   const outputs = [
-    'bsky.app',
-    'bsky.app/3jk7x4irgv52r',
+    'spkeasy.social',
+    'spkeasy.social/3jk7x4irgv52r',
     'bsky.app/3jk7x4irgv52...',
     'very-long-domain-name.com/foo',
     'very-long-domain-name.com/foo?bar=baz#...',
@@ -266,11 +266,11 @@ describe('toShortUrl', () => {
 })
 
 describe('toShareUrl', () => {
-  const inputs = ['https://bsky.app', '/3jk7x4irgv52r', 'item/test/123']
+  const inputs = ['https://spkeasy.social', '/3jk7x4irgv52r', 'item/test/123']
   const outputs = [
-    'https://bsky.app',
-    'https://bsky.app/3jk7x4irgv52r',
-    'https://bsky.app/item/test/123',
+    'https://spkeasy.social',
+    'https://spkeasy.social/3jk7x4irgv52r',
+    'https://spkeasy.social/item/test/123',
   ]
 
   it('appends https, when not present', () => {
@@ -441,58 +441,69 @@ describe('parseEmbedPlayerFromUrl', () => {
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=1',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=1',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=1',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=1',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_short',
       source: 'youtubeShorts',
       hideDetails: true,
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
     {
       type: 'youtube_video',
       source: 'youtube',
-      playerUri: 'https://bsky.app/iframe/youtube.html?videoId=videoId&start=0',
+      playerUri:
+        'https://spkeasy.social/iframe/youtube.html?videoId=videoId&start=0',
     },
 
     undefined,

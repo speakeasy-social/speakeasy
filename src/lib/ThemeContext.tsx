@@ -12,6 +12,7 @@ export type PaletteColorName =
   | 'secondary'
   | 'inverted'
   | 'error'
+  | 'purple'
 export type PaletteColor = {
   background: string
   backgroundLight: string

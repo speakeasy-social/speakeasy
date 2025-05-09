@@ -31,7 +31,10 @@ import {FollowingEndOfFeed} from '#/view/com/posts/FollowingEndOfFeed'
 import {NoFeedsPinned} from '#/screens/Home/NoFeedsPinned'
 import * as Layout from '#/components/Layout'
 
-type Props = NativeStackScreenProps<HomeTabNavigatorParams, 'Home' | 'Start'>
+type Props = NativeStackScreenProps<
+  HomeTabNavigatorParams,
+  'Home' | 'Start' | 'Feed'
+>
 export function HomeScreen(props: Props) {
   const {setShowLoggedOut} = useLoggedOutViewControls()
   const {data: preferences} = usePreferencesQuery()

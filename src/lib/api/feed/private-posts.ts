@@ -459,6 +459,7 @@ export type DecryptedPost = {
   text: string
   langs: string[]
   uri: string
+  cid: string
   rkey: string
   authorDid: string
   encryptedContent: string
@@ -468,11 +469,12 @@ export type DecryptedPost = {
     parent: {uri: string; cid: string}
   }
   facets: AppBskyRichtextFacet.Main[]
-  embed:
+  embed: {$type: string} & (
     | AppBskyEmbedRecordWithMedia.View
     | SocialSpkeasyEmbedExternal
     | SocialSpkeasyEmbedImage
     | SocialSpkeasyEmbedRecord
+  )
 }
 
 export type SocialSpkeasyEmbedImage = {

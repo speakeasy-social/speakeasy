@@ -57,6 +57,7 @@ export interface ThreadCtx {
 }
 
 export type ThreadPost = {
+  $type?: string
   type: 'post'
   _reactKey: string
   uri: string
@@ -273,7 +274,8 @@ function formatThreadNode(
   return {
     type: 'post',
     uri: post.uri,
-    // FIXME
+    // FIXME we should implement support for cid's properly
+    // @ts-ignore
     cid: 'bafyreifrt5aofp6ofqrn4wgfmpyx554rem22dp6mbnhpmevmxgaasbo5bm',
     author: author,
     record: post,

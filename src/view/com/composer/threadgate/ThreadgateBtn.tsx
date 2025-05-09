@@ -26,6 +26,7 @@ export function ThreadgateBtn({
   onChangeThreadgateAllowUISettings: (v: ThreadgateAllowUISetting[]) => void
 
   style?: StyleProp<AnimatedStyle<ViewStyle>>
+  isReply: boolean
 }) {
   const {_} = useLingui()
   const control = Dialog.useDialogControl()
