@@ -14,9 +14,16 @@ import {QueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
 import {
+  decryptPosts,
+  fetchEncryptedPosts,
+  formatPostView,
+} from '#/lib/api/feed/private-posts'
+import {
   listPrivateNotifications,
   PrivateNotification,
 } from '#/lib/api/private-notifications'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
 import {FeedNotification, FeedPage, NotificationType} from './types'
@@ -98,6 +105,8 @@ export async function fetchPage({
           notif.subject = subjects.posts.get(notif.subjectUri)
           if (notif.subject) {
             precacheProfile(queryClient, notif.subject.author)
+          } else {
+            console.log('no subject', notif.subjectUri, notif)
           }
         }
       }
@@ -204,15 +213,36 @@ async function fetchSubjects(
 }> {
   const postUris = new Set<string>()
   const packUris = new Set<string>()
+  const privatePostUris = new Set<string>()
   for (const notif of groupedNotifs) {
     if (notif.subjectUri?.includes('app.bsky.feed.post')) {
       postUris.add(notif.subjectUri)
+    } else if (notif.subjectUri?.includes('social.spkeasy.feed.privatePost')) {
+      privatePostUris.add(notif.subjectUri)
     } else if (
       notif.notification.reasonSubject?.includes('app.bsky.graph.starterpack')
     ) {
       packUris.add(notif.notification.reasonSubject)
     }
   }
+
+  const privatePostsPromise = fetchEncryptedPosts(agent, {
+    uris: Array.from(privatePostUris),
+  }).then(async res => {
+    const privateKey = await getCachedPrivateKey(
+      agent.assertDid,
+      options => callSpeakeasyApiWithAgent(agent, options),
+      false,
+    )
+    const encryptedSessionKeys = res.encryptedSessionKeys
+    return await decryptPosts(
+      agent,
+      res.encryptedPosts,
+      encryptedSessionKeys,
+      privateKey!,
+    )
+  })
+
   const postUriChunks = chunk(Array.from(postUris), 25)
   const packUriChunks = chunk(Array.from(packUris), 25)
   const postsChunks = await Promise.all(
@@ -242,6 +272,17 @@ async function fetchSubjects(
       packsMap.set(pack.uri, pack)
     }
   }
+
+  const privatePosts = await privatePostsPromise
+
+  // Merge private posts into the posts map
+  for (const post of privatePosts) {
+    const postView = formatPostView(post, undefined, '', undefined)
+    if (post.uri) {
+      postsMap.set(post.uri, postView)
+    }
+  }
+
   return {
     posts: postsMap,
     starterPacks: packsMap,

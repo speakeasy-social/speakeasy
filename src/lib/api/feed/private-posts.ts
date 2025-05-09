@@ -576,7 +576,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
  * @param privateKey - The private key to use for decryption
  * @returns Promise resolving to an array of decrypted posts
  */
-async function decryptPosts(
+export async function decryptPosts(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
   encryptedSessionKeys: EncryptedSessionKey[],
