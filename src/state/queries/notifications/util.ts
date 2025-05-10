@@ -73,12 +73,7 @@ export async function fetchPage({
   )
 
   // Convert private notifications to the same format as regular notifications
-  const privateNotifs = privateRes.notifications.map(
-    (notif: PrivateNotification) => ({
-      ...notif,
-      isPrivate: true,
-    }),
-  )
+  const privateNotifs = privateRes.notifications.map(formatPrivateNotification)
 
   // Combine and sort notifications by date
   const allNotifs = [...regularNotifs, ...privateNotifs].sort(
@@ -328,5 +323,22 @@ function getSubjectUri(
     }
   } else if (type === 'feedgen-like') {
     return notif.reasonSubject
+  }
+}
+
+function formatPrivateNotification(
+  notif: PrivateNotification,
+): AppBskyNotificationListNotifications.Notification {
+  return {
+    ...notif,
+    //      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
+    record: {
+      $type: 'app.bsky.feed.like',
+      subject: {
+        uri: notif.reasonSubject,
+        validationStatus: 'valid',
+      },
+    },
+    isPrivate: true,
   }
 }
