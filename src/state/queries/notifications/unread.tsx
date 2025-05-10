@@ -7,6 +7,7 @@ import {AppState} from 'react-native'
 import {useQueryClient} from '@tanstack/react-query'
 import EventEmitter from 'eventemitter3'
 
+import {updatePrivateNotificationSeen} from '#/lib/api/private-notifications'
 import BroadcastChannel from '#/lib/broadcast'
 import {resetBadgeCount} from '#/lib/notifications/notifications'
 import {logger} from '#/logger'
@@ -111,12 +112,15 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
   const api = React.useMemo<ApiContext>(() => {
     return {
       async markAllRead() {
-        // update server
-        await agent.updateSeenNotifications(
-          cacheRef.current.syncedAt.toISOString(),
-        )
+        const time = cacheRef.current.syncedAt.toISOString()
 
-        // update & broadcast
+        // Update both regular and private notifications
+        await Promise.all([
+          agent.updateSeenNotifications(time),
+          updatePrivateNotificationSeen(agent, time),
+        ])
+
+        // Update & broadcast
         setNumUnread('')
         broadcast.postMessage({event: ''})
         resetBadgeCount()
@@ -188,6 +192,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
           }
           broadcast.postMessage({event: unreadCountStr})
         } catch (e) {
+          console.log(e)
           logger.warn('Failed to check unread notifications', {error: e})
         } finally {
           isFetchingRef.current = false

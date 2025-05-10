@@ -160,7 +160,7 @@ async function fetchInBatches<T>(
  * @param uris - Array of profile URIs to fetch
  * @returns Promise resolving to a Map of did to ProfileViewBasic
  */
-async function fetchProfiles(
+export async function fetchProfiles(
   agent: BskyAgent,
   uris: string[],
 ): Promise<Map<string, AppBskyActorDefs.ProfileViewBasic>> {
@@ -475,6 +475,9 @@ export type DecryptedPost = {
     | SocialSpkeasyEmbedImage
     | SocialSpkeasyEmbedRecord
   )
+  viewer: {
+    like: boolean
+  }
 }
 
 export type SocialSpkeasyEmbedImage = {
@@ -573,7 +576,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
  * @param privateKey - The private key to use for decryption
  * @returns Promise resolving to an array of decrypted posts
  */
-async function decryptPosts(
+export async function decryptPosts(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
   encryptedSessionKeys: EncryptedSessionKey[],
@@ -722,7 +725,7 @@ export function formatPostView(
     labels: [],
     viewer: {
       repost: undefined,
-      like: undefined,
+      like: post.viewer.like ? post.uri : undefined,
     },
   }
 }

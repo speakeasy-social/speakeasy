@@ -2,6 +2,7 @@ import {useCallback} from 'react'
 import {AppBskyActorDefs, AppBskyFeedDefs, AtUri} from '@atproto/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 
+import {likePrivatePost, unlikePrivatePost} from '#/lib/api/private-like'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
 import {updatePostShadow} from '#/state/cache/post-shadow'
@@ -169,7 +170,7 @@ function usePostLikeMutation(
     Error,
     {uri: string; cid: string} // the post's uri and cid
   >({
-    mutationFn: ({uri, cid}) => {
+    mutationFn: async ({uri, cid}) => {
       let ownProfile: AppBskyActorDefs.ProfileViewDetailed | undefined
       if (currentAccount) {
         ownProfile = findProfileQueryData(queryClient, currentAccount.did)
@@ -190,7 +191,14 @@ function usePostLikeMutation(
             ? toClout(post.likeCount + post.repostCount + post.replyCount)
             : undefined,
       })
-      return agent.like(uri, cid)
+
+      if (post.$type === 'social.spkeasy.feed.defs#privatePostView') {
+        await likePrivatePost(agent, uri)
+        // For private posts, we don't get a like URI back, so we'll use a placeholder
+        return {uri}
+      } else {
+        return agent.like(uri, cid)
+      }
     },
   })
 }
@@ -200,9 +208,13 @@ function usePostUnlikeMutation(
 ) {
   const agent = useAgent()
   return useMutation<void, Error, {postUri: string; likeUri: string}>({
-    mutationFn: ({likeUri}) => {
+    mutationFn: async ({likeUri}) => {
       logEvent('post:unlike', {logContext})
-      return agent.deleteLike(likeUri)
+      if (likeUri.includes('social.spkeasy.feed.privatePost')) {
+        return unlikePrivatePost(agent, likeUri)
+      } else {
+        return agent.deleteLike(likeUri)
+      }
     },
   })
 }

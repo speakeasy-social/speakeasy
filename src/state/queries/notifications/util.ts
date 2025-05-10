@@ -13,6 +13,17 @@ import {
 import {QueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
+import {
+  decryptPosts,
+  fetchEncryptedPosts,
+  formatPostView,
+} from '#/lib/api/feed/private-posts'
+import {
+  listPrivateNotifications,
+  PrivateNotification,
+} from '#/lib/api/private-notifications'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
 import {FeedNotification, FeedPage, NotificationType} from './types'
@@ -44,23 +55,35 @@ export async function fetchPage({
   page: FeedPage
   indexedAt: string | undefined
 }> {
-  const res = await agent.listNotifications({
-    limit,
-    cursor,
-    reasons,
-  })
+  // Fetch both regular and private notifications
+  const [regularRes, privateRes] = await Promise.all([
+    agent.listNotifications({
+      limit,
+      cursor,
+      reasons,
+    }),
+    listPrivateNotifications(agent),
+  ])
 
-  const indexedAt = res.data.notifications[0]?.indexedAt
+  const indexedAt = regularRes.data.notifications[0]?.indexedAt
 
-  // filter out notifs by mod rules
-  const notifs = res.data.notifications.filter(
+  // Filter out notifs by mod rules
+  const regularNotifs = regularRes.data.notifications.filter(
     notif => !shouldFilterNotif(notif, moderationOpts),
   )
 
-  // group notifications which are essentially similar (follows, likes on a post)
-  let notifsGrouped = groupNotifications(notifs)
+  // Convert private notifications to the same format as regular notifications
+  const privateNotifs = privateRes.notifications.map(formatPrivateNotification)
 
-  // we fetch subjects of notifications (usually posts) now instead of lazily
+  // Combine and sort notifications by date
+  const allNotifs = [...regularNotifs, ...privateNotifs].sort(
+    (a, b) => new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime(),
+  )
+
+  // Group notifications which are essentially similar (follows, likes on a post)
+  let notifsGrouped = groupNotifications(allNotifs)
+
+  // We fetch subjects of notifications (usually posts) now instead of lazily
   // in the UI to avoid relayouts
   if (fetchAdditionalData) {
     const subjects = await fetchSubjects(agent, notifsGrouped)
@@ -77,23 +100,27 @@ export async function fetchPage({
           notif.subject = subjects.posts.get(notif.subjectUri)
           if (notif.subject) {
             precacheProfile(queryClient, notif.subject.author)
+          } else {
+            console.log('no subject', notif.subjectUri, notif)
           }
         }
       }
     }
   }
 
-  let seenAt = res.data.seenAt ? new Date(res.data.seenAt) : new Date()
+  let seenAt = regularRes.data.seenAt
+    ? new Date(regularRes.data.seenAt)
+    : new Date()
   if (Number.isNaN(seenAt.getTime())) {
     seenAt = new Date()
   }
 
   return {
     page: {
-      cursor: res.data.cursor,
+      cursor: regularRes.data.cursor,
       seenAt,
       items: notifsGrouped,
-      priority: res.data.priority ?? false,
+      priority: regularRes.data.priority ?? false,
     },
     indexedAt,
   }
@@ -181,15 +208,36 @@ async function fetchSubjects(
 }> {
   const postUris = new Set<string>()
   const packUris = new Set<string>()
+  const privatePostUris = new Set<string>()
   for (const notif of groupedNotifs) {
     if (notif.subjectUri?.includes('app.bsky.feed.post')) {
       postUris.add(notif.subjectUri)
+    } else if (notif.subjectUri?.includes('social.spkeasy.feed.privatePost')) {
+      privatePostUris.add(notif.subjectUri)
     } else if (
       notif.notification.reasonSubject?.includes('app.bsky.graph.starterpack')
     ) {
       packUris.add(notif.notification.reasonSubject)
     }
   }
+
+  const privatePostsPromise = fetchEncryptedPosts(agent, {
+    uris: Array.from(privatePostUris),
+  }).then(async res => {
+    const privateKey = await getCachedPrivateKey(
+      agent.assertDid,
+      options => callSpeakeasyApiWithAgent(agent, options),
+      false,
+    )
+    const encryptedSessionKeys = res.encryptedSessionKeys
+    return await decryptPosts(
+      agent,
+      res.encryptedPosts,
+      encryptedSessionKeys,
+      privateKey!,
+    )
+  })
+
   const postUriChunks = chunk(Array.from(postUris), 25)
   const packUriChunks = chunk(Array.from(packUris), 25)
   const postsChunks = await Promise.all(
@@ -219,6 +267,17 @@ async function fetchSubjects(
       packsMap.set(pack.uri, pack)
     }
   }
+
+  const privatePosts = await privatePostsPromise
+
+  // Merge private posts into the posts map
+  for (const post of privatePosts) {
+    const postView = formatPostView(post, undefined, '', undefined)
+    if (post.uri) {
+      postsMap.set(post.uri, postView)
+    }
+  }
+
   return {
     posts: postsMap,
     starterPacks: packsMap,
@@ -264,5 +323,22 @@ function getSubjectUri(
     }
   } else if (type === 'feedgen-like') {
     return notif.reasonSubject
+  }
+}
+
+function formatPrivateNotification(
+  notif: PrivateNotification,
+): AppBskyNotificationListNotifications.Notification {
+  return {
+    ...notif,
+    //      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
+    record: {
+      $type: 'app.bsky.feed.like',
+      subject: {
+        uri: notif.reasonSubject,
+        validationStatus: 'valid',
+      },
+    },
+    isPrivate: true,
   }
 }

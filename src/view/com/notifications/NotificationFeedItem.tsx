@@ -211,14 +211,18 @@ let NotificationFeedItem = ({
   )
 
   if (item.type === 'post-like') {
+    const isPrivatePost = item.subjectUri?.includes(
+      'social.spkeasy.feed.privatePost',
+    )
+    const postTitle = isPrivatePost ? 'private post' : 'post'
     a11yLabel = hasMultipleAuthors
       ? _(
           msg`${firstAuthorName} and ${plural(additionalAuthorsCount, {
             one: `${formattedAuthorsCount} other`,
             other: `${formattedAuthorsCount} others`,
-          })} liked your post`,
+          })} liked your ${postTitle}`,
         )
-      : _(msg`${firstAuthorName} liked your post`)
+      : _(msg`${firstAuthorName} liked your ${postTitle}`)
     notificationContent = hasMultipleAuthors ? (
       <Trans>
         {firstAuthorLink} and{' '}
@@ -229,10 +233,12 @@ let NotificationFeedItem = ({
             other={`${formattedAuthorsCount} others`}
           />
         </Text>{' '}
-        liked your post
+        liked your {postTitle}
       </Trans>
     ) : (
-      <Trans>{firstAuthorLink} liked your post</Trans>
+      <Trans>
+        {firstAuthorLink} liked your {postTitle}
+      </Trans>
     )
   } else if (item.type === 'repost') {
     a11yLabel = hasMultipleAuthors
