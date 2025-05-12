@@ -398,6 +398,7 @@ let PostThreadItemLoaded = ({
                   />
                 </View>
               )}
+              <CoverRecordDisplay post={post} />
             </ContentHider>
             <ExpandedPostDetails
               post={post}
@@ -633,6 +634,7 @@ let PostThreadItemLoaded = ({
                 logContext="PostThreadItem"
                 threadgateRecord={threadgateRecord}
               />
+              <CoverRecordDisplay post={post} />
             </View>
           </View>
           {hasMore ? (
@@ -903,6 +905,45 @@ function getThreadAuthor(
   }
 }
 
+function CoverRecordDisplay({
+  post,
+  style,
+}: {
+  post: AppBskyFeedDefs.PostView
+  style?: any
+}) {
+  const pal = usePalette('default')
+  const coverRichText = React.useMemo(() => {
+    if (post.coverRecord && AppBskyFeedPost.isRecord(post.coverRecord)) {
+      return new RichTextAPI({
+        text: post.coverRecord.text,
+        facets: post.coverRecord.facets,
+      })
+    }
+    return null
+  }, [post.coverRecord])
+
+  if (!coverRichText) return null
+
+  return (
+    <View
+      style={[
+        styles.coverTextContainer,
+        a.mt_sm,
+        a.pb_xs,
+        {borderTopColor: pal.colors.border},
+        style,
+      ]}>
+      <RichText
+        enableTags
+        value={coverRichText}
+        style={[pal.textLight, a.text_sm]}
+        authorHandle={post.author.handle}
+      />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   outer: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -933,5 +974,9 @@ const styles = StyleSheet.create({
   cursor: {
     // @ts-ignore web only
     cursor: 'pointer',
+  },
+  coverTextContainer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
   },
 })

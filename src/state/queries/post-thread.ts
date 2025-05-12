@@ -34,6 +34,7 @@ import {
 import {
   findAllPostsInQueryData as findAllPostsInFeedQueryData,
   findAllProfilesInQueryData as findAllProfilesInFeedQueryData,
+  transformHiddenEmbed,
 } from './post-feed'
 import {
   didOrHandleUriMatches,
@@ -103,6 +104,7 @@ export type PostThreadQueryData = {
 export function usePostThreadQuery(uri: string | undefined) {
   const queryClient = useQueryClient()
   const agent = useAgent()
+  const baseUrl = getBaseCdnUrl(agent)
   return useQuery<PostThreadQueryData, Error>({
     gcTime: 0,
     queryKey: RQKEY(uri || ''),
@@ -176,7 +178,12 @@ export function usePostThreadQuery(uri: string | undefined) {
       })
       // TODO get private replies
       if (res.success) {
-        const thread = responseToThreadNodes(res.data.thread)
+        const thread = responseToThreadNodes(
+          res.data.thread,
+          0,
+          'start',
+          baseUrl,
+        )
         annotateSelfThread(thread)
         return {
           thread,
@@ -488,6 +495,7 @@ function responseToThreadNodes(
   node: ThreadViewNode,
   depth = 0,
   direction: 'up' | 'down' | 'start' = 'start',
+  baseUrl?: string,
 ): ThreadNode {
   if (
     AppBskyFeedDefs.isThreadViewPost(node) &&
@@ -501,6 +509,9 @@ function responseToThreadNodes(
     post.replyCount ??= 0
     post.likeCount ??= 0
     post.repostCount ??= 0
+
+    transformHiddenEmbed(node.post.record, post, baseUrl!)
+
     return {
       type: 'post',
       _reactKey: node.post.uri,
@@ -509,12 +520,14 @@ function responseToThreadNodes(
       record: node.post.record,
       parent:
         node.parent && direction !== 'down'
-          ? responseToThreadNodes(node.parent, depth - 1, 'up')
+          ? responseToThreadNodes(node.parent, depth - 1, 'up', baseUrl)
           : undefined,
       replies:
         node.replies?.length && direction !== 'up'
           ? node.replies
-              .map(reply => responseToThreadNodes(reply, depth + 1, 'down'))
+              .map(reply =>
+                responseToThreadNodes(reply, depth + 1, 'down', baseUrl),
+              )
               // do not show blocked posts in replies
               .filter(node => node.type !== 'blocked')
           : undefined,

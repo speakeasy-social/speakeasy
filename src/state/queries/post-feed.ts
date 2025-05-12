@@ -360,45 +360,13 @@ export function usePostFeedQuery(
                         isParentBlocked: item.isParentBlocked,
                         isParentNotFound: item.isParentNotFound,
                       }
-                      if (
-                        !item.post.embed &&
-                        item.record.embed &&
-                        item.record.embed.$type ===
-                          'social.spkeasy.embed.privateMessage'
-                      ) {
-                        const privateMessage = item.record.embed
-                          .privateMessage as {
-                          encodedMessage: string
-                          publicMessage: string
-                        }
-                        try {
-                          const decodedContent = formatPrivatePostForFeed(
-                            JSON.parse(atob(privateMessage.encodedMessage)),
-                            item.post.author.did, // Pass the parent post's author DID
-                            selectArgs.baseUrl,
-                          )
-                          feedPostSliceItem.post.embed = {
-                            $type: 'social.spkeasy.embed.privateMessage',
-                            privateMessage,
-                            decodedEmbed: {
-                              uri: decodedContent.uri,
-                              cid: decodedContent.cid,
-                              author: decodedContent.author,
-                              record: decodedContent.record,
-                              embed: decodedContent.embed,
-                              indexedAt: decodedContent.indexedAt,
-                              labels: decodedContent.labels,
-                              likeCount: decodedContent.likeCount,
-                              replyCount: decodedContent.replyCount,
-                              repostCount: decodedContent.repostCount,
-                              viewer: decodedContent.viewer || {},
-                              $type: decodedContent.$type,
-                            },
-                          }
-                        } catch (e) {
-                          console.error('Failed to decode private message:', e)
-                        }
-                      }
+
+                      transformHiddenEmbed(
+                        item.record,
+                        item.post,
+                        selectArgs.baseUrl,
+                      )
+
                       return feedPostSliceItem
                     }),
                   }
@@ -666,6 +634,54 @@ export function* findAllProfilesInQueryData(
           yield item.reply.root.author
         }
       }
+    }
+  }
+}
+
+export function transformHiddenEmbed(
+  record: AppBskyFeedPost.Record,
+  post: AppBskyFeedDefs.PostView,
+  baseUrl: string,
+) {
+  if (
+    record.embed &&
+    record.embed.$type === 'social.spkeasy.embed.privateMessage'
+  ) {
+    const privateMessage = record.embed.privateMessage as {
+      encodedMessage: string
+      publicMessage: string
+    }
+    try {
+      const decodedContent = formatPrivatePostForFeed(
+        JSON.parse(atob(privateMessage.encodedMessage)),
+        post.author.did, // Pass the parent post's author DID
+        baseUrl,
+      )
+
+      // Store the original record as coverRecord
+      post.coverRecord = {...record}
+
+      // Replace both the post's record and the passed record with the decoded content
+      const decodedRecord = decodedContent.record as AppBskyFeedPost.Record
+      post.record = decodedRecord
+      record.text = decodedRecord.text
+      record.facets = decodedRecord.facets
+      record.embed = decodedRecord.embed
+      record.createdAt = decodedRecord.createdAt
+      record.langs = decodedRecord.langs
+      record.reply = decodedRecord.reply
+
+      // Update the post's other properties
+      post.embed = decodedContent.embed
+      post.likeCount = decodedContent.likeCount
+      post.replyCount = decodedContent.replyCount
+      post.repostCount = decodedContent.repostCount
+      post.quoteCount = decodedContent.quoteCount
+      post.indexedAt = decodedContent.indexedAt
+      post.labels = decodedContent.labels
+      post.viewer = decodedContent.viewer || {}
+    } catch (e) {
+      console.error('Failed to decode private message:', e)
     }
   }
 }
