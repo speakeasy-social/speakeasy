@@ -439,7 +439,20 @@ async function resolveMedia(
     const images: AppBskyEmbedImages.Image[] = await Promise.all(
       imagesDraft.map(async (image, i) => {
         logger.debug(`Compressing image #${i}`)
-        const {path, width, height, mime} = await compressImage(image)
+        let path, width, height, mime
+        if (image.source.mime === 'image/gif') {
+          // Skip compression for GIFs
+          path = image.source.path
+          width = image.source.width
+          height = image.source.height
+          mime = image.source.mime
+        } else {
+          const compressed = await compressImage(image)
+          path = compressed.path
+          width = compressed.width
+          height = compressed.height
+          mime = compressed.mime
+        }
         logger.debug(`Uploading image #${i}`)
 
         // Use speakeasy upload for trusted/hidden audiences
