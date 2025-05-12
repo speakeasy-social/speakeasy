@@ -373,7 +373,9 @@ function NavItem({
         a.transition_color,
       ]}
       hoverStyle={t.atoms.bg_contrast_25}
+      // @ts-ignore the function signature differs on web -prf
       onPress={onPressWrapped}
+      // @ts-ignore web only -prf
       href={href}
       dataSet={{noUnderline: 1}}
       role="link"
