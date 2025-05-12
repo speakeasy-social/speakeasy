@@ -393,6 +393,7 @@ async function resolveEmbed(
             agent,
             path,
             mime,
+            draft.audience,
             sessionId,
             sessionKey,
           )
@@ -444,15 +445,11 @@ async function resolveMedia(
         // Use speakeasy upload for trusted/hidden audiences
         let uploadResult
         if (audience === 'trusted' || audience === 'hidden') {
-          if (!sessionKey || !sessionId) {
-            throw new Error(
-              'Session key and session ID must be provided for speakeasy uploads',
-            )
-          }
           uploadResult = await uploadBlobToSpeakeasy(
             agent,
             path,
             mime,
+            audience,
             sessionId,
             sessionKey,
           )
@@ -506,26 +503,22 @@ async function resolveMedia(
       gifDraft.gif,
     )
     let blob: BlobRef | undefined
-    if (resolvedGif.thumb) {
+    // Upload the full GIF for trusted/hidden audiences
+    if (audience === 'trusted' || audience === 'hidden') {
+      onStateChange?.(t`Uploading GIF...`)
+      let response = await uploadBlobToSpeakeasy(
+        agent,
+        resolvedGif.uri,
+        'image/gif',
+        audience,
+        sessionId,
+        sessionKey,
+      )
+      blob = response.data.blob
+    } else if (resolvedGif.thumb) {
       onStateChange?.(t`Uploading link thumbnail...`)
       const {path, mime} = resolvedGif.thumb.source
-      let response
-      if (audience === 'trusted' || audience === 'hidden') {
-        if (!sessionKey || !sessionId) {
-          throw new Error(
-            'Session key and session ID must be provided for speakeasy uploads',
-          )
-        }
-        response = await uploadBlobToSpeakeasy(
-          agent,
-          path,
-          mime,
-          sessionId,
-          sessionKey,
-        )
-      } else {
-        response = await uploadBlob(agent, path, mime)
-      }
+      let response = await uploadBlob(agent, path, mime)
       blob = response.data.blob
     }
     return {
@@ -820,13 +813,19 @@ async function uploadBlobToSpeakeasy(
   agent: BskyAgent,
   path: string,
   mime: string,
-  sessionId: string,
-  sessionKey: string,
+  audience: string,
+  sessionId?: string,
+  sessionKey?: string,
 ): Promise<ComAtprotoRepoUploadBlob.Response> {
   try {
-    if (!sessionKey || !sessionId) {
+    let realSessionId = sessionId
+    if (audience === 'hidden') {
+      realSessionId = '00000000-0000-0000-0000-000000000000'
+    }
+
+    if (!realSessionId) {
       throw new Error(
-        'Session key and session ID must be provided for speakeasy uploads',
+        'Session session ID must be provided for speakeasy uploads',
       )
     }
 
@@ -887,7 +886,7 @@ async function uploadBlobToSpeakeasy(
     }
 
     // Use the dedicated Speakeasy upload function that handles URL and host resolution
-    return await uploadMediaToSpeakeasy(agent, blob, mime, sessionId)
+    return await uploadMediaToSpeakeasy(agent, blob, mime, realSessionId)
   } catch (e: any) {
     logger.error('Failed to upload blob to Speakeasy', {
       safeMessage: e.message,

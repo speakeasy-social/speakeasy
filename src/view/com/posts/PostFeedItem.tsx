@@ -499,6 +499,17 @@ let PostContent = ({
     setLimitLines(false)
   }, [setLimitLines])
 
+  // Create a RichText instance for the cover record if it exists
+  const coverRichText = React.useMemo(() => {
+    if (post.coverRecord && AppBskyFeedPost.isRecord(post.coverRecord)) {
+      return new RichTextAPI({
+        text: post.coverRecord.text,
+        facets: post.coverRecord.facets,
+      })
+    }
+    return null
+  }, [post.coverRecord])
+
   return (
     <ContentHider
       testID="contentHider-post"
@@ -540,6 +551,22 @@ let PostContent = ({
           />
         </View>
       ) : null}
+      {coverRichText && (
+        <View
+          style={[
+            styles.coverTextContainer,
+            a.mt_sm,
+            a.pb_xs,
+            {borderTopColor: pal.colors.border},
+          ]}>
+          <RichText
+            enableTags
+            value={coverRichText}
+            style={[pal.textLight, a.text_sm]}
+            authorHandle={postAuthor.handle}
+          />
+        </View>
+      )}
     </ContentHider>
   )
 }
@@ -667,5 +694,9 @@ const styles = StyleSheet.create({
   },
   translateLink: {
     marginBottom: 6,
+  },
+  coverTextContainer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
   },
 })

@@ -868,7 +868,12 @@ let ComposerPost = React.memo(function ComposerPost({
 
   const onPhotoPasted = useCallback(
     async (uri: string) => {
-      if (uri.startsWith('data:video/') || uri.startsWith('data:image/gif')) {
+      // If the post is public, treat pasted GIFs as videos (legacy behavior)
+      // If trusted/hidden, treat as GIF
+      if (
+        uri.startsWith('data:video/') ||
+        (uri.startsWith('data:image/gif') && post.audience === 'public')
+      ) {
         if (isNative) return // web only
         const [mimeType] = uri.slice('data:'.length).split(';')
         if (!SUPPORTED_MIME_TYPES.includes(mimeType as SupportedMimeTypes)) {
@@ -885,7 +890,7 @@ let ComposerPost = React.memo(function ComposerPost({
         onImageAdd([res])
       }
     },
-    [post.id, onSelectVideo, onImageAdd, _],
+    [post.id, post.audience, onSelectVideo, onImageAdd, _],
   )
 
   return (
