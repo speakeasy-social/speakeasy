@@ -118,7 +118,13 @@ function PostInner({
     () => countLines(richText?.text) >= MAX_POST_LINES,
   )
   const itemUrip = new AtUri(post.uri)
-  const itemHref = makeProfileLink(post.author, 'post', itemUrip.rkey)
+  const isPrivatePost =
+    post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const itemHref = makeProfileLink(
+    post.author,
+    isPrivatePost ? 'private-post' : 'post',
+    itemUrip.rkey,
+  )
   let replyAuthorDid = ''
   if (record.reply) {
     const urip = new AtUri(record.reply.parent?.uri || record.reply.root.uri)

@@ -715,9 +715,10 @@ export function formatPostView(
           }
         : undefined,
     },
-    embed: post.embed
-      ? transformPrivateEmbed(post.embed, post.authorDid, baseUrl, quotedPost)
-      : undefined,
+    embed:
+      baseUrl && post.embed
+        ? transformPrivateEmbed(post.embed, post.authorDid, baseUrl, quotedPost)
+        : undefined,
     replyCount: 0,
     repostCount: 0,
     likeCount: 0,
