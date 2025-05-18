@@ -1,6 +1,10 @@
 import {AppBskyNotificationListNotifications, BskyAgent} from '@atproto/api'
 
-import {fetchProfiles, profileToAuthorView} from '#/lib/api/feed/private-posts'
+import {
+  EncryptedPost,
+  fetchProfiles,
+  profileToAuthorView,
+} from '#/lib/api/feed/private-posts'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 
 export type PrivateNotification = {
@@ -17,6 +21,7 @@ export type PrivateNotification = {
   record: any
 
   author: AppBskyNotificationListNotifications.Notification['author']
+  post?: EncryptedPost
 }
 
 type PrivateNotificationResponse = {

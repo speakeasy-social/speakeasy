@@ -329,16 +329,42 @@ function getSubjectUri(
 function formatPrivateNotification(
   notif: PrivateNotification,
 ): AppBskyNotificationListNotifications.Notification {
+  let formattedNotification
+
+  if (notif.reason === 'reply') {
+    formattedNotification = {
+      ...notif,
+      uri: notif.post?.uri || 'at://undefined',
+      record: {
+        $type: `app.bsky.feed.post`,
+        reply: {
+          root: {
+            uri: notif.post?.reply?.root.uri,
+          },
+          parent: {
+            uri: notif.post?.reply?.parent.uri,
+          },
+        },
+        createdAt: notif.post?.createdAt,
+      },
+    }
+  } else if (notif.reason === 'like') {
+    formattedNotification = {
+      ...notif,
+      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
+      record: {
+        $type: `app.bsky.feed.like`,
+        subject: {
+          uri: notif.reasonSubject,
+          validationStatus: 'valid',
+        },
+      },
+    }
+  }
+
   return {
     ...notif,
-    //      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
-    record: {
-      $type: 'app.bsky.feed.like',
-      subject: {
-        uri: notif.reasonSubject,
-        validationStatus: 'valid',
-      },
-    },
     isPrivate: true,
+    ...formattedNotification,
   }
 }
