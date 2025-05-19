@@ -168,6 +168,7 @@ let NotificationFeedItem = ({
             }
           }
           hideTopBorder={hideTopBorder}
+          hasReply={item.type === 'reply'}
         />
       </Link>
     )

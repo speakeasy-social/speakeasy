@@ -705,12 +705,16 @@ export function formatPostView(
             root: {
               uri: post.reply.root.uri,
               // FIXME, should be the post's cid, but any valid cid will do
-              cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+              cid:
+                post.reply.root.uri &&
+                'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
             },
             parent: {
               uri: post.reply.parent.uri,
               // FIXME, should be the post's cid, but any valid cid will do
-              cid: 'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
+              cid:
+                post.reply.parent.uri &&
+                'bafyreichsn5zvtlqksg6ojq3ih2yx646mzwhvopejmefat7m5f5fdlvgdi',
             },
           }
         : undefined,

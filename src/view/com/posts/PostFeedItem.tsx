@@ -423,6 +423,7 @@ let FeedItemInner = ({
                 blocked={isParentBlocked}
                 notFound={isParentNotFound}
                 profile={parentAuthor}
+                post={post}
               />
             )}
           <LabelsOnMyPost post={post} />
@@ -576,27 +577,32 @@ function ReplyToLabel({
   profile,
   blocked,
   notFound,
+  post,
 }: {
   profile: AppBskyActorDefs.ProfileViewBasic | undefined
   blocked?: boolean
   notFound?: boolean
+  post: AppBskyFeedDefs.PostView
 }) {
   const pal = usePalette('default')
   const {currentAccount} = useSession()
 
+  const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const replyLabel = isPrivate ? 'Private reply:' : 'Reply'
+
   let label
   if (blocked) {
-    label = <Trans context="description">Reply to a blocked post</Trans>
+    label = <Trans context="description">{replyLabel} to a blocked post</Trans>
   } else if (notFound) {
-    label = <Trans context="description">Reply to a post</Trans>
+    label = <Trans context="description">{replyLabel} to a post</Trans>
   } else if (profile != null) {
     const isMe = profile.did === currentAccount?.did
     if (isMe) {
-      label = <Trans context="description">Reply to you</Trans>
+      label = <Trans context="description">{replyLabel} to you</Trans>
     } else {
       label = (
         <Trans context="description">
-          Reply to{' '}
+          {replyLabel} to{' '}
           <ProfileHoverCard inline did={profile.did}>
             <TextLinkOnWebOnly
               type="md"
