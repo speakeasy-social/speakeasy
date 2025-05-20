@@ -1,4 +1,5 @@
 import {
+  AppBskyActorDefs,
   AppBskyFeedDefs,
   AppBskyFeedLike,
   AppBskyFeedPost,
@@ -268,11 +269,23 @@ async function fetchSubjects(
     }
   }
 
+  const authorProfileMap = new Map<string, AppBskyActorDefs.ProfileViewBasic>(
+    groupedNotifs.map(notif => [
+      notif.notification.author.did,
+      notif.notification.author,
+    ]),
+  )
+
   const privatePosts = await privatePostsPromise
 
   // Merge private posts into the posts map
   for (const post of privatePosts) {
-    const postView = formatPostView(post, undefined, '', undefined)
+    const postView = formatPostView(
+      post,
+      authorProfileMap.get(post.authorDid),
+      '',
+      undefined,
+    )
     if (post.uri) {
       postsMap.set(post.uri, postView)
     }
@@ -329,16 +342,34 @@ function getSubjectUri(
 function formatPrivateNotification(
   notif: PrivateNotification,
 ): AppBskyNotificationListNotifications.Notification {
+  let formattedNotification
+
+  if (notif.reason === 'reply') {
+    formattedNotification = {
+      ...notif,
+      uri: notif.reasonSubject,
+      record: {
+        $type: `app.bsky.feed.post`,
+        author: notif.author,
+      },
+    }
+  } else if (notif.reason === 'like') {
+    formattedNotification = {
+      ...notif,
+      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
+      record: {
+        $type: `app.bsky.feed.like`,
+        subject: {
+          uri: notif.reasonSubject,
+          validationStatus: 'valid',
+        },
+      },
+    }
+  }
+
   return {
     ...notif,
-    //      uri: `at://${notif.author.did}/social.spkeasy.feed.like/${notif.createdAt}`,
-    record: {
-      $type: 'app.bsky.feed.like',
-      subject: {
-        uri: notif.reasonSubject,
-        validationStatus: 'valid',
-      },
-    },
     isPrivate: true,
+    ...formattedNotification,
   }
 }

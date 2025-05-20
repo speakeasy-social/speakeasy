@@ -36,6 +36,7 @@ import {forceLTR} from '#/lib/strings/bidi'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {sanitizeHandle} from '#/lib/strings/handles'
 import {niceDate} from '#/lib/strings/time'
+import {postUriToRelativePath} from '#/lib/strings/url-helpers'
 import {colors, s} from '#/lib/styles'
 import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
@@ -95,14 +96,12 @@ let NotificationFeedItem = ({
   const itemHref = useMemo(() => {
     if (item.type === 'post-like' || item.type === 'repost') {
       if (item.subjectUri) {
-        const urip = new AtUri(item.subjectUri)
-        return `/profile/${urip.host}/post/${urip.rkey}`
+        return postUriToRelativePath(item.subjectUri) || ''
       }
     } else if (item.type === 'follow') {
       return makeProfileLink(item.notification.author)
     } else if (item.type === 'reply') {
-      const urip = new AtUri(item.notification.uri)
-      return `/profile/${urip.host}/post/${urip.rkey}`
+      return postUriToRelativePath(item.notification.uri) || ''
     } else if (
       item.type === 'feedgen-like' ||
       item.type === 'starterpack-joined'
@@ -169,6 +168,7 @@ let NotificationFeedItem = ({
             }
           }
           hideTopBorder={hideTopBorder}
+          hasReply={item.type === 'reply'}
         />
       </Link>
     )

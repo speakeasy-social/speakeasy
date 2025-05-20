@@ -280,11 +280,11 @@ async function resolveReply(
     const encryptedPost = encryptedPosts.encryptedPosts[0]
     return {
       root: {
-        uri: encryptedPost.uri,
+        uri: encryptedPost.reply?.root.uri || encryptedPost.uri,
         cid: 'fixme-calculate-cid',
       },
       parent: {
-        uri: encryptedPost.reply?.root.uri || encryptedPost.uri,
+        uri: encryptedPost.uri,
         cid: 'fixme-calculate-cid',
       },
     }

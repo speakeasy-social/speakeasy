@@ -101,6 +101,7 @@ function PostInner({
   showReplyLine,
   hideTopBorder,
   style,
+  hasReply,
 }: {
   post: Shadow<AppBskyFeedDefs.PostView>
   record: AppBskyFeedPost.Record
@@ -109,6 +110,7 @@ function PostInner({
   showReplyLine?: boolean
   hideTopBorder?: boolean
   style?: StyleProp<ViewStyle>
+  hasReply?: boolean
 }) {
   const queryClient = useQueryClient()
   const pal = usePalette('default')
@@ -118,7 +120,13 @@ function PostInner({
     () => countLines(richText?.text) >= MAX_POST_LINES,
   )
   const itemUrip = new AtUri(post.uri)
-  const itemHref = makeProfileLink(post.author, 'post', itemUrip.rkey)
+  const isPrivatePost =
+    post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const itemHref = makeProfileLink(
+    post.author,
+    isPrivatePost ? 'private-post' : 'post',
+    itemUrip.rkey,
+  )
   let replyAuthorDid = ''
   if (record.reply) {
     const urip = new AtUri(record.reply.parent?.uri || record.reply.root.uri)
@@ -149,6 +157,8 @@ function PostInner({
   const {currentAccount} = useSession()
   const isMe = replyAuthorDid === currentAccount?.did
 
+  const isPrivate = post.$type === 'social.spkeasy.feed.defs#privatePostView'
+  const replyLabel = isPrivate ? 'Private reply' : 'Reply'
   const [hover, setHover] = React.useState(false)
   return (
     <Link
@@ -186,7 +196,7 @@ function PostInner({
             timestamp={post.indexedAt}
             postHref={itemHref}
           />
-          {replyAuthorDid !== '' && (
+          {hasReply && (
             <View style={[s.flexRow, s.mb2, s.alignCenter]}>
               <FontAwesomeIcon
                 icon="reply"
@@ -199,10 +209,12 @@ function PostInner({
                 lineHeight={1.2}
                 numberOfLines={1}>
                 {isMe ? (
-                  <Trans context="description">Reply to you</Trans>
+                  <Trans context="description">{replyLabel} to you</Trans>
+                ) : replyAuthorDid === '' ? (
+                  <Trans context="description">{replyLabel} to post</Trans>
                 ) : (
                   <Trans context="description">
-                    Reply to{' '}
+                    {replyLabel} to{' '}
                     <ProfileHoverCard inline did={replyAuthorDid}>
                       <UserInfoText
                         type="sm"
