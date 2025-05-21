@@ -6,6 +6,7 @@ import {
 import {QueryClient} from '@tanstack/react-query'
 
 import {decryptBatch, decryptDEK, encryptContent} from '#/lib/encryption'
+import {type PronounSet} from '#/state/queries/pronouns'
 import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
 import {
@@ -34,6 +35,7 @@ export type PrivateProfileData = {
   bannerUri?: string // resolved CDN URL (for display)
   rawAvatarUri?: string // original Speakeasy media key (for _privateProfile metadata)
   rawBannerUri?: string // original Speakeasy media key (for _privateProfile metadata)
+  pronouns?: string | PronounSet[] // < 2 sets = string, >= 2 sets = PronounSet[]
 }
 
 /**
@@ -345,12 +347,23 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
     return atprotoProfile
   }
 
+  // Derive native pronouns string from private data
+  let nativePronouns: string | undefined
+  if (privateData.pronouns) {
+    if (Array.isArray(privateData.pronouns)) {
+      nativePronouns = privateData.pronouns[0]?.forms.join('/') || undefined
+    } else {
+      nativePronouns = privateData.pronouns
+    }
+  }
+
   return {
     ...atprotoProfile,
     displayName: privateData.displayName,
     description: privateData.description,
     avatar: privateData.avatarUri ?? atprotoProfile.avatar,
     banner: privateData.bannerUri ?? atprotoProfile.banner,
+    ...(nativePronouns !== undefined ? {pronouns: nativePronouns} : {}),
   }
 }
 
@@ -520,6 +533,7 @@ export async function savePrivateProfile(
     newBanner?: NewMedia | null
     existingAvatarUri?: string
     existingBannerUri?: string
+    pronouns?: string | PronounSet[]
   },
 ): Promise<void> {
   const {isPublic} = profileData
@@ -552,6 +566,7 @@ export async function savePrivateProfile(
     newBanner,
     existingAvatarUri,
     existingBannerUri,
+    pronouns,
   } = profileData
 
   // Resolve avatar URI
@@ -614,6 +629,7 @@ export async function savePrivateProfile(
     description,
     avatarUri,
     bannerUri,
+    pronouns,
   }
   const encryptedContent = await encryptProfileData(privateData, sessionKey)
 

@@ -46,7 +46,8 @@ export function upsertCachedPrivateProfiles(
       existing.avatarUri !== data.avatarUri ||
       existing.bannerUri !== data.bannerUri ||
       existing.rawAvatarUri !== data.rawAvatarUri ||
-      existing.rawBannerUri !== data.rawBannerUri
+      existing.rawBannerUri !== data.rawBannerUri ||
+      JSON.stringify(existing.pronouns) !== JSON.stringify(data.pronouns)
     ) {
       cache.set(did, data)
       changed = true

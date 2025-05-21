@@ -4,6 +4,10 @@ import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 
 import {retry} from '#/lib/async/retry'
 import {useWarnMaxGraphemeCount} from '#/lib/strings/helpers'
+import {
+  getCachedPrivateProfile,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {STALE} from '#/state/queries'
 import {useAgent} from '#/state/session'
 
@@ -262,19 +266,32 @@ export function useEditablePronouns(
   profile: AppBskyActorDefs.ProfileViewDetailed,
 ) {
   const nativePronouns = getProfilePronouns(profile) || ''
+  const cacheVersion = usePrivateProfileCacheVersion()
+  const privateEditablePronouns = useMemo(() => {
+    const cached = getCachedPrivateProfile(profile.did)
+    if (!cached?.pronouns) return undefined
+    if (Array.isArray(cached.pronouns)) {
+      return formatPronounSetsForEditing({sets: cached.pronouns})
+    }
+    return cached.pronouns
+  }, [profile.did, cacheVersion]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const {data: editablePronouns} = useEditablePronounsQuery({
     did: profile.did,
     nativePronouns,
   })
+
+  const effectiveEditable = privateEditablePronouns ?? editablePronouns
+
   const [pronouns, setPronouns] = useState('')
   const [initialPronouns, setInitialPronouns] = useState('')
 
   useEffect(() => {
-    if (editablePronouns !== undefined) {
-      setPronouns(editablePronouns)
-      setInitialPronouns(editablePronouns)
+    if (effectiveEditable !== undefined) {
+      setPronouns(effectiveEditable)
+      setInitialPronouns(effectiveEditable)
     }
-  }, [editablePronouns])
+  }, [effectiveEditable])
 
   const parsedSets = useMemo(() => parsePronounsInput(pronouns), [pronouns])
   const nativePronounsValue = useMemo(

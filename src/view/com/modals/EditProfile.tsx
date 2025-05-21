@@ -25,7 +25,10 @@ import {useTheme} from '#/lib/ThemeContext'
 import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
 import {useModalControls} from '#/state/modals'
-import {useProfileUpdateMutation} from '#/state/queries/profile'
+import {
+  type ProfileViewDetailedWithPrivate,
+  useProfileUpdateMutation,
+} from '#/state/queries/profile'
 import {
   setProfilePronouns,
   useEditablePronouns,
@@ -35,6 +38,10 @@ import {Text} from '#/view/com/util/text/Text'
 import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
 import {UserBanner} from '#/view/com/util/UserBanner'
+import {Admonition} from '#/components/Admonition'
+import {Button, ButtonIcon, ButtonText} from '#/components/Button'
+import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
+import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {ErrorMessage} from '../util/error/ErrorMessage'
 
 const AnimatedTouchableOpacity =
@@ -56,12 +63,18 @@ export function Component({
   const updateMutation = useProfileUpdateMutation()
   const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState<string>('')
+  const privateProfileMeta = (profile as ProfileViewDetailedWithPrivate)
+    ._privateProfile
   const [displayName, setDisplayName] = useState<string>(
     profile.displayName || '',
   )
   const [description, setDescription] = useState<string>(
     profile.description || '',
   )
+  const [isPrivate, setIsPrivate] = useState(
+    privateProfileMeta?.isPrivate ?? false,
+  )
+  const [publicDescription, setPublicDescription] = useState('')
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -135,16 +148,24 @@ export function Component({
           existing = existing || {}
           existing.displayName = displayName
           existing.description = description
-          setProfilePronouns(existing, nativePronounsValue)
+          if (!isPrivate) setProfilePronouns(existing, nativePronounsValue)
           return existing
         },
         newUserAvatar,
         newUserBanner,
+        isPrivate,
+        existingPrivateAvatarUri: privateProfileMeta?.avatarUri,
+        existingPrivateBannerUri: privateProfileMeta?.bannerUri,
+        pronouns: {native: nativePronounsValue, sets: parsedSets},
+        privateDisplayName: displayName,
+        privateDescription: description,
       })
-      await savePronounsMutation.mutateAsync({
-        did: profile.did,
-        sets: parsedSets,
-      })
+      if (!isPrivate) {
+        await savePronounsMutation.mutateAsync({
+          did: profile.did,
+          sets: parsedSets,
+        })
+      }
       Toast.show(_(msg`Profile updated`))
       onUpdate?.()
       closeModal()
@@ -162,6 +183,8 @@ export function Component({
     nativePronounsValue,
     parsedSets,
     pronounsTooLong,
+    isPrivate,
+    publicDescription,
     newUserAvatar,
     newUserBanner,
     setImageError,
@@ -198,6 +221,38 @@ export function Component({
           </View>
         )}
         <View style={styles.form}>
+          <View style={[s.pb10]}>
+            <View style={[styles.toggleContainer]}>
+              <Text style={[styles.label, pal.text]}>
+                <Trans>Profile Visibility</Trans>
+              </Text>
+              <Button
+                variant="solid"
+                color="secondary"
+                onPress={() => setIsPrivate(!isPrivate)}
+                style={[
+                  styles.visibilityButton,
+                  isPrivate ? styles.private : styles.public,
+                ]}
+                accessibilityHint={_(
+                  msg`Choose to make your profile visible publicly, or only to people you trust`,
+                )}
+                accessibilityLabel={isPrivate ? _('Private') : _('Public')}
+                label={isPrivate ? _('Private') : _('Public')}>
+                <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
+                <ButtonText style={styles.visibilityButtonText}>
+                  {isPrivate ? _('Private') : _('Public')}
+                </ButtonText>
+              </Button>
+            </View>
+            <Admonition type="info">
+              {isPrivate
+                ? _(
+                    'Only those you trust can see your name, description, avatar and banner',
+                  )
+                : _('Your profile is visible to everyone')}
+            </Admonition>
+          </View>
           <View>
             <Text style={[styles.label, pal.text]}>
               <Trans>Display Name</Trans>
@@ -250,6 +305,31 @@ export function Component({
               accessibilityHint={_(msg`Edit your pronouns`)}
             />
           </View>
+
+          {isPrivate && (
+            <View style={s.pb10}>
+              <Text style={[styles.label, pal.text]}>
+                <Trans>Public Description</Trans>
+              </Text>
+              <TextInput
+                testID="editProfilePublicDescriptionInput"
+                style={[styles.textArea, pal.border, pal.text]}
+                placeholder={_(
+                  msg`This profile is private and only visible on @spkeasy.social`,
+                )}
+                placeholderTextColor={colors.gray4}
+                keyboardAppearance={theme.colorScheme}
+                multiline
+                value={publicDescription}
+                onChangeText={setPublicDescription}
+                accessible={true}
+                accessibilityLabel={_(msg`Public description`)}
+                accessibilityHint={_(
+                  msg`A description of your profile visible to everyone`,
+                )}
+              />
+            </View>
+          )}
           {updateMutation.isPending ? (
             <View style={[styles.btn, s.mt10, {backgroundColor: colors.gray2}]}>
               <ActivityIndicator />
@@ -351,4 +431,25 @@ const styles = StyleSheet.create({
     marginHorizontal: -14,
   },
   errorContainer: {marginTop: 20},
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  visibilityButton: {
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    minWidth: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  visibilityButtonText: {
+    fontWeight: '600',
+    fontSize: 15,
+    marginLeft: 6,
+  },
+  private: {},
+  public: {},
 })

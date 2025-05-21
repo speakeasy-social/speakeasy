@@ -1,4 +1,4 @@
-import {useCallback} from 'react'
+import {useCallback, useMemo} from 'react'
 import {Image as RNImage} from 'react-native-image-crop-picker'
 import {
   AppBskyActorDefs,
@@ -41,7 +41,9 @@ import {
   isDidChecked,
   markDidsChecked,
   upsertCachedPrivateProfiles,
+  usePrivateProfileCacheVersion,
 } from '#/state/cache/private-profile-cache'
+import {type PronounSet} from '#/state/queries/pronouns'
 import {Shadow} from '#/state/cache/types'
 import {
   addCachedFollowerDid,
@@ -104,8 +106,9 @@ export function useProfileQuery({
   const queryClient = useQueryClient()
   const agent = useAgent()
   const {currentAccount} = useSession()
+  const privateProfileCacheVersion = usePrivateProfileCacheVersion()
 
-  return useQuery<ProfileViewDetailedWithPrivate>({
+  const query = useQuery<ProfileViewDetailedWithPrivate>({
     // WARNING
     // this staleTime is load-bearing
     // if you remove it, the UI infinite-loops
@@ -171,8 +174,12 @@ export function useProfileQuery({
           }
         } else {
           // NotFound (getPrivateProfile returns null for 404)
-          evictDid(did ?? '')
-          markDidsChecked([did ?? ''])
+          // When AT Proto shows the private sentinel, do not cache "no private profile"
+          // so a later refetch can succeed.
+          if (result.displayName !== 'Private Profile') {
+            evictDid(did ?? '')
+            markDidsChecked([did ?? ''])
+          }
           result._privateProfile = {isPrivate: false}
         }
       } catch {
@@ -192,6 +199,28 @@ export function useProfileQuery({
     },
     enabled: !!did,
   })
+
+  // Re-merge with private profile cache when it updates (e.g. filled by feed or
+  // another component), so the profile screen updates without refetching.
+  const data = useMemo(() => {
+    const base = query.data
+    if (!base || !did) return base
+    const cached = getCachedPrivateProfile(did)
+    if (!cached) return base
+    const merged = mergePrivateProfileData(base, cached)
+    const withMeta: ProfileViewDetailedWithPrivate = {
+      ...merged,
+      _privateProfile: {
+        isPrivate: true,
+        avatarUri: cached.rawAvatarUri,
+        bannerUri: cached.rawBannerUri,
+      },
+    }
+    return withMeta
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- privateProfileCacheVersion forces re-merge when cache updates
+  }, [query.data, privateProfileCacheVersion, did])
+
+  return {...query, data}
 }
 
 export function useProfilesQuery({handles}: {handles: string[]}) {
@@ -308,6 +337,13 @@ interface ProfileUpdateParams {
   isPrivate?: boolean
   existingPrivateAvatarUri?: string // Speakeasy media key for migration
   existingPrivateBannerUri?: string // Speakeasy media key for migration
+  pronouns?: {
+    native: string // first set as "she/her"
+    sets: PronounSet[] // all parsed sets
+  }
+  // Explicit values for private profile storage (needed when updates is a function)
+  privateDisplayName?: string
+  privateDescription?: string
 }
 export function useProfileUpdateMutation() {
   const queryClient = useQueryClient()
@@ -322,6 +358,9 @@ export function useProfileUpdateMutation() {
       isPrivate,
       existingPrivateAvatarUri,
       existingPrivateBannerUri,
+      pronouns,
+      privateDisplayName,
+      privateDescription,
     }) => {
       // Create call function for Speakeasy API
       const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
@@ -332,11 +371,20 @@ export function useProfileUpdateMutation() {
         // 1. Save to Speakeasy first (handles media upload internally)
         // 2. Then anonymize ATProto profile
 
+        // Determine pronouns value for private storage
+        let privatePronouns: string | PronounSet[] | undefined
+        if (pronouns) {
+          privatePronouns =
+            pronouns.sets.length >= 2 ? pronouns.sets : pronouns.native
+        }
+
         await savePrivateProfile(agent, call, queryClient, {
           displayName:
-            typeof updates === 'function' ? '' : updates.displayName || '',
+            privateDisplayName ??
+            (typeof updates === 'function' ? '' : updates.displayName || ''),
           description:
-            typeof updates === 'function' ? '' : updates.description || '',
+            privateDescription ??
+            (typeof updates === 'function' ? '' : updates.description || ''),
           isPublic: false,
           newAvatar: newUserAvatar
             ? {path: newUserAvatar.path, mime: newUserAvatar.mime}
@@ -344,25 +392,44 @@ export function useProfileUpdateMutation() {
           newBanner: newUserBanner
             ? {path: newUserBanner.path, mime: newUserBanner.mime}
             : newUserBanner,
-          // If no new avatar, pass the existing ATProto avatar for migration
+          // If no new avatar, prefer the raw Speakeasy media key (avoids
+          // re-downloading CDN URLs for already-private profiles), falling
+          // back to the ATProto avatar for first-time private migration.
           existingAvatarUri:
             newUserAvatar === undefined
-              ? (profile.avatar as string | undefined)
+              ? (existingPrivateAvatarUri ??
+                (profile.avatar as string | undefined))
               : undefined,
           existingBannerUri:
             newUserBanner === undefined
-              ? (profile.banner as string | undefined)
+              ? (existingPrivateBannerUri ??
+                (profile.banner as string | undefined))
               : undefined,
+          pronouns: privatePronouns,
         })
 
-        // Anonymize ATProto profile
+        // Anonymize ATProto profile (clears native pronouns field)
         const anonymized = anonymizeAtProtoProfile()
-        await agent.upsertProfile(() => ({
+        await agent.upsertProfile(existing => ({
+          ...existing,
           displayName: anonymized.displayName,
           description: anonymized.description,
           avatar: undefined,
           banner: undefined,
         }))
+
+        // Delete extended pronouns AT Proto record
+        try {
+          await agent.api.com.atproto.repo.deleteRecord({
+            repo: profile.did,
+            collection: 'app.nearhorizon.actor.pronouns',
+            rkey: 'self',
+          })
+        } catch (e: any) {
+          if (!e.message?.includes('Could not locate record')) {
+            throw e
+          }
+        }
 
         await whenAppViewReady(agent, profile.did, res => {
           return (
@@ -491,11 +558,46 @@ export function useProfileUpdateMutation() {
       }
     },
     onSuccess(data, variables) {
-      // Evict from private profile cache so next query re-fetches from API
-      evictDid(variables.profile.did)
+      const did = variables.profile.did
+      if (variables.isPrivate) {
+        // Optimistically upsert the private profile we just saved so the refetch
+        // uses cache instead of calling getPrivateProfile (avoids race where
+        // Speakeasy isn't ready yet and we'd show "Private Profile").
+        const displayName =
+          variables.privateDisplayName ??
+          (typeof variables.updates === 'function'
+            ? ''
+            : variables.updates.displayName || '')
+        const description =
+          variables.privateDescription ??
+          (typeof variables.updates === 'function'
+            ? ''
+            : variables.updates.description || '')
+        let pronouns: string | PronounSet[] | undefined
+        if (variables.pronouns) {
+          pronouns =
+            variables.pronouns.sets.length >= 2
+              ? variables.pronouns.sets
+              : variables.pronouns.native
+        }
+        const raw: PrivateProfileData = {
+          displayName,
+          description,
+          avatarUri: variables.existingPrivateAvatarUri,
+          bannerUri: variables.existingPrivateBannerUri,
+          pronouns,
+        }
+        const baseUrl = getBaseCdnUrl(agent)
+        const resolved = resolvePrivateProfileUrls(raw, baseUrl)
+        upsertCachedPrivateProfiles(new Map([[did, resolved]]))
+        markDidsChecked([did])
+      } else {
+        // Evict from private profile cache so next query re-fetches from API
+        evictDid(did)
+      }
       // invalidate cache
       queryClient.invalidateQueries({
-        queryKey: RQKEY(variables.profile.did),
+        queryKey: RQKEY(did),
       })
     },
   })
