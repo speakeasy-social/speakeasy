@@ -418,8 +418,7 @@ export async function fetchEncryptedPostThread(
   cursor: string
   encryptedPost: EncryptedPost
   encryptedReplyPosts: EncryptedPost[]
-  encryptedParentPost?: EncryptedPost
-  encryptedRootPost?: EncryptedPost
+  encryptedParentPosts: EncryptedPost[]
   encryptedSessionKeys: {
     sessionId: string
     encryptedDek: string
@@ -751,10 +750,7 @@ export function profileToAuthorView(
     handle: profile?.handle || authorDid,
     avatar: profile?.avatar || '',
     displayName: profile?.displayName || authorDid,
-    viewer: {
-      muted: false,
-      blockedBy: false,
-    },
+    viewer: profile?.viewer,
     labels: [],
   }
 }

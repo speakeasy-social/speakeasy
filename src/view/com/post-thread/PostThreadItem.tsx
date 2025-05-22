@@ -39,6 +39,7 @@ import {formatCount} from '#/view/com/util/numeric/format'
 import {PostCtrls} from '#/view/com/util/post-ctrls/PostCtrls'
 import {PostEmbeds, PostEmbedViewContext} from '#/view/com/util/post-embeds'
 import {PostMeta} from '#/view/com/util/PostMeta'
+import {PrivatePostPill} from '#/view/com/util/PrivatePostPill'
 import {PreviewableUserAvatar} from '#/view/com/util/UserAvatar'
 import {atoms as a, useTheme} from '#/alf'
 import {colors} from '#/components/Admonition'
@@ -337,16 +338,28 @@ let PostThreadItemLoaded = ({
             />
             <View style={[a.flex_1]}>
               <Link style={s.flex1} href={authorHref} title={authorTitle}>
-                <Text
-                  emoji
-                  style={[a.text_lg, a.font_bold, a.leading_snug, a.self_start]}
-                  numberOfLines={1}>
-                  {sanitizeDisplayName(
-                    post.author.displayName ||
-                      sanitizeHandle(post.author.handle),
-                    moderation.ui('displayName'),
+                <View
+                  style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                  <Text
+                    emoji
+                    style={[
+                      a.text_lg,
+                      a.font_bold,
+                      a.leading_snug,
+                      a.self_start,
+                    ]}
+                    numberOfLines={1}>
+                    {sanitizeDisplayName(
+                      post.author.displayName ||
+                        sanitizeHandle(post.author.handle),
+                      moderation.ui('displayName'),
+                    )}
+                  </Text>
+                  {post.$type ===
+                    'social.spkeasy.feed.defs#privatePostView' && (
+                    <PrivatePostPill />
                   )}
-                </Text>
+                </View>
               </Link>
               <Link style={s.flex1} href={authorHref} title={authorTitle}>
                 <Text
