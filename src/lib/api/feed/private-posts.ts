@@ -751,10 +751,7 @@ export function profileToAuthorView(
     handle: profile?.handle || authorDid,
     avatar: profile?.avatar || '',
     displayName: profile?.displayName || authorDid,
-    viewer: {
-      muted: false,
-      blockedBy: false,
-    },
+    viewer: profile?.viewer,
     labels: [],
   }
 }
