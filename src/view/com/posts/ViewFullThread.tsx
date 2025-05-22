@@ -20,7 +20,12 @@ export function ViewFullThread({uri}: {uri: string}) {
   const pal = usePalette('default')
   const itemHref = React.useMemo(() => {
     const urip = new AtUri(uri)
-    return makeProfileLink({did: urip.hostname, handle: ''}, 'post', urip.rkey)
+    const isPrivatePost = uri.includes('/social.spkeasy.feed.privatePost/')
+    return makeProfileLink(
+      {did: urip.hostname, handle: ''},
+      isPrivatePost ? 'private-post' : 'post',
+      urip.rkey,
+    )
   }, [uri])
 
   return (
