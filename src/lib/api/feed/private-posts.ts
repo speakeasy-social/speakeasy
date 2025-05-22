@@ -418,8 +418,7 @@ export async function fetchEncryptedPostThread(
   cursor: string
   encryptedPost: EncryptedPost
   encryptedReplyPosts: EncryptedPost[]
-  encryptedParentPost?: EncryptedPost
-  encryptedRootPost?: EncryptedPost
+  encryptedParentPosts: EncryptedPost[]
   encryptedSessionKeys: {
     sessionId: string
     encryptedDek: string

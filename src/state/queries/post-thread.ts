@@ -119,8 +119,7 @@ export function usePostThreadQuery(uri: string | undefined) {
         const {
           cursor,
           encryptedPost,
-          encryptedParentPost,
-          encryptedRootPost,
+          encryptedParentPosts,
           encryptedReplyPosts,
           encryptedSessionKeys,
         } = await fetchEncryptedPostThread(agent, uri, {})
@@ -128,13 +127,13 @@ export function usePostThreadQuery(uri: string | undefined) {
         // FIXME if encryptedPost has bsky parent or root,
         // we need to fetch them
 
-        const allEncryptedPosts = [encryptedPost, ...encryptedReplyPosts]
-        if (encryptedParentPost) {
-          allEncryptedPosts.push(encryptedParentPost)
-        }
-        if (encryptedRootPost) {
-          allEncryptedPosts.push(encryptedRootPost)
-        }
+        const allEncryptedPosts = [
+          ...encryptedReplyPosts,
+          encryptedPost,
+          ...encryptedParentPosts,
+        ]
+
+        const encryptedPostIndex = encryptedReplyPosts.length
 
         const {posts: allPosts, authorProfileMap} =
           await decryptPostsAndFetchAuthorProfiles(
@@ -143,10 +142,9 @@ export function usePostThreadQuery(uri: string | undefined) {
             encryptedSessionKeys,
           )
 
-        let rootPost = encryptedRootPost ? allPosts.pop() : null
-        let parentPost = encryptedParentPost ? allPosts.pop() : null
+        const parentPosts = allPosts.splice(encryptedPostIndex + 1)
 
-        const threadPost = allPosts.shift()
+        const threadPost = allPosts.pop()
 
         if (!threadPost) {
           return {thread: {type: 'unknown', uri} as ThreadUnknown}
@@ -157,8 +155,7 @@ export function usePostThreadQuery(uri: string | undefined) {
         const thread = await formatPostsForThread(
           agent,
           threadPost,
-          parentPost || undefined,
-          rootPost || undefined,
+          parentPosts,
           replyPosts,
           authorProfileMap,
           cursor,
@@ -274,11 +271,33 @@ function nestReplies(
   return topLevelReplies
 }
 
+// Helper to build the parent chain for a thread
+function buildParentChain(
+  agent: BskyAgent,
+  parentPosts: DecryptedPost[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+): ThreadNode | undefined {
+  if (!parentPosts.length) return undefined
+  // Start from the furthest parent (root-most)
+  let parentNode: ThreadNode | undefined
+  for (let i = parentPosts.length - 1; i >= 0; i--) {
+    const post = parentPosts[i]
+    const node = formatThreadNode(
+      agent,
+      post,
+      authorProfileMap,
+      -1 - i,
+    ) as ThreadPost
+    node.parent = parentNode
+    parentNode = node
+  }
+  return parentNode
+}
+
 export async function formatPostsForThread(
   agent: BskyAgent,
   threadPost: DecryptedPost,
-  parentPost: DecryptedPost | undefined,
-  rootPost: DecryptedPost | undefined,
+  parentPosts: DecryptedPost[],
   replyPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
   hasMore: string | boolean,
@@ -299,9 +318,7 @@ export async function formatPostsForThread(
 
     post: formatPostView(threadPost, author, baseUrl, quotedPost),
     record: threadPost,
-    parent: parentPost
-      ? formatThreadNode(agent, parentPost, authorProfileMap, -1)
-      : undefined,
+    parent: buildParentChain(agent, parentPosts, authorProfileMap),
     replies: nestReplies(agent, threadPost, replyPosts, authorProfileMap),
     ctx: {
       depth: 0,

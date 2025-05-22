@@ -44,21 +44,25 @@ export function Post({
   showReplyLine,
   hideTopBorder,
   style,
+  hasReply,
 }: {
   post: AppBskyFeedDefs.PostView
   showReplyLine?: boolean
   hideTopBorder?: boolean
   style?: StyleProp<ViewStyle>
+  hasReply?: boolean
 }) {
   const moderationOpts = useModerationOpts()
-  const record = useMemo<AppBskyFeedPost.Record | undefined>(
-    () =>
-      AppBskyFeedPost.isRecord(post.record) &&
+  const record = useMemo<AppBskyFeedPost.Record | undefined>(() => {
+    // if (post.record?.reply?.parent && !post.record?.reply?.parent?.uri) post.record.reply.parent.uri = 'at://placeholder'
+    // Necessary for message to render properly when parent is missing
+    if (post.record?.reply?.parent && !post.record?.reply?.parent?.uri)
+      delete post.record.reply
+    return AppBskyFeedPost.isRecord(post.record) &&
       AppBskyFeedPost.validateRecord(post.record).success
-        ? post.record
-        : undefined,
-    [post],
-  )
+      ? post.record
+      : undefined
+  }, [post])
   const postShadowed = usePostShadow(post)
   const richText = useMemo(
     () =>
@@ -74,6 +78,14 @@ export function Post({
     () => (moderationOpts ? moderatePost(post, moderationOpts) : undefined),
     [moderationOpts, post],
   )
+  console.log(
+    'Post.tsx render?',
+    postShadowed === POST_TOMBSTONE,
+    record,
+    richText,
+    moderation,
+  )
+
   if (postShadowed === POST_TOMBSTONE) {
     return null
   }
@@ -87,6 +99,7 @@ export function Post({
         showReplyLine={showReplyLine}
         hideTopBorder={hideTopBorder}
         style={style}
+        hasReply={hasReply}
       />
     )
   }
