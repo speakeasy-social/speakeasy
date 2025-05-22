@@ -224,6 +224,56 @@ export function fillThreadModerationCache(
   }
 }
 
+// Helper to nest replies under their parent
+function nestReplies(
+  agent: BskyAgent,
+  threadPost: DecryptedPost,
+  replyPosts: DecryptedPost[],
+  authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+): ThreadNode[] {
+  // Map of uri -> ThreadNode
+  const nodeMap = new Map<string, ThreadNode>()
+  // Prepare all nodes (depth will be set later)
+  for (const reply of replyPosts) {
+    const node = formatThreadNode(agent, reply, authorProfileMap, 0)
+    nodeMap.set(reply.uri, node)
+  }
+  // Attach children to parents (do not set depth yet)
+  for (const reply of replyPosts) {
+    const parentUri = reply.reply?.parent?.uri
+    const node = nodeMap.get(reply.uri) as ThreadPost
+    if (parentUri && nodeMap.has(parentUri)) {
+      const parentNode = nodeMap.get(parentUri) as ThreadPost
+      if (!parentNode.replies) parentNode.replies = []
+      parentNode.replies.push(node)
+    }
+  }
+  // Top-level replies: those whose parent is the threadPost
+  const topLevelReplies: ThreadNode[] = []
+  for (const reply of replyPosts) {
+    const parentUri = reply.reply?.parent?.uri
+    if (parentUri === threadPost.uri) {
+      const node = nodeMap.get(reply.uri) as ThreadPost
+      topLevelReplies.push(node)
+    }
+  }
+  // Recursively set depth for all nodes
+  function setDepth(node: ThreadNode, depth: number) {
+    if (node.type === 'post') {
+      node.ctx.depth = depth
+      if (node.replies) {
+        for (const child of node.replies) {
+          setDepth(child, depth + 1)
+        }
+      }
+    }
+  }
+  for (const node of topLevelReplies) {
+    setDepth(node, 1)
+  }
+  return topLevelReplies
+}
+
 export async function formatPostsForThread(
   agent: BskyAgent,
   threadPost: DecryptedPost,
@@ -252,9 +302,7 @@ export async function formatPostsForThread(
     parent: parentPost
       ? formatThreadNode(agent, parentPost, authorProfileMap, -1)
       : undefined,
-    replies: replyPosts.map(reply =>
-      formatThreadNode(agent, reply, authorProfileMap, 1),
-    ),
+    replies: nestReplies(agent, threadPost, replyPosts, authorProfileMap),
     ctx: {
       depth: 0,
       isHighlightedPost: true,
