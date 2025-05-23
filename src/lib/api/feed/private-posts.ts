@@ -683,6 +683,7 @@ export function formatPostView(
       $type: 'app.bsky.feed.post',
       text: post.text,
       createdAt: post.createdAt,
+      indexedAt: post.createdAt,
       langs: post.langs || [],
       facets: post.facets || [],
 
@@ -749,7 +750,7 @@ export function profileToAuthorView(
     did: profile?.did || authorDid,
     handle: profile?.handle || authorDid,
     avatar: profile?.avatar || '',
-    displayName: profile?.displayName || authorDid,
+    displayName: profile?.displayName || profile?.handle || authorDid,
     viewer: profile?.viewer,
     labels: [],
   }

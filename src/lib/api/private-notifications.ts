@@ -26,14 +26,21 @@ export type PrivateNotification = {
 
 type PrivateNotificationResponse = {
   notifications: PrivateNotification[]
+  cursor: string | undefined
 }
 
 export async function listPrivateNotifications(
   agent: BskyAgent,
+  cursor: string | undefined,
+  limit: number,
 ): Promise<PrivateNotificationResponse> {
   const res = (await callSpeakeasyApiWithAgent(agent, {
     api: 'social.spkeasy.notification.listNotifications',
     method: 'GET',
+    query: {
+      cursor,
+      limit,
+    },
   })) as PrivateNotificationResponse
 
   // Fetch profiles for all notification authors
