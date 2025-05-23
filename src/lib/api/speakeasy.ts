@@ -52,7 +52,10 @@ export async function callSpeakeasyApiWithAgent(
           .map(v => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`)
           .join('&')
       }
-      return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+      if (typeof value !== 'undefined') {
+        return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+      }
+      return ''
     })
     .join('&')
   const url = `${serverUrl}/xrpc/${api}${queryString ? `?${queryString}` : ''}`
