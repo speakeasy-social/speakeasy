@@ -10,12 +10,16 @@ import {
   Props as FontAwesomeProps,
 } from '@fortawesome/react-native-fontawesome'
 
-const DURATION = 3500
+const TIMEOUT = 2000
+const LINKED_TIMEOUT = 20000
 
 interface ActiveToast {
   text: string
   icon: FontAwesomeProps['icon']
+  linkTitle?: string
+  onLinkPress?: () => void
 }
+
 type GlobalSetActiveToast = (_activeToast: ActiveToast | undefined) => void
 
 // globals
@@ -42,7 +46,19 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({}) => {
             size={20}
             style={styles.icon as FontAwesomeIconStyle}
           />
-          <Text style={styles.text}>{activeToast.text}</Text>
+          <View style={styles.content}>
+            <Text style={styles.text}>{activeToast.text}</Text>
+            {activeToast.linkTitle && (
+              <Text
+                style={styles.link}
+                onPress={() => {
+                  activeToast.onLinkPress?.()
+                  setActiveToast(undefined)
+                }}>
+                {activeToast.linkTitle}
+              </Text>
+            )}
+          </View>
           <Pressable
             style={styles.dismissBackdrop}
             accessibilityLabel="Dismiss"
@@ -60,14 +76,21 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({}) => {
 // methods
 // =
 
-export function show(text: string, icon: FontAwesomeProps['icon'] = 'check') {
+export function show(
+  text: string,
+  icon: FontAwesomeProps['icon'] = 'check',
+  options?: Omit<ActiveToast, 'text' | 'icon'>,
+) {
   if (toastTimeout) {
     clearTimeout(toastTimeout)
   }
-  globalSetActiveToast?.({text, icon})
-  toastTimeout = setTimeout(() => {
-    globalSetActiveToast?.(undefined)
-  }, DURATION)
+  globalSetActiveToast?.({text, icon, ...options})
+  toastTimeout = setTimeout(
+    () => {
+      globalSetActiveToast?.(undefined)
+    },
+    options?.onLinkPress ? LINKED_TIMEOUT : TIMEOUT,
+  )
 }
 
 const styles = StyleSheet.create({
@@ -85,6 +108,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#000c',
     borderRadius: 10,
   },
+  content: {
+    flex: 1,
+    marginLeft: 10,
+  },
   dismissBackdrop: {
     position: 'absolute',
     top: 0,
@@ -99,6 +126,10 @@ const styles = StyleSheet.create({
   text: {
     color: '#fff',
     fontSize: 18,
-    marginLeft: 10,
+  },
+  link: {
+    color: '#4dabf7',
+    fontSize: 18,
+    marginTop: 4,
   },
 })

@@ -1,4 +1,5 @@
 import React from 'react'
+import {View} from 'react-native'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useFocusEffect} from '@react-navigation/native'
@@ -13,8 +14,10 @@ import {useSetMinimalShellMode} from '#/state/shell'
 import {ProfileCardWithFollowBtn} from '#/view/com/profile/ProfileCard'
 import {List} from '#/view/com/util/List'
 import {ViewHeader} from '#/view/com/util/ViewHeader'
+import {atoms as a} from '#/alf'
 import * as Layout from '#/components/Layout'
 import {ListFooter, ListMaybePlaceholder} from '#/components/Lists'
+import {TrustActions} from '#/components/TrustActions'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Trusted'>
 
@@ -69,6 +72,24 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
   return (
     <Layout.Screen>
       <ViewHeader title={_(msg`Trusted Users`)} />
+      <View
+        style={[
+          a.flex_row,
+          a.gap_sm,
+          a.p_md,
+          {
+            flexDirection: 'row',
+            gap: 8,
+            width: '100%',
+            maxWidth: 600,
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+          },
+        ]}>
+        <TrustActions profiles={trustedProfiles} />
+      </View>
       <List
         data={trustedProfiles}
         renderItem={({item: profile}) => (
