@@ -1,5 +1,6 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
+import {mergeCursors, parseCursor} from '#/lib/api/cursor'
 import {PrivatePostsFeedAPI} from './private-posts'
 import {FeedAPI, FeedAPIResponse} from './types'
 
@@ -66,28 +67,6 @@ export class PrivatePostsWrapper implements FeedAPI {
       // If public posts fail, continue to wrapped feed
     }
     return this.privatePosts.peekLatest()
-  }
-
-  /**
-   * Parses a combined cursor string into separate cursors for private and wrapped feeds.
-   * @param {string | undefined} cursor - The combined cursor string in format "privateCursor|wrappedCursor"
-   */
-  private parseCursor(cursor: string | undefined): {
-    privateCursor: string | undefined
-    wrappedCursor: string | undefined
-  } {
-    let privateCursor: string | undefined
-    let wrappedCursor: string | undefined
-
-    if (cursor) {
-      const splitIndex = cursor.indexOf('|')
-      if (splitIndex !== -1) {
-        privateCursor = cursor.substring(0, splitIndex)
-        wrappedCursor = cursor.substring(splitIndex + 1)
-      }
-    }
-
-    return {privateCursor, wrappedCursor}
   }
 
   /**
@@ -211,7 +190,7 @@ export class PrivatePostsWrapper implements FeedAPI {
     do {
       try {
         // Parse the cursor into private and wrapped components
-        const {privateCursor, wrappedCursor} = this.parseCursor(cursor)
+        const [privateCursor, wrappedCursor] = parseCursor(cursor)
 
         // Fetch posts from both sources
         const [privatePostsRes, wrappedRes] = await this.fetchBothFeeds(
@@ -220,12 +199,7 @@ export class PrivatePostsWrapper implements FeedAPI {
           limit,
         )
 
-        // Combine cursors for next request
-        mergedCursor = `${privatePostsRes.cursor || 'EOF'}|${
-          wrappedRes.cursor || 'EOF'
-        }`
-
-        if (mergedCursor === 'EOF|EOF') mergedCursor = undefined
+        mergedCursor = mergeCursors(privatePostsRes.cursor, wrappedRes.cursor)
 
         // Merge the feeds
         mergedFeed = this.mergeFeeds(

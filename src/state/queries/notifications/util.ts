@@ -14,6 +14,7 @@ import {
 import {QueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
+import {mergeCursors, parseCursor} from '#/lib/api/cursor'
 import {
   decryptPosts,
   fetchEncryptedPosts,
@@ -56,15 +57,33 @@ export async function fetchPage({
   page: FeedPage
   indexedAt: string | undefined
 }> {
+  const [regularCursor, privateCursor] = parseCursor(cursor)
+
   // Fetch both regular and private notifications
   const [regularRes, privateRes] = await Promise.all([
-    agent.listNotifications({
-      limit,
-      cursor,
-      reasons,
-    }),
-    listPrivateNotifications(agent),
+    regularCursor === 'EOF'
+      ? Promise.resolve({
+          data: {
+            notifications: [],
+            cursor: 'EOF',
+            priority: false,
+            seenAt: null,
+          },
+        })
+      : agent.listNotifications({
+          limit,
+          cursor: regularCursor,
+          reasons,
+        }),
+    privateCursor === 'EOF'
+      ? Promise.resolve({
+          notifications: [],
+          cursor: 'EOF',
+        })
+      : listPrivateNotifications(agent, privateCursor, limit),
   ])
+
+  const mergedCursor = mergeCursors(regularRes.data.cursor, privateRes.cursor)
 
   const indexedAt = regularRes.data.notifications[0]?.indexedAt
 
@@ -118,7 +137,7 @@ export async function fetchPage({
 
   return {
     page: {
-      cursor: regularRes.data.cursor,
+      cursor: mergedCursor,
       seenAt,
       items: notifsGrouped,
       priority: regularRes.data.priority ?? false,
