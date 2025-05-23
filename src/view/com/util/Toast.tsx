@@ -26,28 +26,45 @@ import {useNonReactiveCallback} from '#/lib/hooks/useNonReactiveCallback'
 import {atoms as a, useTheme} from '#/alf'
 import {Text} from '#/components/Typography'
 
-const TIMEOUT = 2e3
+const TIMEOUT = 2000
+const LINKED_TIMEOUT = 20000
+
+type ToastOptions = {
+  message: string
+  icon?: FontAwesomeProps['icon']
+  linkTitle?: string
+  onLinkPress?: () => void
+}
 
 export function show(
   message: string,
   icon: FontAwesomeProps['icon'] = 'check',
+  options?: Omit<ToastOptions, 'message' | 'icon'>,
 ) {
   if (process.env.NODE_ENV === 'test') {
     return
   }
   AccessibilityInfo.announceForAccessibility(message)
   const item = new RootSiblings(
-    <Toast message={message} icon={icon} destroy={() => item.destroy()} />,
+    (
+      <Toast
+        message={message}
+        icon={icon}
+        linkTitle={options?.linkTitle}
+        onLinkPress={options?.onLinkPress}
+        destroy={() => item.destroy()}
+      />
+    ),
   )
 }
 
 function Toast({
   message,
   icon,
+  linkTitle,
+  onLinkPress,
   destroy,
-}: {
-  message: string
-  icon: FontAwesomeProps['icon']
+}: ToastOptions & {
   destroy: () => void
 }) {
   const t = useTheme()
@@ -64,14 +81,17 @@ function Toast({
   const hideAndDestroyImmediately = () => {
     setAlive(false)
     setTimeout(() => {
-      destroy()
+      // destroy()
     }, 1e3)
   }
 
   const destroyTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const hideAndDestroyAfterTimeout = useNonReactiveCallback(() => {
     clearTimeout(destroyTimeoutRef.current)
-    destroyTimeoutRef.current = setTimeout(hideAndDestroyImmediately, TIMEOUT)
+    destroyTimeoutRef.current = setTimeout(
+      hideAndDestroyImmediately,
+      onLinkPress ? LINKED_TIMEOUT : TIMEOUT,
+    )
   })
   const pauseDestroy = useNonReactiveCallback(() => {
     clearTimeout(destroyTimeoutRef.current)
@@ -153,6 +173,13 @@ function Toast({
     }
   })
 
+  const handleLinkPress = () => {
+    if (onLinkPress) {
+      onLinkPress()
+      destroy()
+    }
+  }
+
   return (
     <GestureHandlerRootView
       style={[a.absolute, {top: topOffset, left: 16, right: 16}]}
@@ -199,6 +226,13 @@ function Toast({
                   <Text style={a.text_md} emoji>
                     {message}
                   </Text>
+                  {linkTitle && (
+                    <Text
+                      style={[a.text_md, {color: t.palette.primary_500}]}
+                      onPress={handleLinkPress}>
+                      {linkTitle}
+                    </Text>
+                  )}
                 </View>
               </View>
             </GestureDetector>
