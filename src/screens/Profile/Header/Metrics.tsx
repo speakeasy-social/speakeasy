@@ -55,12 +55,6 @@ export function ProfileHeaderMetrics({
           {pluralizedFollowings}
         </Text>
       </InlineLinkText>
-      <Text style={[a.font_bold, t.atoms.text, a.text_md]}>
-        {formatCount(i18n, profile.postsCount || 0)}{' '}
-        <Text style={[t.atoms.text_contrast_medium, a.font_normal, a.text_md]}>
-          {plural(profile.postsCount || 0, {one: 'post', other: 'posts'})}
-        </Text>
-      </Text>
       {isOwnProfile && (
         <InlineLinkText
           style={[a.flex_row, t.atoms.text]}
@@ -73,6 +67,12 @@ export function ProfileHeaderMetrics({
           </Text>
         </InlineLinkText>
       )}
+      <Text style={[a.font_bold, t.atoms.text, a.text_md]}>
+        {formatCount(i18n, profile.postsCount || 0)}{' '}
+        <Text style={[t.atoms.text_contrast_medium, a.font_normal, a.text_md]}>
+          {plural(profile.postsCount || 0, {one: 'post', other: 'posts'})}
+        </Text>
+      </Text>
     </View>
   )
 }
