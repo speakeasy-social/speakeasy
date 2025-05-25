@@ -78,13 +78,6 @@ export function Post({
     () => (moderationOpts ? moderatePost(post, moderationOpts) : undefined),
     [moderationOpts, post],
   )
-  console.log(
-    'Post.tsx render?',
-    postShadowed === POST_TOMBSTONE,
-    record,
-    richText,
-    moderation,
-  )
 
   if (postShadowed === POST_TOMBSTONE) {
     return null
