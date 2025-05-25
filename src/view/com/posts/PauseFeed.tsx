@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
+import {useNavigation} from '@react-navigation/native'
 
 import {useLeaveOptions} from '#/state/preferences/leave-options'
 import {useTheme} from '#/alf'
@@ -59,6 +60,7 @@ export function PauseFeed({
   const [gifUrl, setGifUrl] = React.useState<string>()
   const isReducedMotion = useReducedMotion()
   const height = useSharedValue(isCompact ? 60 : 500)
+  const navigation = useNavigation()
 
   React.useEffect(() => {
     height.value = isCompact ? 60 : 500
@@ -153,6 +155,10 @@ export function PauseFeed({
                   onPress={() => {
                     if (option.link === 'close') {
                       handleClose()
+                    } else if (option.link === 'chat') {
+                      // Not sure why it doesn't recognise the route
+                      // @ts-ignore
+                      navigation.navigate('Messages')
                     } else {
                       window.location.href = option.link
                     }

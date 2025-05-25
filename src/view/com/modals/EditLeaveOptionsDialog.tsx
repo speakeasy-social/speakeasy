@@ -12,21 +12,14 @@ import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import * as TextField from '#/components/forms/TextField'
 import {Text} from '#/components/Typography'
+import {DEFAULT_LEAVE_OPTIONS} from '#/constants/leave-options'
 
 export function LeaveDialog({control}: {control: Dialog.DialogControlProps}) {
   const {_} = useLingui()
   const options = useLeaveOptions()
   const setOptions = useSetLeaveOptions()
 
-  const defaultOptions = [
-    {title: 'Read a Book', link: 'https://bookshop.org/'},
-    {
-      title: 'Message a Friend',
-      link: 'https://web.whatsapp.com/send?text=Hey!%20What%27s%20up%3F',
-    },
-    {title: 'Take a Breath', link: 'https://insighttimer.com/'},
-    {title: 'Go for a Walk', link: 'close'},
-  ]
+  const defaultOptions = DEFAULT_LEAVE_OPTIONS
 
   const [localOptions, setLocalOptions] = React.useState(
     options || defaultOptions,

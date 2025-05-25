@@ -3,6 +3,7 @@ import {z} from 'zod'
 import {deviceLanguageCodes, deviceLocales} from '#/locale/deviceLocales'
 import {findSupportedAppLanguage} from '#/locale/helpers'
 import {logger} from '#/logger'
+import {DEFAULT_LEAVE_OPTIONS} from '#/constants/leave-options'
 import {PlatformInfo} from '../../../modules/expo-bluesky-swiss-army'
 
 const externalEmbedOptions = ['show', 'hide'] as const
@@ -136,7 +137,7 @@ const schema = z.object({
         link: z.string(),
       }),
     )
-    .optional(),
+    .default(DEFAULT_LEAVE_OPTIONS),
 })
 export type Schema = z.infer<typeof schema>
 
@@ -186,15 +187,7 @@ export const defaults: Schema = {
   trendingVideoDisabled: false,
   showInteractionNumbers: false,
   useGridLayout: true, // Default to grid layout
-  leaveOptions: [
-    {title: 'Read a Book', link: 'https://bookshop.org/'},
-    {
-      title: 'Message a Friend',
-      link: 'https://web.whatsapp.com/send?text=Hey!%20What%27s%20up%3F',
-    },
-    {title: 'Take Some Breaths', link: 'https://insighttimer.com/'},
-    {title: 'Take a Walk', link: 'close'},
-  ],
+  leaveOptions: DEFAULT_LEAVE_OPTIONS,
 }
 
 export function tryParse(rawData: string): Schema | undefined {
