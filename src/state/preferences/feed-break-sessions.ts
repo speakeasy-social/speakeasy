@@ -57,6 +57,12 @@ export async function saveSessionStats(
 
   // Only count as a new session if this is a different session ID
   if (entry.lastSessionId !== sessionId) {
+    // ensure we numbers don't get too big, by resetting it often, but keeping the average
+    if (entry.totalSessions > 20) {
+      entry.totalSessions = 1
+      entry.totalPostsSeen = entry.totalPostsSeen / 20
+    }
+
     entry.totalSessions++
     entry.lastSessionId = sessionId
   }
