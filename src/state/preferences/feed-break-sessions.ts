@@ -49,7 +49,6 @@ export async function saveSessionStats(
   sessionId: string,
 ): Promise<void> {
   const stats = await loadEffectivenessStats()
-  console.log('jesse-stats', stats)
 
   // Find the entry for this posts-per-interrupt value
   const entry = stats.find(s => s.postsPerInterrupt === postsPerInterrupt)
