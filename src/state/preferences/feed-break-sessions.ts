@@ -22,6 +22,7 @@ const MIN_POSTS = 20
 const MAX_POSTS = 100
 const POST_INCREMENT = 10
 const MIN_WEIGHT = 0.05 // 5% minimum weight
+const DEFAULT_WEIGHT = 0.1 // 10% weight as default
 
 // Generate all possible posts-per-interrupt values
 const POSSIBLE_POSTS_PER_INTERRUPT = Array.from(
@@ -48,6 +49,7 @@ export async function saveSessionStats(
   sessionId: string,
 ): Promise<void> {
   const stats = await loadEffectivenessStats()
+  console.log('jesse-stats', stats)
 
   // Find the entry for this posts-per-interrupt value
   const entry = stats.find(s => s.postsPerInterrupt === postsPerInterrupt)
@@ -71,7 +73,11 @@ export async function saveSessionStats(
   // Update weights inversely proportional to average posts seen
   // More effective (fewer posts seen) = higher weight
   stats.forEach(s => {
-    if (s.totalSessions === 0) return
+    // if no data, just 10%
+    if (s.totalSessions === 0) {
+      s.weight = DEFAULT_WEIGHT
+      return
+    }
     const avgPosts = s.totalPostsSeen / s.totalSessions
     // Normalize to 0-1 range, then invert (1 - x) so lower posts = higher weight
     const normalizedEffectiveness =
