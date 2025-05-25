@@ -1,4 +1,4 @@
-import React, {memo} from 'react'
+import React, {memo, useEffect, useRef, useState} from 'react'
 import {
   ActivityIndicator,
   AppState,
@@ -27,6 +27,11 @@ import {logger} from '#/logger'
 import {isIOS, isNative, isWeb} from '#/platform/detection'
 import {listenPostCreated} from '#/state/events'
 import {useFeedFeedbackContext} from '#/state/feed-feedback'
+import {
+  calculateNextPostsPerInterrupt,
+  DEFAULT_POSTS_PER_INTERRUPT,
+  saveSessionStats,
+} from '#/state/preferences/feed-break-sessions'
 import {useTrendingSettings} from '#/state/preferences/trending'
 import {STALE} from '#/state/queries'
 import {
@@ -154,9 +159,6 @@ export function getItemsForFeedback(feedRow: FeedRow):
   }
 }
 
-// Add a pause reminder every n posts
-const PAUSE_AFTER_VIEWING = 50
-
 // DISABLED need to check if this is causing random feed refreshes -prf
 // const REFRESH_AFTER = STALE.HOURS.ONE
 const CHECK_LATEST_AFTER = STALE.SECONDS.THIRTY
@@ -224,6 +226,12 @@ let PostFeed = ({
   // Track which end-of-feed markers have been clicked
   const [pauseSectionCount, setPauseSectionCount] = React.useState(1)
   const [pauseSectionsRendered, setPauseSectionsRendered] = React.useState(0)
+  const [postsPerInterrupt, setPostsPerInterrupt] = useState(
+    DEFAULT_POSTS_PER_INTERRUPT,
+  )
+  const hasInitializedRef = useRef(false)
+  const sessionIdRef = useRef<string>()
+  const savedStatsSectionsRef = useRef(new Set<number>())
 
   const feedCacheKey = feedParams?.feedCacheKey
   const opts = React.useMemo(
@@ -485,7 +493,7 @@ let PostFeed = ({
                 // Add end of feed marker every PAUSE_AFTER_VIEWING posts
                 if (
                   sliceIndex > 0 &&
-                  (sliceIndex + 1) % PAUSE_AFTER_VIEWING === 0
+                  (sliceIndex + 1) % postsPerInterrupt === 0
                 ) {
                   arr.push({
                     type: 'pauseFeed',
@@ -605,6 +613,7 @@ let PostFeed = ({
     areVideoFeedsEnabled,
     mediaGrid,
     pauseSectionCount,
+    postsPerInterrupt,
   ])
 
   // events
@@ -667,6 +676,41 @@ let PostFeed = ({
     fetchNextPage()
   }, [fetchNextPage])
 
+  // Initialize posts per interrupt when component mounts
+  useEffect(() => {
+    // Skip if we've already initialized
+    if (hasInitializedRef.current) {
+      return
+    }
+
+    let mounted = true
+    hasInitializedRef.current = true
+
+    const initPostsPerInterrupt = async () => {
+      try {
+        const nextPostsPerInterrupt = await calculateNextPostsPerInterrupt()
+        if (!mounted) return
+        setPostsPerInterrupt(nextPostsPerInterrupt)
+      } catch (err) {
+        hasInitializedRef.current = false
+      }
+    }
+
+    initPostsPerInterrupt()
+
+    savedStatsSectionsRef.current.clear()
+
+    // Cleanup on unmount
+    return () => {
+      mounted = false
+    }
+  }, []) // Empty deps array since we only want this to run on mount/unmount
+
+  // Generate a new session ID when component mounts
+  useEffect(() => {
+    sessionIdRef.current = Date.now().toString()
+  }, [])
+
   // rendering
   // =
 
@@ -696,6 +740,16 @@ let PostFeed = ({
         return <PostFeedLoadingPlaceholder />
       } else if (row.type === 'pauseFeed') {
         console.log('rendering pause feed', row.sectionIndex, pauseSectionCount)
+
+        // Save stats with the current session ID and latest post count
+        if (
+          sessionIdRef.current &&
+          !savedStatsSectionsRef.current.has(row.sectionIndex)
+        ) {
+          saveSessionStats(postsPerInterrupt, sessionIdRef.current)
+          savedStatsSectionsRef.current.add(row.sectionIndex)
+        }
+
         return (
           <PauseFeed
             onKeepScrolling={() => handleExpandSection()}
@@ -786,6 +840,7 @@ let PostFeed = ({
       pauseSectionCount,
       handleExpandSection,
       feedStartTime,
+      postsPerInterrupt,
     ],
   )
 
