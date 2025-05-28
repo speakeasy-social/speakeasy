@@ -84,6 +84,16 @@ jobs:
             docker load --input /home/speakeasy/speakeasy-client.tar &&
             docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
 
+      - name: Cleanup Old Docker Images
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            docker image prune -f --filter "until=24h" --filter "label!=current"
+
   deploy-production:
     runs-on: ubuntu-latest
     needs: build
@@ -120,4 +130,14 @@ jobs:
             gunzip -f /home/speakeasy/speakeasy-client.tar.gz &&
             docker load --input /home/speakeasy/speakeasy-client.tar &&
             docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
+
+      - name: Cleanup Old Docker Images
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            docker image prune -f --filter "until=24h" --filter "label!=current"
             
