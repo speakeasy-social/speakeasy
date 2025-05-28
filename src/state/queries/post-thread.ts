@@ -15,6 +15,7 @@ import {
   DecryptedPost,
   decryptPostsAndFetchAuthorProfiles,
   fetchEncryptedPostThread,
+  fetchMixedPosts,
   formatPostView,
   profileToAuthorView,
 } from '#/lib/api/feed/private-posts'
@@ -142,6 +143,17 @@ export function usePostThreadQuery(uri: string | undefined) {
             encryptedSessionKeys,
           )
 
+        // Fetch quoted posts
+        const quotedPostUris = allPosts
+          .map(post => (post.embed as any)?.record?.uri)
+          .filter(Boolean)
+
+        const postMap = await fetchMixedPosts(
+          agent,
+          quotedPostUris,
+          authorProfileMap,
+        )
+
         const parentPosts = allPosts.splice(encryptedPostIndex + 1)
 
         const threadPost = allPosts.pop()
@@ -149,7 +161,6 @@ export function usePostThreadQuery(uri: string | undefined) {
         if (!threadPost) {
           return {thread: {type: 'unknown', uri} as ThreadUnknown}
         }
-
         const replyPosts = allPosts
 
         const thread = await formatPostsForThread(
@@ -158,6 +169,7 @@ export function usePostThreadQuery(uri: string | undefined) {
           parentPosts,
           replyPosts,
           authorProfileMap,
+          postMap,
           cursor,
         )
 
@@ -227,12 +239,13 @@ function nestReplies(
   threadPost: DecryptedPost,
   replyPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  postMap: Map<string, AppBskyFeedDefs.PostView>,
 ): ThreadNode[] {
   // Map of uri -> ThreadNode
   const nodeMap = new Map<string, ThreadNode>()
   // Prepare all nodes (depth will be set later)
   for (const reply of replyPosts) {
-    const node = formatThreadNode(agent, reply, authorProfileMap, 0)
+    const node = formatThreadNode(agent, reply, authorProfileMap, postMap, 0)
     nodeMap.set(reply.uri, node)
   }
   // Attach children to parents (do not set depth yet)
@@ -276,6 +289,7 @@ function buildParentChain(
   agent: BskyAgent,
   parentPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  postMap: Map<string, AppBskyFeedDefs.PostView>,
 ): ThreadNode | undefined {
   if (!parentPosts.length) return undefined
   // Start from the furthest parent (root-most)
@@ -286,6 +300,7 @@ function buildParentChain(
       agent,
       post,
       authorProfileMap,
+      postMap,
       -1 - i,
     ) as ThreadPost
     node.parent = parentNode
@@ -300,12 +315,14 @@ export async function formatPostsForThread(
   parentPosts: DecryptedPost[],
   replyPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  postMap: Map<string, AppBskyFeedDefs.PostView>,
   hasMore: string | boolean,
 ) {
   const baseUrl = getBaseCdnUrl(agent)
 
-  // FIXME
-  const quotedPost = undefined
+  // Some posts have embed.record, some don't, the ? guards adequately
+  // @ts-ignore
+  const quotedPost = postMap.get(threadPost.embed?.record?.uri)
 
   const author = authorProfileMap.get(threadPost.authorDid)
 
@@ -318,8 +335,14 @@ export async function formatPostsForThread(
 
     post: formatPostView(threadPost, author, baseUrl, quotedPost),
     record: threadPost,
-    parent: buildParentChain(agent, parentPosts, authorProfileMap),
-    replies: nestReplies(agent, threadPost, replyPosts, authorProfileMap),
+    parent: buildParentChain(agent, parentPosts, authorProfileMap, postMap),
+    replies: nestReplies(
+      agent,
+      threadPost,
+      replyPosts,
+      authorProfileMap,
+      postMap,
+    ),
     ctx: {
       depth: 0,
       isHighlightedPost: true,
@@ -336,11 +359,14 @@ function formatThreadNode(
   agent: BskyAgent,
   post: DecryptedPost,
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  postMap: Map<string, AppBskyFeedDefs.PostView>,
   depth: number,
 ): ThreadNode {
   const profile = authorProfileMap.get(post.authorDid)
   const author = profileToAuthorView(post.authorDid, profile)
-  const quotedPost = undefined
+  // Some posts have embed.record, some don't, the ? guards adequately
+  // @ts-ignore
+  const quotedPost = postMap.get(post.embed?.record?.uri)
   const baseUrl = getBaseCdnUrl(agent)
 
   return {
