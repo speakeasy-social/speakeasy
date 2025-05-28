@@ -66,7 +66,7 @@ jobs:
           chmod 600 deploy_key
           eval $(ssh-agent -s)
           echo "${{ secrets.SSH_PASSPHRASE }}" | ssh-add deploy_key
-          scp -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy
+          scp -v -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy/
           ssh-agent -k
           rm deploy_key
 
@@ -103,7 +103,7 @@ jobs:
           chmod 600 deploy_key
           eval $(ssh-agent -s)
           echo "${{ secrets.SSH_PASSPHRASE }}" | ssh-add deploy_key
-          scp -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy
+          scp -v -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy/
           ssh-agent -k
           rm deploy_key
 
