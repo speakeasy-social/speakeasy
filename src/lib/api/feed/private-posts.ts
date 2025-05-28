@@ -215,7 +215,7 @@ async function fetchPostsWithinBatch(agent: BskyAgent, uris: string[]) {
  * @param authorProfileMap - Map of author DIDs to their profile information
  * @returns Promise resolving to a Map of URI to PostView
  */
-async function fetchMixedPosts(
+export async function fetchMixedPosts(
   agent: BskyAgent,
   uris: string[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
