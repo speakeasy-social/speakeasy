@@ -104,15 +104,15 @@ export const RepostButton = ({
               <Menu.ItemIcon icon={Repost} position="right" />
             </Menu.Item>
           )}
-          <Menu.Item
-            label={isReposted ? _(msg`Undo repost`) : _(msg`Repost to Trusted`)}
-            testID="repostDropdownRepostBtn"
-            onPress={onRepostPrivate}>
-            <Menu.ItemText>
-              {isReposted ? _(msg`Undo repost`) : _(msg`Repost to Trusted`)}
-            </Menu.ItemText>
-            <Menu.ItemIcon icon={Repost} position="right" />
-          </Menu.Item>
+          {!isReposted && (
+            <Menu.Item
+              label={_(msg`Repost to Trusted`)}
+              testID="repostDropdownRepostBtn"
+              onPress={onRepostPrivate}>
+              <Menu.ItemText>{_(msg`Repost to Trusted`)}</Menu.ItemText>
+              <Menu.ItemIcon icon={Repost} position="right" />
+            </Menu.Item>
+          )}
           <Menu.Item
             disabled={embeddingDisabled}
             label={
