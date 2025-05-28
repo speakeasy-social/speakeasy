@@ -34,39 +34,40 @@ export async function listPrivateNotifications(
   cursor: string | undefined,
   limit: number,
 ): Promise<PrivateNotificationResponse> {
-  const res = (await Promise.race([
-    callSpeakeasyApiWithAgent(agent, {
-      api: 'social.spkeasy.notification.listNotifications',
-      method: 'GET',
-      query: {
-        cursor,
-        limit,
-      },
-    }),
-    new Promise<PrivateNotificationResponse>(resolve => {
-      setTimeout(
-        () =>
-          resolve({
-            notifications: [],
-            cursor: undefined,
-          }),
-        5000,
-      )
-    }),
-  ])) as PrivateNotificationResponse
+  try {
+    const res = (await Promise.race([
+      callSpeakeasyApiWithAgent(agent, {
+        api: 'social.spkeasy.notification.listNotifications',
+        method: 'GET',
+        query: {
+          cursor,
+          limit,
+        },
+      }),
+      new Promise<PrivateNotificationResponse>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      }),
+    ])) as PrivateNotificationResponse
 
-  // Fetch profiles for all notification authors
-  const authorDids = [...new Set(res.notifications.map(n => n.authorDid))]
-  const profileMap = await fetchProfiles(agent, authorDids)
+    // Fetch profiles for all notification authors
+    const authorDids = [...new Set(res.notifications.map(n => n.authorDid))]
+    const profileMap = await fetchProfiles(agent, authorDids)
 
-  // Transform notifications with proper author details
-  res.notifications.forEach((notif: PrivateNotification) => {
-    const profile = profileMap.get(notif.authorDid)
+    // Transform notifications with proper author details
+    res.notifications.forEach((notif: PrivateNotification) => {
+      const profile = profileMap.get(notif.authorDid)
 
-    notif.isRead = !!notif.readAt
-    notif.author = profileToAuthorView(notif.authorDid, profile)
-    notif.indexedAt = notif.createdAt
-  })
+      notif.isRead = !!notif.readAt
+      notif.author = profileToAuthorView(notif.authorDid, profile)
+      notif.indexedAt = notif.createdAt
+    })
+  } catch (error) {
+    console.error('Error listing private notifications:', error)
+    return {
+      notifications: [],
+      cursor: undefined,
+    }
+  }
 
   return res
 }
