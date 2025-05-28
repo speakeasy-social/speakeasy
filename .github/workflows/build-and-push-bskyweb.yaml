@@ -61,15 +61,14 @@ jobs:
           path: ${{ github.workspace }}
 
       - name: Copy Docker Image to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: ${{ github.workspace }}/speakeasy-client.tar.gz
-          target: /home/speakeasy
-          strip_components: 5
+        run: |
+          echo "${{ secrets.SSH_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          eval $(ssh-agent -s)
+          echo "${{ secrets.SSH_PASSPHRASE }}" | ssh-add deploy_key
+          scp -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy
+          ssh-agent -k
+          rm deploy_key
 
       - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
@@ -81,8 +80,8 @@ jobs:
           script: |
             docker stop speakeasy-client || true
             docker rm speakeasy-client || true
-            gunzip -f /home/speakeasy/github/workspace/speakeasy-client.tar.gz &&
-            docker load --input /home/speakeasy/github/workspace/speakeasy-client.tar &&
+            gunzip -f /home/speakeasy/speakeasy-client.tar.gz &&
+            docker load --input /home/speakeasy/speakeasy-client.tar &&
             docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
 
   deploy-production:
@@ -99,14 +98,14 @@ jobs:
           path: ${{ github.workspace }}
 
       - name: Copy Docker Image to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: ${{ github.workspace }}/speakeasy-client.tar.gz
-          target: /home/speakeasy
+        run: |
+          echo "${{ secrets.SSH_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          eval $(ssh-agent -s)
+          echo "${{ secrets.SSH_PASSPHRASE }}" | ssh-add deploy_key
+          scp -o StrictHostKeyChecking=no ${{ github.workspace }}/speakeasy-client.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/home/speakeasy
+          ssh-agent -k
+          rm deploy_key
 
       - name: Deploy and Run Docker Image on Server
         uses: appleboy/ssh-action@master
@@ -118,7 +117,7 @@ jobs:
           script: |
             docker stop speakeasy-client || true
             docker rm speakeasy-client || true
-            gunzip -f ./home/runner/work/speakeasy/speakeasy/speakeasy-client.tar.gz &&
-            docker load --input ./home/runner/work/speakeasy/speakeasy/speakeasy-client.tar &&
+            gunzip -f /home/speakeasy/speakeasy-client.tar.gz &&
+            docker load --input /home/speakeasy/speakeasy-client.tar &&
             docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
             
