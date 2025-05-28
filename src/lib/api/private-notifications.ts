@@ -34,14 +34,26 @@ export async function listPrivateNotifications(
   cursor: string | undefined,
   limit: number,
 ): Promise<PrivateNotificationResponse> {
-  const res = (await callSpeakeasyApiWithAgent(agent, {
-    api: 'social.spkeasy.notification.listNotifications',
-    method: 'GET',
-    query: {
-      cursor,
-      limit,
-    },
-  })) as PrivateNotificationResponse
+  const res = (await Promise.race([
+    callSpeakeasyApiWithAgent(agent, {
+      api: 'social.spkeasy.notification.listNotifications',
+      method: 'GET',
+      query: {
+        cursor,
+        limit,
+      },
+    }),
+    new Promise<PrivateNotificationResponse>(resolve => {
+      setTimeout(
+        () =>
+          resolve({
+            notifications: [],
+            cursor: undefined,
+          }),
+        5000,
+      )
+    }),
+  ])) as PrivateNotificationResponse
 
   // Fetch profiles for all notification authors
   const authorDids = [...new Set(res.notifications.map(n => n.authorDid))]
