@@ -61,6 +61,8 @@ export async function listPrivateNotifications(
       notif.author = profileToAuthorView(notif.authorDid, profile)
       notif.indexedAt = notif.createdAt
     })
+
+    return res
   } catch (error) {
     console.error('Error listing private notifications:', error)
     return {
@@ -68,8 +70,6 @@ export async function listPrivateNotifications(
       cursor: undefined,
     }
   }
-
-  return res
 }
 
 export async function updatePrivateNotificationSeen(
