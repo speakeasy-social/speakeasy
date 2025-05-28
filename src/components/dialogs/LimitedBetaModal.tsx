@@ -24,6 +24,7 @@ export interface LimitedBetaModalProps {
     campaign?: string
   }
   onSuccess?: () => void
+  onCancel?: () => void
 }
 
 export function LimitedBetaModal({
@@ -32,6 +33,7 @@ export function LimitedBetaModal({
   featureDescription,
   utmParams,
   onSuccess,
+  onCancel,
 }: LimitedBetaModalProps) {
   const {_} = useLingui()
   const {gtMobile} = useBreakpoints()
@@ -43,7 +45,18 @@ export function LimitedBetaModal({
   const [showInviteCode, setShowInviteCode] = React.useState(false)
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
+  const wasSuccessfulRef = React.useRef(false)
   const queryClient = useQueryClient()
+
+  // Reset state when dialog is opened
+  React.useEffect(() => {
+    if (control.isOpen) {
+      wasSuccessfulRef.current = false
+      setShowInviteCode(false)
+      setCode('')
+      setError(null)
+    }
+  }, [control.isOpen])
 
   const applyInviteCode = useMutation({
     mutationFn: async (inviteCode: string) => {
@@ -87,10 +100,11 @@ export function LimitedBetaModal({
     const success = await applyInviteCode.mutateAsync(code)
     if (success) {
       Toast.show(_(msg`${featureName} has been activated!`))
-      control.close()
       if (onSuccess) {
         onSuccess()
       }
+      wasSuccessfulRef.current = true
+      control.close()
     }
   }
 
@@ -99,6 +113,9 @@ export function LimitedBetaModal({
       control={control}
       onClose={() => {
         setShowInviteCode(false)
+        if (onCancel && !wasSuccessfulRef.current) {
+          onCancel()
+        }
       }}>
       <Dialog.Handle />
       <Dialog.ScrollableInner label={_(msg`Please bear with us!`)}>

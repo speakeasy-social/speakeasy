@@ -122,6 +122,7 @@ import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {atoms as a, native, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import {useDialogControl} from '#/components/Dialog'
+import * as Dialog from '#/components/Dialog'
 import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {VerifyEmailDialog} from '#/components/dialogs/VerifyEmailDialog'
 import {CircleInfo_Stroke2_Corner0_Rounded as CircleInfo} from '#/components/icons/CircleInfo'
@@ -180,11 +181,39 @@ export const ComposePost = ({
   const discardPromptControl = Prompt.usePromptControl()
   const {closeAllDialogs} = useDialogStateControlContext()
   const {closeAllModals} = useModalControls()
+  const privatePostsDialogControl = useDialogControl()
+  const {data: features = [], isPending: isFeaturesPending} = useFeaturesQuery()
+  const canPostPrivate = features.some(
+    f => f.key === 'private-posts' && f.value === 'true',
+  )
 
   const [isKeyboardVisible] = useIsKeyboardVisible({iosUseWillEvents: true})
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishingStage, setPublishingStage] = useState('')
   const [error, setError] = useState('')
+
+  const onClose = useCallback(() => {
+    closeComposer()
+    clearThumbnailCache(queryClient)
+  }, [closeComposer, queryClient])
+
+  // Check if this is a reply to a private post
+  const isPrivateReply = replyTo?.uri?.includes(
+    '/social.spkeasy.feed.privatePost/',
+  )
+  const effectiveAudience = isPrivateReply ? 'trusted' : initAudience
+
+  // Show private posts modal on load if needed
+  useEffect(() => {
+    if (isPrivateReply && !isFeaturesPending && !canPostPrivate) {
+      privatePostsDialogControl.open()
+    }
+  }, [
+    isPrivateReply,
+    canPostPrivate,
+    privatePostsDialogControl,
+    isFeaturesPending,
+  ])
 
   const [composerState, composerDispatch] = useReducer(
     composerReducer,
@@ -194,7 +223,7 @@ export const ComposePost = ({
       initText,
       initRealTalk,
       initMention,
-      initAudience,
+      initAudience: effectiveAudience,
     },
     createComposerState,
   )
@@ -271,11 +300,6 @@ export const ComposePost = ({
   )
 
   const [publishOnUpload, setPublishOnUpload] = useState(false)
-
-  const onClose = useCallback(() => {
-    closeComposer()
-    clearThumbnailCache(queryClient)
-  }, [closeComposer, queryClient])
 
   const insets = useSafeAreaInsets()
   const viewStyles = useMemo(
@@ -680,6 +704,35 @@ export const ComposePost = ({
           msg`Before creating a post, you must first verify your email.`,
         )}
       />
+      <LimitedBetaModal
+        control={privatePostsDialogControl}
+        featureDescription={_(
+          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
+        )}
+        featureName={_(msg`Private Post to Trusted Communities`)}
+        utmParams={{
+          source: 'composer',
+          medium: 'trusted_toggle',
+          campaign: 'groups_beta',
+        }}
+        onSuccess={() => {
+          // Set audience to trusted since the feature was just activated
+          composerDispatch({
+            type: 'update_post',
+            postId: activePost.id,
+            postAction: {
+              type: 'update_audience',
+              audience: 'trusted',
+            },
+          })
+        }}
+        onCancel={() => {
+          // Only close the composer if this is a private reply and user can't post privately
+          if (isPrivateReply && !canPostPrivate) {
+            onClose()
+          }
+        }}
+      />
       <KeyboardAvoidingView
         testID="composePostView"
         behavior={isIOS ? 'padding' : 'height'}
@@ -716,6 +769,7 @@ export const ComposePost = ({
             thread={thread}
             dispatch={composerDispatch}
             isReply={!!replyTo}
+            privatePostsDialogControl={privatePostsDialogControl}
           />
           <TrustedAudienceBanner post={activePost} />
           <Animated.ScrollView
@@ -1819,15 +1873,16 @@ function AudienceBar({
   thread,
   dispatch,
   isReply,
+  privatePostsDialogControl,
 }: {
   post: PostDraft
   thread: ThreadDraft
   dispatch: (action: ComposerAction) => void
   isReply: boolean
+  privatePostsDialogControl: Dialog.DialogOuterProps['control']
 }) {
   const {_} = useLingui()
   const t = useTheme()
-  const groupsDialogControl = useDialogControl()
   const privateQuoteDialogControl = useDialogControl()
   const {data: features = []} = useFeaturesQuery()
   const canPostPrivate = features.some(
@@ -1843,7 +1898,7 @@ function AudienceBar({
       return
     }
     if (!canPostPrivate && post.audience === 'public') {
-      groupsDialogControl.open()
+      privatePostsDialogControl.open()
     } else {
       const newAudience = post.audience === 'public' ? 'trusted' : 'public'
       dispatch({
@@ -1860,7 +1915,7 @@ function AudienceBar({
     dispatch,
     post.id,
     post.audience,
-    groupsDialogControl,
+    privatePostsDialogControl,
     hasPrivateQuote,
     privateQuoteDialogControl,
   ])
@@ -1889,29 +1944,6 @@ function AudienceBar({
 
   return (
     <>
-      <LimitedBetaModal
-        control={groupsDialogControl}
-        featureDescription={_(
-          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
-        )}
-        featureName={_(msg`Private Post to Trusted Communities`)}
-        utmParams={{
-          source: 'composer',
-          medium: 'trusted_toggle',
-          campaign: 'groups_beta',
-        }}
-        onSuccess={() => {
-          // Set audience to trusted since the feature was just activated
-          dispatch({
-            type: 'update_post',
-            postId: post.id,
-            postAction: {
-              type: 'update_audience',
-              audience: 'trusted',
-            },
-          })
-        }}
-      />
       <Prompt.Basic
         control={privateQuoteDialogControl}
         title={_(msg`Private Quote Required`)}
