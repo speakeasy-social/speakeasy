@@ -5,6 +5,7 @@ import {useLingui} from '@lingui/react'
 
 import {makeProfileLink} from '#/lib/routes/links'
 import {Shadow} from '#/state/cache/types'
+import {useTrustedUserCount} from '#/state/queries/trusted'
 import {useSession} from '#/state/session'
 import {formatCount} from '#/view/com/util/numeric/format'
 import {atoms as a, useTheme} from '#/alf'
@@ -30,6 +31,7 @@ export function ProfileHeaderMetrics({
     one: 'following',
     other: 'following',
   })
+  const {data: trustedCount} = useTrustedUserCount(currentAccount?.did)
 
   return (
     <View
@@ -65,8 +67,8 @@ export function ProfileHeaderMetrics({
         <InlineLinkText
           style={[a.flex_row, t.atoms.text]}
           to="/trusted"
-          label="0 trusted">
-          <Text style={[a.font_bold, a.text_md]}>0 </Text>
+          label={`${trustedCount || 0} trusted`}>
+          <Text style={[a.font_bold, a.text_md]}>{trustedCount || 0} </Text>
           <Text
             style={[t.atoms.text_contrast_medium, a.font_normal, a.text_md]}>
             trusted
