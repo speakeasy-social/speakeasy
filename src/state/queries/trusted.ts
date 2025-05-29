@@ -30,10 +30,12 @@ export async function getTrustedUsers(
   did: string,
   speakeasyApi: any,
   queryClient: QueryClient,
+  limit?: number,
 ): Promise<TrustedUser[]> {
   const data = await speakeasyApi({
     api: 'social.spkeasy.graph.getTrusted',
     query: {
+      limit,
       authorDid: did,
     },
   })
@@ -44,6 +46,14 @@ export async function getTrustedUsers(
   })
 
   return data.trusted
+}
+
+export async function getTrustedUserCount(speakeasyApi: any): Promise<number> {
+  const data = await speakeasyApi({
+    api: 'social.spkeasy.graph.getTrustedCount',
+  })
+
+  return data.trustedCount
 }
 
 /**
@@ -87,5 +97,14 @@ export function useTrustedProfiles(did: string | undefined) {
       const profileResults = await Promise.all(profilePromises)
       return profileResults.flatMap(result => result.data.profiles)
     },
+  })
+}
+
+export function useTrustedUserCount(did: string | undefined) {
+  const {call: speakeasyApi} = useSpeakeasyApi()
+  return useQuery({
+    enabled: !!did,
+    queryKey: ['trustedUserCount', did],
+    queryFn: async () => getTrustedUserCount(speakeasyApi),
   })
 }
