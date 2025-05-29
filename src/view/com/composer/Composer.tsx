@@ -52,6 +52,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome'
 import {msg, Trans} from '@lingui/macro'
 import {t} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
+import {useNavigation} from '@react-navigation/native'
 import {useQueryClient} from '@tanstack/react-query'
 
 import {createDefaultHiddenMessage} from '#/lib/api'
@@ -90,6 +91,7 @@ import {
 import {useFeaturesQuery} from '#/state/queries/features'
 import {useProfileQuery} from '#/state/queries/profile'
 import {Gif} from '#/state/queries/tenor'
+import {useTrustedUserCount} from '#/state/queries/trusted'
 import {useAgent, useSession} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
 import {ComposerOpts} from '#/state/shell/composer'
@@ -131,6 +133,7 @@ import {Gift1_Stroke2_Corner0_Rounded as Gift} from '#/components/icons/Gift1'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {TimesLarge_Stroke2_Corner0_Rounded as X} from '#/components/icons/Times'
+import {InlineLinkText} from '#/components/Link'
 import * as Prompt from '#/components/Prompt'
 import {Text as NewText} from '#/components/Typography'
 import {BottomSheetPortalProvider} from '../../../../modules/bottom-sheet'
@@ -186,6 +189,8 @@ export const ComposePost = ({
   const canPostPrivate = features.some(
     f => f.key === 'private-posts' && f.value === 'true',
   )
+  const {data: trustedCount} = useTrustedUserCount(currentAccount?.did)
+  const hasTrusted = !!trustedCount && trustedCount > 0
 
   const [isKeyboardVisible] = useIsKeyboardVisible({iosUseWillEvents: true})
   const [isPublishing, setIsPublishing] = useState(false)
@@ -771,7 +776,11 @@ export const ComposePost = ({
             isReply={!!replyTo}
             privatePostsDialogControl={privatePostsDialogControl}
           />
-          <TrustedAudienceBanner post={activePost} />
+          <TrustedAudienceBanner
+            hasTrusted={hasTrusted}
+            post={activePost}
+            userHandle={currentAccount?.handle}
+          />
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
@@ -820,9 +829,18 @@ export const ComposePost = ({
   )
 }
 
-function TrustedAudienceBanner({post}: {post: PostDraft}) {
+function TrustedAudienceBanner({
+  post,
+  userHandle,
+  hasTrusted,
+}: {
+  post: PostDraft
+  userHandle?: string
+  hasTrusted: boolean
+}) {
   const t = useTheme()
   const {_} = useLingui()
+  const navigation = useNavigation()
 
   if (post.audience !== 'trusted') {
     return null
@@ -841,9 +859,37 @@ function TrustedAudienceBanner({post}: {post: PostDraft}) {
           a.gap_sm,
         ]}>
         <Lock size="sm" fill={t.palette.primary_500} />
-        <NewText style={[a.flex_1, a.leading_snug]}>
-          {_(msg`The post will only be visible to people that you trust`)}
-        </NewText>
+        {hasTrusted ? (
+          <NewText style={[a.flex_1, a.leading_snug]}>
+            {_(msg`The post will only be visible to`)}{' '}
+            <InlineLinkText
+              to="/trusted"
+              label={_(msg`View trusted users`)}
+              style={[t.atoms.text, {color: t.palette.primary_500}]}>
+              people that you trust
+            </InlineLinkText>
+          </NewText>
+        ) : (
+          <>
+            <NewText style={[a.flex_1, a.leading_snug]}>
+              {_(
+                msg`This post will not be visible to anyone. Trust some people to let them to see your private posts`,
+              )}
+            </NewText>
+            <Button
+              label={_(msg`Choose People to Trust`)}
+              size="tiny"
+              variant="ghost"
+              color="primary"
+              style={[a.ml_sm]}
+              onPress={() =>
+                // @ts-ignore
+                navigation.navigate('ProfileFollows', {name: userHandle || ''})
+              }>
+              <ButtonText>{_(msg`Choose People to Trust`)}</ButtonText>
+            </Button>
+          </>
+        )}
       </View>
     </View>
   )
