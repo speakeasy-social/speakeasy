@@ -167,19 +167,19 @@ export function TrustActions({profiles}: Props) {
     <>
       <Button
         variant="solid"
-        color="primary"
-        size="small"
-        label={_(msg`Trust All`)}
-        onPress={handleTrustAll}>
-        <ButtonText>Trust All</ButtonText>
-      </Button>
-      <Button
-        variant="solid"
         color="secondary"
         size="small"
         label={_(msg`Untrust All`)}
         onPress={handleUntrustAll}>
         <ButtonText>Untrust All</ButtonText>
+      </Button>
+      <Button
+        variant="solid"
+        color="primary"
+        size="small"
+        label={_(msg`Trust All`)}
+        onPress={handleTrustAll}>
+        <ButtonText>Trust All</ButtonText>
       </Button>
 
       <Prompt.Basic
