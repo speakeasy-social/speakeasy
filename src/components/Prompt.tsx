@@ -4,6 +4,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {atoms as a, useBreakpoints, useTheme} from '#/alf'
+import {Admonition} from '#/components/Admonition'
 import {Button, ButtonColor, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {Text} from '#/components/Typography'
@@ -186,6 +187,7 @@ export function Basic({
   onConfirm,
   confirmButtonColor,
   showCancel = true,
+  admonition,
 }: React.PropsWithChildren<{
   control: Dialog.DialogOuterProps['control']
   title: string
@@ -202,11 +204,20 @@ export function Basic({
   onConfirm: (e: GestureResponderEvent) => void
   confirmButtonColor?: ButtonColor
   showCancel?: boolean
+  admonition?: {
+    type: 'info' | 'tip' | 'warning' | 'error'
+    content: string
+  }
 }>) {
   return (
     <Outer control={control} testID="confirmModal">
       <TitleText>{title}</TitleText>
       <DescriptionText>{description}</DescriptionText>
+      {admonition && (
+        <Admonition type={admonition.type} style={[a.mt_md, a.mb_lg]}>
+          {admonition.content}
+        </Admonition>
+      )}
       <Actions>
         <Action
           cta={confirmButtonCta}
