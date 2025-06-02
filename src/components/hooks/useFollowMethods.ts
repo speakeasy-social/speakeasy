@@ -6,7 +6,9 @@ import {useLingui} from '@lingui/react'
 import {LogEvents} from '#/lib/statsig/statsig'
 import {logger} from '#/logger'
 import {Shadow} from '#/state/cache/types'
+import {useTrustPreferences} from '#/state/preferences/trust'
 import {useProfileFollowMutationQueue} from '#/state/queries/profile'
+import {useTrustMutationQueue} from '#/state/queries/trust'
 import {useRequireAuth} from '#/state/session'
 import * as Toast from '#/view/com/util/Toast'
 
@@ -52,6 +54,65 @@ export function useFollowMethods({
       }
     })
   }, [_, queueUnfollow, requireAuth])
+
+  return {
+    follow,
+    unfollow,
+  }
+}
+
+export function useFollowWithTrustMethods({
+  profile,
+  logContext,
+}: {
+  profile: Shadow<AppBskyActorDefs.ProfileViewBasic>
+  logContext: LogEvents['profile:follow']['logContext'] &
+    LogEvents['profile:unfollow']['logContext']
+}) {
+  const {_} = useLingui()
+  const requireAuth = useRequireAuth()
+  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
+    profile,
+    logContext,
+  )
+  const {autoTrustOnFollow, autoUntrustOnUnfollow} = useTrustPreferences()
+  const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
+
+  const follow = React.useCallback(() => {
+    requireAuth(async () => {
+      try {
+        await queueFollow()
+        if (autoTrustOnFollow) {
+          await queueTrust()
+        }
+      } catch (e: any) {
+        logger.error(`useFollowWithTrustMethods: failed to follow`, {
+          message: String(e),
+        })
+        if (e?.name !== 'AbortError') {
+          Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
+        }
+      }
+    })
+  }, [_, queueFollow, requireAuth, autoTrustOnFollow, queueTrust])
+
+  const unfollow = React.useCallback(() => {
+    requireAuth(async () => {
+      try {
+        await queueUnfollow()
+        if (autoUntrustOnUnfollow) {
+          await queueUntrust()
+        }
+      } catch (e: any) {
+        logger.error(`useFollowWithTrustMethods: failed to unfollow`, {
+          message: String(e),
+        })
+        if (e?.name !== 'AbortError') {
+          Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
+        }
+      }
+    })
+  }, [_, queueUnfollow, requireAuth, autoUntrustOnUnfollow, queueUntrust])
 
   return {
     follow,

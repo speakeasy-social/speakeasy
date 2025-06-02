@@ -13,7 +13,9 @@ import {LogEvents} from '#/lib/statsig/statsig'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {sanitizeHandle} from '#/lib/strings/handles'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
+import {useTrustPreferences} from '#/state/preferences/trust'
 import {useProfileFollowMutationQueue} from '#/state/queries/profile'
+import {useTrustMutationQueue} from '#/state/queries/trust'
 import {useSession} from '#/state/session'
 import {ProfileCardPills} from '#/view/com/profile/ProfileCard'
 import * as Toast from '#/view/com/util/Toast'
@@ -309,6 +311,8 @@ export function FollowButtonInner({
     profile,
     logContext,
   )
+  const {autoTrustOnFollow, autoUntrustOnUnfollow} = useTrustPreferences()
+  const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
   const isRound = Boolean(rest.shape && rest.shape === 'round')
 
   const onPressFollow = async (e: GestureResponderEvent) => {
@@ -316,6 +320,9 @@ export function FollowButtonInner({
     e.stopPropagation()
     try {
       await queueFollow()
+      if (autoTrustOnFollow) {
+        await queueTrust()
+      }
       Toast.show(
         _(
           msg`Following ${sanitizeDisplayName(
@@ -337,6 +344,9 @@ export function FollowButtonInner({
     e.stopPropagation()
     try {
       await queueUnfollow()
+      if (autoUntrustOnUnfollow) {
+        await queueUntrust()
+      }
       Toast.show(
         _(
           msg`No longer following ${sanitizeDisplayName(

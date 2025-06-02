@@ -20,7 +20,7 @@ import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {ProfileHeaderHandle} from '#/screens/Profile/Header/Handle'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
-import {useFollowMethods} from '#/components/hooks/useFollowMethods'
+import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
 import {useRichText} from '#/components/hooks/useRichText'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
@@ -386,7 +386,7 @@ function Inner({
   )
   const [descriptionRT] = useRichText(profile.description ?? '')
   const profileShadow = useProfileShadow(profile)
-  const {follow, unfollow} = useFollowMethods({
+  const {follow, unfollow} = useFollowWithTrustMethods({
     profile: profileShadow,
     logContext: 'ProfileHoverCard',
   })

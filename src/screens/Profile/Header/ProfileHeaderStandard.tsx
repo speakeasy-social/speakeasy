@@ -9,17 +9,13 @@ import {
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {logger} from '#/logger'
 import {isIOS, isWeb} from '#/platform/detection'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {Shadow} from '#/state/cache/types'
 import {useModalControls} from '#/state/modals'
-import {
-  useProfileBlockMutationQueue,
-  useProfileFollowMutationQueue,
-} from '#/state/queries/profile'
-import {useRequireAuth, useSession} from '#/state/session'
+import {useProfileBlockMutationQueue} from '#/state/queries/profile'
+import {useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
 import {TrustButton} from '#/view/com/profile/TrustButton'
 import * as Toast from '#/view/com/util/Toast'
@@ -27,6 +23,7 @@ import {atoms as a} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import {useDialogControl} from '#/components/Dialog'
 import {MessageProfileButton} from '#/components/dms/MessageProfileButton'
+import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 import {
@@ -64,13 +61,8 @@ let ProfileHeaderStandard = ({
     () => moderateProfile(profile, moderationOpts),
     [profile, moderationOpts],
   )
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
-    profile,
-    'ProfileHeader',
-  )
   const [_queueBlock, queueUnblock] = useProfileBlockMutationQueue(profile)
   const unblockPromptControl = Prompt.usePromptControl()
-  const requireAuth = useRequireAuth()
   const isBlockedUser =
     profile.viewer?.blocking ||
     profile.viewer?.blockedBy ||
@@ -90,47 +82,11 @@ let ProfileHeaderStandard = ({
     }
   }, [editProfileControl, openModal, profile])
 
-  const onPressFollow = () => {
-    requireAuth(async () => {
-      try {
-        await queueFollow()
-        Toast.show(
-          _(
-            msg`Following ${sanitizeDisplayName(
-              profile.displayName || profile.handle,
-              moderation.ui('displayName'),
-            )}`,
-          ),
-        )
-      } catch (e: any) {
-        if (e?.name !== 'AbortError') {
-          logger.error('Failed to follow', {message: String(e)})
-          Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
-        }
-      }
+  const {follow: onPressFollow, unfollow: onPressUnfollow} =
+    useFollowWithTrustMethods({
+      profile,
+      logContext: 'ProfileHeader',
     })
-  }
-
-  const onPressUnfollow = () => {
-    requireAuth(async () => {
-      try {
-        await queueUnfollow()
-        Toast.show(
-          _(
-            msg`No longer following ${sanitizeDisplayName(
-              profile.displayName || profile.handle,
-              moderation.ui('displayName'),
-            )}`,
-          ),
-        )
-      } catch (e: any) {
-        if (e?.name !== 'AbortError') {
-          logger.error('Failed to unfollow', {message: String(e)})
-          Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
-        }
-      }
-    })
-  }
 
   const unblockAccount = React.useCallback(async () => {
     try {

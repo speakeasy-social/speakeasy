@@ -16,7 +16,7 @@ import {
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a, select, useTheme} from '#/alf'
 import {Button} from '#/components/Button'
-import {useFollowMethods} from '#/components/hooks/useFollowMethods'
+import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
 import {PlusSmall_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 
 export function AviFollowButton({
@@ -31,7 +31,7 @@ export function AviFollowButton({
   const {_} = useLingui()
   const t = useTheme()
   const profile = useProfileShadow(author)
-  const {follow} = useFollowMethods({
+  const {follow} = useFollowWithTrustMethods({
     profile: profile,
     logContext: 'AvatarButton',
   })

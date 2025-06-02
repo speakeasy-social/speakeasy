@@ -4,7 +4,9 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {Shadow} from '#/state/cache/types'
+import {useTrustPreferences} from '#/state/preferences/trust'
 import {useProfileFollowMutationQueue} from '#/state/queries/profile'
+import {useTrustMutationQueue} from '#/state/queries/trust'
 import {Button, ButtonType} from '../util/forms/Button'
 import * as Toast from '../util/Toast'
 
@@ -25,11 +27,16 @@ export function FollowButton({
     profile,
     logContext,
   )
+  const {autoTrustOnFollow, autoUntrustOnUnfollow} = useTrustPreferences()
+  const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
   const {_} = useLingui()
 
   const onPressFollow = async () => {
     try {
       await queueFollow()
+      if (autoTrustOnFollow) {
+        await queueTrust()
+      }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
         Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
@@ -40,6 +47,9 @@ export function FollowButton({
   const onPressUnfollow = async () => {
     try {
       await queueUnfollow()
+      if (autoUntrustOnUnfollow) {
+        await queueUntrust()
+      }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
         Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')

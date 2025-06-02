@@ -4,16 +4,11 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigation} from '@react-navigation/native'
 
-import {logger} from '#/logger'
 import {Shadow, useProfileShadow} from '#/state/cache/profile-shadow'
-import {
-  useProfileFollowMutationQueue,
-  useProfileQuery,
-} from '#/state/queries/profile'
-import {useRequireAuth} from '#/state/session'
-import * as Toast from '#/view/com/util/Toast'
+import {useProfileQuery} from '#/state/queries/profile'
 import {atoms as a, useBreakpoints} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
+import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 
@@ -37,12 +32,6 @@ function PostThreadFollowBtnLoaded({
   const {gtMobile} = useBreakpoints()
   const profile: Shadow<AppBskyActorDefs.ProfileViewBasic> =
     useProfileShadow(profileUnshadowed)
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
-    profile,
-    'PostThreadItem',
-  )
-  const requireAuth = useRequireAuth()
-
   const isFollowing = !!profile.viewer?.following
   const isFollowedBy = !!profile.viewer?.followedBy
   const [wasFollowing, setWasFollowing] = React.useState<boolean>(isFollowing)
@@ -80,31 +69,18 @@ function PostThreadFollowBtnLoaded({
     }
   }, [isFollowing, wasFollowing, navigation])
 
+  const {follow, unfollow} = useFollowWithTrustMethods({
+    profile,
+    logContext: 'PostThreadItem',
+  })
+
   const onPress = React.useCallback(() => {
     if (!isFollowing) {
-      requireAuth(async () => {
-        try {
-          await queueFollow()
-        } catch (e: any) {
-          if (e?.name !== 'AbortError') {
-            logger.error('Failed to follow', {message: String(e)})
-            Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
-          }
-        }
-      })
+      follow()
     } else {
-      requireAuth(async () => {
-        try {
-          await queueUnfollow()
-        } catch (e: any) {
-          if (e?.name !== 'AbortError') {
-            logger.error('Failed to unfollow', {message: String(e)})
-            Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
-          }
-        }
-      })
+      unfollow()
     }
-  }, [isFollowing, requireAuth, queueFollow, _, queueUnfollow])
+  }, [isFollowing, follow, unfollow])
 
   if (!showFollowBtn) return null
 
