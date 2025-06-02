@@ -5,7 +5,7 @@ import ProgressCircle from 'react-native-progress/Circle'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {bulkTrust, bulkUntrust} from '#/lib/api/trust'
+import {bulkTrust, bulkUntrust, getDailyTrustedQuota} from '#/lib/api/trust'
 import {useAgent} from '#/state/session'
 import {show as showToast} from '#/view/com/util/Toast'
 import {atoms as a, useTheme} from '#/alf'
@@ -18,12 +18,15 @@ import {Text} from '#/components/Typography'
 const BATCH_SIZE = 1000
 
 type Props = {
-  profiles: Array<any> // TODO: Add proper type
+  loadAllProfiles: (
+    cursor?: string | undefined,
+  ) => Promise<{dids: string[]; nextCursor: string | undefined}>
+  hideTrustAll?: boolean
 }
 
 type CustomError = Error & {error: string; details: {max: number}}
 
-export function TrustActions({profiles}: Props) {
+export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
   const {_} = useLingui()
   const t = useTheme()
   const agent = useAgent()
@@ -36,7 +39,12 @@ export function TrustActions({profiles}: Props) {
   const [lastAction, setLastAction] = React.useState<
     'trust' | 'untrust' | null
   >(null)
-  const [lastProcessedDids, setLastProcessedDids] = React.useState<string[]>([])
+  const isCancelledRef = React.useRef(false)
+  const [_isUndo, setIsUndo] = React.useState<boolean>(false)
+  const [progressText, setProgressText] = React.useState<string>('')
+  const [totalProcessed, setTotalProcessed] = React.useState(0)
+  const [lastTrustCount, setLastTrustCount] = React.useState(0)
+  const showToastFnRef = React.useRef<(() => void) | null>(null)
 
   const handleTrustAll = React.useCallback(() => {
     setLastAction('trust')
@@ -48,30 +56,68 @@ export function TrustActions({profiles}: Props) {
     confirmDialogControl.open()
   }, [confirmDialogControl])
 
-  const processBatch = React.useCallback(
+  const processBatches = React.useCallback(
     async (
-      dids: string[],
+      loadProfileDids: (
+        cursor?: string,
+      ) => Promise<{dids: string[]; nextCursor?: string}>,
       action: 'trust' | 'untrust',
-      onProgress: (progress: number) => void,
+      limit?: number,
     ) => {
-      const batches = []
-      let processedDids: string[] = []
-      for (let i = 0; i < dids.length; i += BATCH_SIZE) {
-        batches.push(dids.slice(i, i + BATCH_SIZE))
-      }
+      const dids: string[] = []
+      let loadProfilesPromise
+      let cursor: string | undefined = 'NEXT'
+      let loadError: Error | null = null
+      const batchSize = limit ? Math.min(limit, BATCH_SIZE) : BATCH_SIZE
 
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i]
-        let result
-        if (action === 'trust') {
-          result = await bulkTrust(agent, batch)
-        } else {
-          result = await bulkUntrust(agent, batch)
+      let processedDids: string[] = []
+      let i = 0
+      do {
+        if (isCancelledRef.current) break
+
+        if (!loadProfilesPromise && cursor) {
+          loadProfilesPromise = loadProfileDids(
+            cursor === 'NEXT' ? undefined : cursor,
+          )
+            .then(res => {
+              loadProfilesPromise = null
+              cursor = res.nextCursor
+              dids.push(...res.dids)
+            })
+            .catch(err => {
+              loadError = err
+            })
         }
-        processedDids = processedDids.concat(result.recipientDids)
-        onProgress((i + 1) / batches.length)
-      }
-      return processedDids
+
+        if (i + batchSize > dids.length && cursor) {
+          await loadProfilesPromise
+          if (loadError) throw loadError
+        } else {
+          // Do we hav a full batch or are at the end?
+          let batchEnd = limit
+            ? Math.min(i + batchSize, i + limit - processedDids.length)
+            : i + batchSize
+          const batch = dids.slice(i, batchEnd)
+          if (batch.length === 0) break
+          let result
+          if (action === 'trust') {
+            result = await bulkTrust(agent, batch)
+          } else {
+            result = await bulkUntrust(agent, batch)
+          }
+          processedDids = processedDids.concat(result.recipientDids)
+          i += batch.length
+          setTotalProcessed(processedDids.length)
+          setProgress(i / dids.length)
+          // setProgress(processedDids.length / (processedDids.length + Math.max(1, dids.length - i)))
+        }
+      } while (
+        ((!limit || processedDids.length < limit) && i < dids.length) ||
+        !cursor
+      )
+      // Let last actions finish so we have a complete picture of what was done
+      if (loadProfilesPromise) await loadProfilesPromise
+      return {processedDids, moreRemain: cursor || i < dids.length}
     },
     [agent],
   )
@@ -80,54 +126,108 @@ export function TrustActions({profiles}: Props) {
     confirmDialogControl.close()
     progressDialogControl.open()
     setProgress(0)
+    setTotalProcessed(0)
+    isCancelledRef.current = false
+    let maxDaily: number | null = null
+    let allProcessedDids: string[] = []
+    setIsUndo(false)
+    setProgressText(lastAction === 'trust' ? 'Trusting' : 'Untrusting')
 
-    try {
-      const dids = profiles.map(p => p.did)
-      const processedDids = await processBatch(dids, lastAction!, progress => {
-        setProgress(progress)
-      })
-      setLastProcessedDids(processedDids)
-
+    const showToastFn = () => {
       // Show success toast with undo link
       showToast(
         _(
           msg`${lastAction === 'trust' ? 'Trusted' : 'Untrusted'} ${
-            processedDids.length
+            allProcessedDids.length
           } users`,
         ),
         'check',
         {
           linkTitle: _(msg`Undo`),
-          onLinkPress: async () => {
-            try {
-              // Reverse the last action
-              const reverseAction = lastAction === 'trust' ? 'untrust' : 'trust'
-              await processBatch(lastProcessedDids, reverseAction, () => {})
-              showToast(
-                _(
-                  msg`Undid ${
-                    lastAction === 'trust' ? 'trusting' : 'untrusting'
-                  } ${lastProcessedDids.length} users`,
-                ),
-                'check',
-              )
-            } catch (err) {
-              showToast(
-                _(
-                  msg`Failed to undo ${
-                    lastAction === 'trust' ? 'trust' : 'untrust'
-                  } action`,
-                ),
-                'exclamation',
-              )
-            }
-          },
+          onLinkPress: undoFn,
         },
       )
+    }
+    showToastFnRef.current = showToastFn
+
+    const undoFn = async () => {
+      if (allProcessedDids.length === 0) {
+        return
+      }
+      try {
+        isCancelledRef.current = false
+        progressDialogControl.open()
+        setIsUndo(true)
+        setProgressText(
+          lastAction === 'trust' ? 'Undoing trust of' : 'Undoing untrust of',
+        )
+
+        // Reverse the last action
+        const reverseAction = lastAction === 'trust' ? 'untrust' : 'trust'
+
+        // Pause before starting the undo to give them time to cancel
+        await new Promise(resolve => setTimeout(resolve, 3000))
+
+        const res = await processBatches(
+          () => Promise.resolve({dids: allProcessedDids}),
+          reverseAction,
+        )
+        if (res.processedDids.length) {
+          showToast(
+            _(
+              msg`Undid ${lastAction === 'trust' ? 'trusting' : 'untrusting'} ${
+                res.processedDids.length
+              } users`,
+            ),
+            'check',
+          )
+        }
+      } catch (err) {
+        showToast(
+          _(
+            msg`Failed to undo ${
+              lastAction === 'trust' ? 'trust' : 'untrust'
+            } action`,
+          ),
+          'exclamation',
+        )
+      } finally {
+        progressDialogControl.close()
+      }
+    }
+
+    try {
+      const quotaRes = await getDailyTrustedQuota(agent)
+      const remaining = quotaRes.remaining
+      maxDaily = quotaRes.maxDaily
+
+      const res = await processBatches(
+        loadAllProfiles,
+        lastAction!,
+        lastAction === 'trust' ? remaining : undefined,
+      )
+      allProcessedDids = res.processedDids
+
+      if (isCancelledRef.current) {
+        // Let this function finish first and close the progress dialog so
+        // it doesn't race with the open dialog
+        setTimeout(undoFn, 0)
+      } else if (res.moreRemain) {
+        setLastTrustCount(allProcessedDids.length)
+        const err = new Error('Exceeded daily trust limit') as CustomError
+        err.error = 'RateLimitError'
+        throw err
+      } else {
+        showToastFn()
+      }
     } catch (err) {
       const error = err as CustomError
+      if (error.message === 'UserCancelledError') {
+        undoFn()
+        return
+      }
       if (error.error === 'RateLimitError') {
-        setTrustLimit(error.details.max)
+        setTrustLimit(error.details?.max || maxDaily)
         rateLimitDialogControl.open()
       } else {
         showToast(
@@ -143,14 +243,14 @@ export function TrustActions({profiles}: Props) {
       progressDialogControl.close()
     }
   }, [
+    agent,
     confirmDialogControl,
     progressDialogControl,
     lastAction,
-    processBatch,
-    profiles,
+    processBatches,
+    loadAllProfiles,
     _,
     rateLimitDialogControl,
-    lastProcessedDids,
   ])
 
   const baseUrl = 'https://about.speakeasy.com/donate'
@@ -173,14 +273,16 @@ export function TrustActions({profiles}: Props) {
         onPress={handleUntrustAll}>
         <ButtonText>Untrust All</ButtonText>
       </Button>
-      <Button
-        variant="solid"
-        color="primary"
-        size="small"
-        label={_(msg`Trust All`)}
-        onPress={handleTrustAll}>
-        <ButtonText>Trust All</ButtonText>
-      </Button>
+      {!hideTrustAll && (
+        <Button
+          variant="solid"
+          color="primary"
+          size="small"
+          label={_(msg`Trust All`)}
+          onPress={handleTrustAll}>
+          <ButtonText>Trust All</ButtonText>
+        </Button>
+      )}
 
       <Prompt.Basic
         control={confirmDialogControl}
@@ -190,8 +292,20 @@ export function TrustActions({profiles}: Props) {
         description={_(
           msg`You are about to ${
             lastAction === 'trust' ? 'trust' : 'untrust'
-          } ${profiles.length} people.`,
+          } all people. ${
+            lastAction === 'trust' ? 'This may take a while.' : ''
+          }`,
         )}
+        admonition={
+          lastAction === 'untrust'
+            ? {
+                type: 'warning',
+                content: _(
+                  msg`Warning: You may not be able to undo this action.`,
+                ),
+              }
+            : undefined
+        }
         confirmButtonCta={_(msg`Continue`)}
         onConfirm={handleConfirm}
       />
@@ -208,20 +322,22 @@ export function TrustActions({profiles}: Props) {
               unfilledColor={t.palette.contrast_50}
             />
             <Text style={[a.text_lg, a.font_bold]}>
-              {lastAction === 'trust' ? 'Trusting' : 'Untrusting'}{' '}
-              {profiles.length} people
+              {progressText} {totalProcessed} people
             </Text>
-            <Button
-              variant="ghost"
-              color="secondary"
-              size="small"
-              label={_(msg`Cancel`)}
-              onPress={() => {
-                progressDialogControl.close()
-                setProgress(0)
-              }}>
-              <ButtonText>Cancel</ButtonText>
-            </Button>
+            {!isCancelledRef.current && (
+              <Button
+                variant="ghost"
+                color="secondary"
+                size="small"
+                label={_(msg`Cancel`)}
+                onPress={() => {
+                  progressDialogControl.close()
+                  setProgress(0)
+                  isCancelledRef.current = true
+                }}>
+                <ButtonText>Cancel</ButtonText>
+              </Button>
+            )}
           </View>
         </Dialog.ScrollableInner>
       </Dialog.Outer>
@@ -232,24 +348,30 @@ export function TrustActions({profiles}: Props) {
           <View style={[a.gap_md, a.p_xl]}>
             <Text style={[a.text_lg]}>Daily Trust Limit Reached</Text>
             <Text style={[a.text_md]}>
+              Added {lastTrustCount} trusted people.
+            </Text>
+            <Text style={[a.text_md]}>
               To keep our community funded services responsive for everyone,
               there is a limit of trusting {trustLimit} people per day.
             </Text>
             <Text style={[a.text_md]}>
-              We will increase this limit as more people commit a{' '}
+              We will increase this limit as more people are able to{' '}
               <Link to={donateUrl} label="Make a recurring contribution">
                 <Text style={[a.text_md, {color: t.palette.primary_500}]}>
-                  recurring contribution
+                  support the running of Speakeasy
                 </Text>
-              </Link>{' '}
-              to support the running of Speakeasy
+              </Link>
+              .
             </Text>
             <Button
               variant="solid"
               color="primary"
               size="small"
               label={_(msg`Close`)}
-              onPress={() => rateLimitDialogControl.close()}>
+              onPress={() => {
+                rateLimitDialogControl.close()
+                showToastFnRef.current?.()
+              }}>
               <ButtonText>Close</ButtonText>
             </Button>
           </View>

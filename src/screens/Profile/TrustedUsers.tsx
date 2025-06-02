@@ -4,6 +4,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useFocusEffect} from '@react-navigation/native'
 
+import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {useInitialNumToRender} from '#/lib/hooks/useInitialNumToRender'
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {cleanError} from '#/lib/strings/errors'
@@ -19,6 +20,8 @@ import * as Layout from '#/components/Layout'
 import {ListFooter, ListMaybePlaceholder} from '#/components/Lists'
 import {TrustActions} from '#/components/TrustActions'
 
+const PAGE_SIZE = 100
+
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Trusted'>
 
 export const ProfileTrustedUsersScreen = (_props: Props) => {
@@ -26,6 +29,7 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
   const setMinimalShellMode = useSetMinimalShellMode()
   const initialNumToRender = useInitialNumToRender()
   const {currentAccount} = useSession()
+  const {call: speakeasyApi} = useSpeakeasyApi()
 
   const [isPTRing, setIsPTRing] = React.useState(false)
   const {
@@ -34,6 +38,25 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
     error,
     refetch,
   } = useTrustedProfiles(currentAccount?.did)
+
+  const loadAllProfiles = React.useCallback(
+    async (cursor?: string) => {
+      if (!currentAccount?.did) return {dids: [], nextCursor: ''}
+      const res = await speakeasyApi({
+        api: 'social.spkeasy.graph.getTrusted',
+        query: {
+          limit: PAGE_SIZE,
+          authorDid: currentAccount.did,
+          cursor,
+        },
+      })
+      return {
+        dids: res.trusted.map((t: {recipientDid: string}) => t.recipientDid),
+        nextCursor: res.cursor,
+      }
+    },
+    [currentAccount?.did, speakeasyApi],
+  )
 
   const onRefresh = React.useCallback(async () => {
     setIsPTRing(true)
@@ -88,7 +111,7 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
             alignItems: 'center',
           },
         ]}>
-        <TrustActions profiles={trustedProfiles} />
+        <TrustActions loadAllProfiles={loadAllProfiles} hideTrustAll={true} />
       </View>
       <List
         data={trustedProfiles}

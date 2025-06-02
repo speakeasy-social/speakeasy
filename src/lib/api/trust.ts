@@ -39,3 +39,12 @@ export async function bulkUntrust(
     },
   })
 }
+
+export async function getDailyTrustedQuota(
+  agent: BskyAgent,
+): Promise<{maxDaily: number; remaining: number}> {
+  return callSpeakeasyApiWithAgent(agent, {
+    api: 'social.spkeasy.graph.getDailyTrustedQuota',
+    method: 'GET',
+  })
+}
