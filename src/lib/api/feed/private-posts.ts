@@ -259,10 +259,12 @@ export async function fetchMixedPosts(
   const bskyPosts = await bskyPostsPromise
 
   const mappedSpeakeasyPosts = new Map(
-    formattedPrivatePosts.map(post => [
-      post.post.uri as string,
-      post.post as AppBskyFeedDefs.PostView,
-    ]),
+    formattedPrivatePosts
+      .filter(post => !!post.post)
+      .map(post => [
+        post.post.uri as string,
+        post.post as AppBskyFeedDefs.PostView,
+      ]),
   )
 
   const posts = new Map<string, AppBskyFeedDefs.PostView>([
