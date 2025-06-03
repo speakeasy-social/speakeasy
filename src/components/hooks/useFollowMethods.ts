@@ -78,23 +78,26 @@ export function useFollowWithTrustMethods({
   const {autoTrustOnFollow, autoUntrustOnUnfollow} = useTrustPreferences()
   const [queueTrust, queueUntrust] = useTrustMutationQueue(profile)
 
-  const follow = React.useCallback(() => {
-    requireAuth(async () => {
-      try {
-        await queueFollow()
-        if (autoTrustOnFollow) {
-          await queueTrust()
+  const follow = React.useCallback(
+    (forceTrust: boolean = false) => {
+      requireAuth(async () => {
+        try {
+          await queueFollow()
+          if (autoTrustOnFollow || forceTrust) {
+            await queueTrust()
+          }
+        } catch (e: any) {
+          logger.error(`useFollowWithTrustMethods: failed to follow`, {
+            message: String(e),
+          })
+          if (e?.name !== 'AbortError') {
+            Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
+          }
         }
-      } catch (e: any) {
-        logger.error(`useFollowWithTrustMethods: failed to follow`, {
-          message: String(e),
-        })
-        if (e?.name !== 'AbortError') {
-          Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
-        }
-      }
-    })
-  }, [_, queueFollow, requireAuth, autoTrustOnFollow, queueTrust])
+      })
+    },
+    [_, queueFollow, requireAuth, autoTrustOnFollow, queueTrust],
+  )
 
   const unfollow = React.useCallback(() => {
     requireAuth(async () => {
@@ -117,5 +120,21 @@ export function useFollowWithTrustMethods({
   return {
     follow,
     unfollow,
+  }
+}
+
+export function useFirstTimeFollowDialog({onFollow}: {onFollow: () => void}): {
+  handleFollow: () => void
+  shouldShowDialog: boolean
+} {
+  const {autoTrustOnFollow} = useTrustPreferences()
+
+  const handleFollow = React.useCallback(() => {
+    onFollow()
+  }, [onFollow])
+
+  return {
+    handleFollow,
+    shouldShowDialog: autoTrustOnFollow === undefined,
   }
 }

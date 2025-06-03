@@ -450,7 +450,9 @@ function Inner({
                   : _(msg`Follow`)
               }
               style={[a.rounded_full]}
-              onPress={profileShadow.viewer?.following ? unfollow : follow}>
+              onPress={
+                profileShadow.viewer?.following ? unfollow : () => follow()
+              }>
               <ButtonIcon
                 position="left"
                 icon={profileShadow.viewer?.following ? Check : Plus}

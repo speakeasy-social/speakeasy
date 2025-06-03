@@ -22,8 +22,12 @@ import * as Toast from '#/view/com/util/Toast'
 import {atoms as a} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import {useDialogControl} from '#/components/Dialog'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
 import {MessageProfileButton} from '#/components/dms/MessageProfileButton'
-import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 import {
@@ -82,11 +86,22 @@ let ProfileHeaderStandard = ({
     }
   }, [editProfileControl, openModal, profile])
 
-  const {follow: onPressFollow, unfollow: onPressUnfollow} =
-    useFollowWithTrustMethods({
-      profile,
-      logContext: 'ProfileHeader',
-    })
+  const {follow, unfollow: onPressUnfollow} = useFollowWithTrustMethods({
+    profile,
+    logContext: 'ProfileHeader',
+  })
+
+  const promptControl = Prompt.usePromptControl()
+
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+
+  const onPressFollow = () => {
+    if (shouldShowDialog) {
+      promptControl.open()
+    } else {
+      onPressFollow()
+    }
+  }
 
   const unblockAccount = React.useCallback(async () => {
     try {
@@ -175,7 +190,9 @@ let ProfileHeaderStandard = ({
                     : _(msg`Follow ${profile.handle}`)
                 }
                 onPress={
-                  profile.viewer?.following ? onPressUnfollow : onPressFollow
+                  profile.viewer?.following
+                    ? onPressUnfollow
+                    : () => onPressFollow()
                 }
                 style={[a.rounded_full]}>
                 <ButtonIcon
@@ -230,6 +247,7 @@ let ProfileHeaderStandard = ({
           </View>
         )}
       </View>
+      <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
       <Prompt.Basic
         control={unblockPromptControl}
         title={_(msg`Unblock Account?`)}

@@ -189,7 +189,7 @@ export const defaults: Schema = {
   trendingVideoDisabled: false,
   showInteractionNumbers: false,
   useGridLayout: true, // Default to grid layout
-  autoTrustOnFollow: false, // Default to false
+  autoTrustOnFollow: undefined, // Start as undefined to show the prompt
   autoUntrustOnUnfollow: true, // Default to true
   leaveOptions: DEFAULT_LEAVE_OPTIONS,
 }

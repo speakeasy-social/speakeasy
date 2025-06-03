@@ -3,7 +3,7 @@ import React from 'react'
 import * as persisted from '#/state/persisted'
 
 type StateContext = {
-  autoTrustOnFollow: boolean
+  autoTrustOnFollow: boolean | undefined
   autoUntrustOnUnfollow: boolean
 }
 
@@ -13,7 +13,7 @@ type ApiContext = {
 }
 
 const StateContext = React.createContext<StateContext>({
-  autoTrustOnFollow: Boolean(persisted.defaults.autoTrustOnFollow),
+  autoTrustOnFollow: undefined,
   autoUntrustOnUnfollow: Boolean(persisted.defaults.autoUntrustOnUnfollow),
 })
 
@@ -23,17 +23,18 @@ const ApiContext = React.createContext<ApiContext>({
 })
 
 function usePersistedBooleanValue<T extends keyof persisted.Schema>(key: T) {
-  const [value, _set] = React.useState(() => {
+  const [value, _set] = React.useState<persisted.Schema[T]>(() => {
     const persistedValue = persisted.get(key)
-    if (typeof persistedValue === 'boolean') return persistedValue
-    // fallback to schema default
-    return Boolean(persisted.defaults[key])
+    if (typeof persistedValue === 'boolean')
+      return persistedValue as persisted.Schema[T]
+    // fallback to schema default, but allow undefined for autoTrustOnFollow
+    if (key === 'autoTrustOnFollow' && persistedValue === undefined)
+      return undefined as persisted.Schema[T]
+    return Boolean(persisted.defaults[key]) as persisted.Schema[T]
   })
-  const set = React.useCallback<
-    (value: Exclude<persisted.Schema[T], undefined>) => void
-  >(
+  const set = React.useCallback<(value: persisted.Schema[T]) => void>(
     hidden => {
-      _set(Boolean(hidden))
+      _set(hidden)
       persisted.write(key, hidden)
     },
     [key, _set],
@@ -41,9 +42,11 @@ function usePersistedBooleanValue<T extends keyof persisted.Schema>(key: T) {
   React.useEffect(() => {
     return persisted.onUpdate(key, hidden => {
       if (typeof hidden === 'boolean') {
-        _set(hidden)
+        _set(hidden as persisted.Schema[T])
+      } else if (key === 'autoTrustOnFollow' && hidden === undefined) {
+        _set(undefined as persisted.Schema[T])
       } else {
-        _set(Boolean(persisted.defaults[key]))
+        _set(Boolean(persisted.defaults[key]) as persisted.Schema[T])
       }
     })
   }, [key, _set])
@@ -54,8 +57,10 @@ function usePersistedBooleanValue<T extends keyof persisted.Schema>(key: T) {
 export function Provider({children}: React.PropsWithChildren<{}>) {
   const [autoTrustOnFollow, setAutoTrustOnFollow] =
     usePersistedBooleanValue('autoTrustOnFollow')
-  const [autoUntrustOnUnfollow, setAutoUntrustOnUnfollow] =
+  const [autoUntrustOnUnfollowRaw, setAutoUntrustOnUnfollow] =
     usePersistedBooleanValue('autoUntrustOnUnfollow')
+  // Ensure autoUntrustOnUnfollow is always boolean
+  const autoUntrustOnUnfollow = autoUntrustOnUnfollowRaw ?? false
 
   const state = React.useMemo(
     () => ({

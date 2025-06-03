@@ -8,9 +8,14 @@ import {Shadow, useProfileShadow} from '#/state/cache/profile-shadow'
 import {useProfileQuery} from '#/state/queries/profile'
 import {atoms as a, useBreakpoints} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
-import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
+import * as Prompt from '#/components/Prompt'
 
 export function PostThreadFollowBtn({did}: {did: string}) {
   const {data: profile, isLoading} = useProfileQuery({did})
@@ -73,44 +78,53 @@ function PostThreadFollowBtnLoaded({
     profile,
     logContext: 'PostThreadItem',
   })
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+  const promptControl = Prompt.usePromptControl()
 
   const onPress = React.useCallback(() => {
     if (!isFollowing) {
-      follow()
+      if (shouldShowDialog) {
+        promptControl.open()
+      } else {
+        follow()
+      }
     } else {
       unfollow()
     }
-  }, [isFollowing, follow, unfollow])
+  }, [isFollowing, shouldShowDialog, follow, unfollow, promptControl])
 
   if (!showFollowBtn) return null
 
   return (
-    <Button
-      testID="followBtn"
-      label={_(msg`Follow ${profile.handle}`)}
-      onPress={onPress}
-      size="small"
-      variant="solid"
-      color={isFollowing ? 'secondary' : 'secondary_inverted'}
-      style={[a.rounded_full]}>
-      {gtMobile && (
-        <ButtonIcon
-          icon={isFollowing ? Check : Plus}
-          position="left"
-          size="sm"
-        />
-      )}
-      <ButtonText>
-        {!isFollowing ? (
-          isFollowedBy ? (
-            <Trans>Follow Back</Trans>
-          ) : (
-            <Trans>Follow</Trans>
-          )
-        ) : (
-          <Trans>Following</Trans>
+    <>
+      <Button
+        testID="followBtn"
+        label={_(msg`Follow ${profile.handle}`)}
+        onPress={onPress}
+        size="small"
+        variant="solid"
+        color={isFollowing ? 'secondary' : 'secondary_inverted'}
+        style={[a.rounded_full]}>
+        {gtMobile && (
+          <ButtonIcon
+            icon={isFollowing ? Check : Plus}
+            position="left"
+            size="sm"
+          />
         )}
-      </ButtonText>
-    </Button>
+        <ButtonText>
+          {!isFollowing ? (
+            isFollowedBy ? (
+              <Trans>Follow Back</Trans>
+            ) : (
+              <Trans>Follow</Trans>
+            )
+          ) : (
+            <Trans>Following</Trans>
+          )}
+        </ButtonText>
+      </Button>
+      <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
+    </>
   )
 }
