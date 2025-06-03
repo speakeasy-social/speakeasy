@@ -130,6 +130,8 @@ const schema = z.object({
   trendingVideoDisabled: z.boolean().optional(),
   showInteractionNumbers: z.boolean().optional(),
   useGridLayout: z.boolean().optional(), // Preference for grid vs carousel layout for multiple images
+  autoTrustOnFollow: z.boolean().optional(), // Automatically trust when following
+  autoUntrustOnUnfollow: z.boolean().optional(), // Automatically untrust when unfollowing
   leaveOptions: z
     .array(
       z.object({
@@ -187,6 +189,8 @@ export const defaults: Schema = {
   trendingVideoDisabled: false,
   showInteractionNumbers: false,
   useGridLayout: true, // Default to grid layout
+  autoTrustOnFollow: undefined, // Start as undefined to show the prompt
+  autoUntrustOnUnfollow: true, // Default to true
   leaveOptions: DEFAULT_LEAVE_OPTIONS,
 }
 

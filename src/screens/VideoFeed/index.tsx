@@ -65,7 +65,6 @@ import {
   FeedPostSliceItem,
   usePostFeedQuery,
 } from '#/state/queries/post-feed'
-import {useProfileFollowMutationQueue} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {useComposerControls, useSetMinimalShellMode} from '#/state/shell'
 import {useSetLightStatusBar} from '#/state/shell/light-status-bar'
@@ -78,6 +77,7 @@ import {atoms as a, platform, ThemeProvider, useTheme} from '#/alf'
 import {setNavigationBar} from '#/alf/util/navigationBar'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import {Divider} from '#/components/Divider'
+import {useFollowWithTrustMethods} from '#/components/hooks/useFollowMethods'
 import {ArrowLeft_Stroke2_Corner0_Rounded as ArrowLeftIcon} from '#/components/icons/Arrow'
 import {Check_Stroke2_Corner0_Rounded as CheckIcon} from '#/components/icons/Check'
 import {EyeSlash_Stroke2_Corner0_Rounded as Eye} from '#/components/icons/EyeSlash'
@@ -681,10 +681,10 @@ function Overlay({
   const seekingAnimationSV = useSharedValue(0)
 
   const profile = useProfileShadow(post.author)
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
+  const {follow, unfollow} = useFollowWithTrustMethods({
     profile,
-    'ImmersiveVideo',
-  )
+    logContext: 'ImmersiveVideo',
+  })
 
   const rkey = new AtUri(post.uri).rkey
   const record = AppBskyFeedPost.isRecord(post.record) ? post.record : undefined
@@ -796,9 +796,7 @@ function Overlay({
                     color="secondary_inverted"
                     style={[a.mb_xs]}
                     onPress={() =>
-                      profile.viewer?.following
-                        ? queueUnfollow()
-                        : queueFollow()
+                      profile.viewer?.following ? unfollow() : follow()
                     }>
                     {!!profile.viewer?.following && (
                       <ButtonIcon icon={CheckIcon} />

@@ -14,13 +14,17 @@ import {useModalControls} from '#/state/modals'
 import {
   RQKEY as profileQueryKey,
   useProfileBlockMutationQueue,
-  useProfileFollowMutationQueue,
   useProfileMuteMutationQueue,
 } from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {EventStopper} from '#/view/com/util/EventStopper'
 import * as Toast from '#/view/com/util/Toast'
 import {Button, ButtonIcon} from '#/components/Button'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
 import {ArrowOutOfBox_Stroke2_Corner0_Rounded as Share} from '#/components/icons/ArrowOutOfBox'
 import {DotGrid_Stroke2_Corner0_Rounded as Ellipsis} from '#/components/icons/DotGrid'
 import {Flag_Stroke2_Corner0_Rounded as Flag} from '#/components/icons/Flag'
@@ -55,10 +59,12 @@ let ProfileMenu = ({
 
   const [queueMute, queueUnmute] = useProfileMuteMutationQueue(profile)
   const [queueBlock, queueUnblock] = useProfileBlockMutationQueue(profile)
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
+  const {follow, unfollow} = useFollowWithTrustMethods({
     profile,
-    'ProfileMenu',
-  )
+    logContext: 'ProfileMenu',
+  })
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+  const promptControl = Prompt.usePromptControl()
 
   const blockPromptControl = Prompt.usePromptControl()
   const loggedOutWarningPromptControl = Prompt.usePromptControl()
@@ -140,20 +146,24 @@ let ProfileMenu = ({
   }, [profile.viewer?.blocking, _, queueUnblock, queueBlock])
 
   const onPressFollowAccount = React.useCallback(async () => {
-    try {
-      await queueFollow()
-      Toast.show(_(msg`Account followed`))
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') {
-        logger.error('Failed to follow account', {message: e})
-        Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
+    if (shouldShowDialog) {
+      promptControl.open()
+    } else {
+      try {
+        await follow()
+        Toast.show(_(msg`Account followed`))
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          logger.error('Failed to follow account', {message: e})
+          Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
+        }
       }
     }
-  }, [_, queueFollow])
+  }, [_, follow, shouldShowDialog, promptControl])
 
   const onPressUnfollowAccount = React.useCallback(async () => {
     try {
-      await queueUnfollow()
+      await unfollow()
       Toast.show(_(msg`Account unfollowed`))
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
@@ -161,7 +171,7 @@ let ProfileMenu = ({
         Toast.show(_(msg`There was an issue! ${e.toString()}`), 'xmark')
       }
     }
-  }, [_, queueUnfollow])
+  }, [_, unfollow])
 
   const onPressReportAccount = React.useCallback(() => {
     reportDialogControl.open()
@@ -352,6 +362,8 @@ let ProfileMenu = ({
         onConfirm={onPressShare}
         confirmButtonCta={_(msg`Share anyway`)}
       />
+
+      <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
     </EventStopper>
   )
 }

@@ -4,13 +4,16 @@ import {useLingui} from '@lingui/react'
 import {NativeStackScreenProps} from '@react-navigation/native-stack'
 
 import {CommonNavigatorParams} from '#/lib/routes/types'
+import {useTrustPreferences} from '#/state/preferences/trust'
 import {useAppPasswordsQuery} from '#/state/queries/app-passwords'
 import {useSession} from '#/state/session'
 import * as SettingsList from '#/screens/Settings/components/SettingsList'
 import {atoms as a, useTheme} from '#/alf'
 import * as Admonition from '#/components/Admonition'
+import * as Toggle from '#/components/forms/Toggle'
 import {EyeSlash_Stroke2_Corner0_Rounded as EyeSlashIcon} from '#/components/icons/EyeSlash'
 import {Key_Stroke2_Corner2_Rounded as KeyIcon} from '#/components/icons/Key'
+import {PeopleRemove2_Stroke2_Corner0_Rounded as PeopleRemove} from '#/components/icons/PeopleRemove2'
 import {Verified_Stroke2_Corner2_Rounded as VerifiedIcon} from '#/components/icons/Verified'
 import * as Layout from '#/components/Layout'
 import {InlineLinkText} from '#/components/Link'
@@ -26,6 +29,12 @@ export function PrivacyAndSecuritySettingsScreen({}: Props) {
   const t = useTheme()
   const {data: appPasswords} = useAppPasswordsQuery()
   const {currentAccount} = useSession()
+  const {
+    autoTrustOnFollow,
+    autoUntrustOnUnfollow,
+    setAutoTrustOnFollow,
+    setAutoUntrustOnUnfollow,
+  } = useTrustPreferences()
 
   return (
     <Layout.Screen>
@@ -71,6 +80,53 @@ export function PrivacyAndSecuritySettingsScreen({}: Props) {
               </SettingsList.BadgeText>
             )}
           </SettingsList.LinkItem>
+          <SettingsList.Divider />
+          <SettingsList.Group>
+            <SettingsList.ItemIcon icon={PeopleRemove} />
+            <SettingsList.ItemText>
+              <Trans>Trust Settings</Trans>
+            </SettingsList.ItemText>
+            <View style={[a.flex_1, a.gap_sm]}>
+              <Toggle.Item
+                type="checkbox"
+                name="auto_trust_follow"
+                label={_(msg`Automatically trust when following`)}
+                value={autoTrustOnFollow}
+                onChange={value => setAutoTrustOnFollow(value)}
+                style={[a.w_full]}>
+                <Toggle.LabelText style={[a.flex_1]}>
+                  <Trans>Automatically trust when following</Trans>
+                </Toggle.LabelText>
+                <Toggle.Platform />
+              </Toggle.Item>
+              <Toggle.Item
+                type="checkbox"
+                name="auto_untrust_unfollow"
+                label={_(msg`Automatically untrust when unfollowing`)}
+                value={autoUntrustOnUnfollow}
+                onChange={value => setAutoUntrustOnUnfollow(value)}
+                style={[a.w_full]}>
+                <Toggle.LabelText style={[a.flex_1]}>
+                  <Trans>Automatically untrust when unfollowing</Trans>
+                </Toggle.LabelText>
+                <Toggle.Platform />
+              </Toggle.Item>
+              <Admonition.Outer type="tip" style={[a.flex_1]}>
+                <Admonition.Row>
+                  <Admonition.Icon />
+                  <View style={[a.flex_1, a.gap_sm]}>
+                    <Admonition.Text>
+                      <Trans>
+                        Note: These trust settings only apply when following or
+                        unfollowing from within Speakeasy. These settings are
+                        not applied to past actions.
+                      </Trans>
+                    </Admonition.Text>
+                  </View>
+                </Admonition.Row>
+              </Admonition.Outer>
+            </View>
+          </SettingsList.Group>
           <SettingsList.Divider />
           <SettingsList.Group>
             <SettingsList.ItemIcon icon={EyeSlashIcon} />

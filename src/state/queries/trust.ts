@@ -4,6 +4,7 @@ import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {getPublicKey} from '#/lib/api/user-keys'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
+import {logger} from '#/logger'
 import {RQKEY as TRUST_STATUS_RQKEY} from './trust-status'
 
 const RQKEY_ROOT = 'trust'
@@ -89,10 +90,11 @@ function useUntrustMutation() {
           },
         })
       } catch (error: any) {
-        if (error.code === 'NotFoundError') {
+        logger.error('untrustMutation error', error)
+        if (error.code === 'NotFound') {
           return
         }
-        throw new Error('Failed to remove trusted user')
+        throw new Error('Failed to untrust')
       }
     },
   })

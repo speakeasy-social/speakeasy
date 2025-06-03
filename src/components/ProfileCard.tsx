@@ -13,16 +13,21 @@ import {LogEvents} from '#/lib/statsig/statsig'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {sanitizeHandle} from '#/lib/strings/handles'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
-import {useProfileFollowMutationQueue} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {ProfileCardPills} from '#/view/com/profile/ProfileCard'
 import * as Toast from '#/view/com/util/Toast'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonProps, ButtonText} from '#/components/Button'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
 import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 import {Link as InternalLink, LinkProps} from '#/components/Link'
+import * as Prompt from '#/components/Prompt'
 import {RichText} from '#/components/RichText'
 import {Text} from '#/components/Typography'
 
@@ -305,17 +310,30 @@ export function FollowButtonInner({
   const {_} = useLingui()
   const profile = useProfileShadow(profileUnshadowed)
   const moderation = moderateProfile(profile, moderationOpts)
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
+  const {follow, unfollow} = useFollowWithTrustMethods({
     profile,
     logContext,
-  )
+  })
   const isRound = Boolean(rest.shape && rest.shape === 'round')
+  const promptControl = Prompt.usePromptControl()
 
-  const onPressFollow = async (e: GestureResponderEvent) => {
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+
+  const handleFollowPress = (e: GestureResponderEvent) => {
     e.preventDefault()
     e.stopPropagation()
+
+    if (shouldShowDialog) {
+      promptControl.open()
+    } else {
+      onPressFollow()
+    }
+    onPressProp?.(e)
+  }
+
+  const onPressFollow = async (forceTrust: boolean = false) => {
     try {
-      await queueFollow()
+      await follow(forceTrust)
       Toast.show(
         _(
           msg`Following ${sanitizeDisplayName(
@@ -324,7 +342,6 @@ export function FollowButtonInner({
           )}`,
         ),
       )
-      onPressProp?.(e)
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
         Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
@@ -336,7 +353,7 @@ export function FollowButtonInner({
     e.preventDefault()
     e.stopPropagation()
     try {
-      await queueUnfollow()
+      await unfollow()
       Toast.show(
         _(
           msg`No longer following ${sanitizeDisplayName(
@@ -394,11 +411,12 @@ export function FollowButtonInner({
           variant="solid"
           color={colorInverted ? 'secondary_inverted' : 'primary'}
           {...rest}
-          onPress={onPressFollow}>
+          onPress={handleFollowPress}>
           <ButtonIcon icon={Plus} position={isRound ? undefined : 'left'} />
           {isRound ? null : <ButtonText>{followLabel}</ButtonText>}
         </Button>
       )}
+      <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
     </View>
   )
 }
