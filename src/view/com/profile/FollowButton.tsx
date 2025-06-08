@@ -4,9 +4,13 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {Shadow} from '#/state/cache/types'
-import {useProfileFollowMutationQueue} from '#/state/queries/profile'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
+import * as Prompt from '#/components/Prompt'
 import {Button, ButtonType} from '../util/forms/Button'
-import * as Toast from '../util/Toast'
 
 export function FollowButton({
   unfollowedType = 'inverted',
@@ -21,29 +25,19 @@ export function FollowButton({
   labelStyle?: StyleProp<TextStyle>
   logContext: 'ProfileCard' | 'StarterPackProfilesList'
 }) {
-  const [queueFollow, queueUnfollow] = useProfileFollowMutationQueue(
+  const {follow, unfollow} = useFollowWithTrustMethods({
     profile,
     logContext,
-  )
+  })
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+  const promptControl = Prompt.usePromptControl()
   const {_} = useLingui()
 
-  const onPressFollow = async () => {
-    try {
-      await queueFollow()
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') {
-        Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
-      }
-    }
-  }
-
-  const onPressUnfollow = async () => {
-    try {
-      await queueUnfollow()
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') {
-        Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
-      }
+  const handleFollowPress = () => {
+    if (shouldShowDialog) {
+      promptControl.open()
+    } else {
+      follow()
     }
   }
 
@@ -51,32 +45,31 @@ export function FollowButton({
     return <View />
   }
 
-  if (profile.viewer.following) {
-    return (
-      <Button
-        type={followedType}
-        labelStyle={labelStyle}
-        onPress={onPressUnfollow}
-        label={_(msg({message: 'Unfollow', context: 'action'}))}
-      />
-    )
-  } else if (!profile.viewer.followedBy) {
-    return (
-      <Button
-        type={unfollowedType}
-        labelStyle={labelStyle}
-        onPress={onPressFollow}
-        label={_(msg({message: 'Follow', context: 'action'}))}
-      />
-    )
-  } else {
-    return (
-      <Button
-        type={unfollowedType}
-        labelStyle={labelStyle}
-        onPress={onPressFollow}
-        label={_(msg({message: 'Follow Back', context: 'action'}))}
-      />
-    )
-  }
+  return (
+    <>
+      {profile.viewer.following ? (
+        <Button
+          type={followedType}
+          labelStyle={labelStyle}
+          onPress={unfollow}
+          label={_(msg({message: 'Unfollow', context: 'action'}))}
+        />
+      ) : !profile.viewer.followedBy ? (
+        <Button
+          type={unfollowedType}
+          labelStyle={labelStyle}
+          onPress={handleFollowPress}
+          label={_(msg({message: 'Follow', context: 'action'}))}
+        />
+      ) : (
+        <Button
+          type={unfollowedType}
+          labelStyle={labelStyle}
+          onPress={handleFollowPress}
+          label={_(msg({message: 'Follow Back', context: 'action'}))}
+        />
+      )}
+      <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
+    </>
+  )
 }

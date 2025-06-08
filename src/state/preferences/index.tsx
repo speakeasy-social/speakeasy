@@ -14,6 +14,7 @@ import {Provider as LeaveOptionsProvider} from './leave-options'
 import {Provider as ShowInteractionNumbersProvider} from './show-interaction-numbers'
 import {Provider as SubtitlesProvider} from './subtitles'
 import {Provider as TrendingSettingsProvider} from './trending'
+import {Provider as TrustPreferencesProvider} from './trust'
 import {Provider as UsedStarterPacksProvider} from './used-starter-packs'
 
 export {
@@ -59,7 +60,9 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
                             <ShowInteractionNumbersProvider>
                               <LeaveOptionsProvider>
                                 <ImageLayoutProvider>
-                                  {children}
+                                  <TrustPreferencesProvider>
+                                    {children}
+                                  </TrustPreferencesProvider>
                                 </ImageLayoutProvider>
                               </LeaveOptionsProvider>
                             </ShowInteractionNumbersProvider>

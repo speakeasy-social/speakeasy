@@ -16,8 +16,13 @@ import {
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a, select, useTheme} from '#/alf'
 import {Button} from '#/components/Button'
-import {useFollowMethods} from '#/components/hooks/useFollowMethods'
+import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
+import {
+  useFirstTimeFollowDialog,
+  useFollowWithTrustMethods,
+} from '#/components/hooks/useFollowMethods'
 import {PlusSmall_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
+import * as Prompt from '#/components/Prompt'
 
 export function AviFollowButton({
   author,
@@ -31,10 +36,12 @@ export function AviFollowButton({
   const {_} = useLingui()
   const t = useTheme()
   const profile = useProfileShadow(author)
-  const {follow} = useFollowMethods({
+  const {follow} = useFollowWithTrustMethods({
     profile: profile,
     logContext: 'AvatarButton',
   })
+  const {shouldShowDialog} = useFirstTimeFollowDialog({onFollow: follow})
+  const promptControl = Prompt.usePromptControl()
   const {currentAccount, hasSession} = useSession()
   const navigation = useNavigation<NavigationProp>()
 
@@ -46,7 +53,11 @@ export function AviFollowButton({
     profile.viewer?.following || profile.did === currentAccount?.did
 
   function onPress() {
-    follow()
+    if (shouldShowDialog) {
+      promptControl.open()
+    } else {
+      follow()
+    }
     Toast.show(_(msg`Following ${name}`))
   }
 
@@ -82,59 +93,62 @@ export function AviFollowButton({
       {children}
 
       {!isFollowing && (
-        <Button
-          label={_(msg`Open ${name} profile shortcut menu`)}
-          style={[
-            a.rounded_full,
-            a.absolute,
-            {
-              bottom: -7,
-              right: -7,
-            },
-          ]}>
-          <NativeDropdown items={items}>
-            <View
-              style={[
-                {
-                  // An asymmetric hit slop
-                  // to prioritize bottom right taps.
-                  paddingTop: 2,
-                  paddingLeft: 2,
-                  paddingBottom: 6,
-                  paddingRight: 6,
-                },
-                a.align_center,
-                a.justify_center,
-                a.rounded_full,
-              ]}>
+        <>
+          <Button
+            label={_(msg`Open ${name} profile shortcut menu`)}
+            style={[
+              a.rounded_full,
+              a.absolute,
+              {
+                bottom: -7,
+                right: -7,
+              },
+            ]}>
+            <NativeDropdown items={items}>
               <View
                 style={[
-                  a.rounded_full,
-                  a.align_center,
-                  select(t.name, {
-                    light: t.atoms.bg_contrast_100,
-                    dim: t.atoms.bg_contrast_100,
-                    dark: t.atoms.bg_contrast_200,
-                  }),
                   {
-                    borderWidth: 1,
-                    borderColor: t.atoms.bg.backgroundColor,
+                    // An asymmetric hit slop
+                    // to prioritize bottom right taps.
+                    paddingTop: 2,
+                    paddingLeft: 2,
+                    paddingBottom: 6,
+                    paddingRight: 6,
                   },
+                  a.align_center,
+                  a.justify_center,
+                  a.rounded_full,
                 ]}>
-                <Plus
-                  size="sm"
-                  fill={
+                <View
+                  style={[
+                    a.rounded_full,
+                    a.align_center,
                     select(t.name, {
-                      light: t.atoms.bg_contrast_600,
-                      dim: t.atoms.bg_contrast_500,
-                      dark: t.atoms.bg_contrast_600,
-                    }).backgroundColor
-                  }
-                />
+                      light: t.atoms.bg_contrast_100,
+                      dim: t.atoms.bg_contrast_100,
+                      dark: t.atoms.bg_contrast_200,
+                    }),
+                    {
+                      borderWidth: 1,
+                      borderColor: t.atoms.bg.backgroundColor,
+                    },
+                  ]}>
+                  <Plus
+                    size="sm"
+                    fill={
+                      select(t.name, {
+                        light: t.atoms.bg_contrast_600,
+                        dim: t.atoms.bg_contrast_500,
+                        dark: t.atoms.bg_contrast_600,
+                      }).backgroundColor
+                    }
+                  />
+                </View>
               </View>
-            </View>
-          </NativeDropdown>
-        </Button>
+            </NativeDropdown>
+          </Button>
+          <FirstTimeFollowDialog onFollow={follow} control={promptControl} />
+        </>
       )}
     </View>
   ) : (
