@@ -1,5 +1,15 @@
+import {BskyAgent} from '@atproto/api'
 import basex from 'base-x'
 import {MlKem768} from 'mlkem'
+
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {getCachedPrivateKey} from '#/lib/api/user-keys'
+
+export type EncryptedSessionKey = {
+  sessionId: string
+  encryptedDek: string
+  recipientDid: string
+}
 
 // =====================
 // Utility Functions
@@ -411,8 +421,6 @@ export async function decryptContent(
   encryptedData: string,
   dek: string,
 ): Promise<string> {
-  const dekBytes = safeAtob(dek)
-
   try {
     const packagedContentBytes = safeAtob(encryptedData)
 
@@ -421,13 +429,7 @@ export async function decryptContent(
     const ciphertext = packagedContentBytes.slice(12)
 
     // Import the DEK for AES-GCM decryption
-    const key = await crypto.subtle.importKey(
-      'raw',
-      dekBytes,
-      {name: 'AES-GCM', length: 256},
-      false,
-      ['decrypt'],
-    )
+    const key = await getCryptoKey(dek, 'AES-GCM', 'decrypt')
 
     // Decrypt the ciphertext using AES-GCM with the provided DEK and IV
     const decryptedContentBytes = await crypto.subtle.decrypt(
@@ -444,10 +446,205 @@ export async function decryptContent(
       error instanceof Error ? error.message : error,
     )
     throw new Error('Decryption failed')
-  } finally {
-    // Wipe sensitive data from memory after use
-    secureWipe(dekBytes)
   }
+}
+
+function getCryptoKey(
+  dek: string,
+  keyType: 'AES-GCM' | 'AES-CTR',
+  usage: 'encrypt' | 'decrypt',
+) {
+  const dekBytes = safeAtob(dek)
+  return crypto.subtle.importKey(
+    'raw',
+    dekBytes,
+    {name: keyType, length: 256},
+    false,
+    [usage],
+  )
+}
+
+export async function decryptStream(
+  readable: ReadableStream,
+  dek: string,
+): Promise<ReadableStream> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    safeAtob(dek),
+    {name: 'AES-CTR', length: 256},
+    false,
+    ['decrypt'],
+  )
+  let iv: Uint8Array | null = null
+  let ivBuffer = new Uint8Array(0)
+
+  // Create a TransformStream to process chunks as they arrive
+  const {readable: decryptedReadable, writable} = new TransformStream({
+    async start() {
+      // Initialize buffer
+      ivBuffer = new Uint8Array(0)
+    },
+    async transform(chunk, controller) {
+      // If we haven't extracted the IV yet
+      if (!iv) {
+        // Append new chunk to IV buffer
+        const newBuffer = new Uint8Array(ivBuffer.length + chunk.length)
+        newBuffer.set(ivBuffer)
+        newBuffer.set(chunk, ivBuffer.length)
+        ivBuffer = newBuffer
+
+        // If we have enough data for the IV
+        if (ivBuffer.length >= 12) {
+          iv = ivBuffer.slice(0, 12)
+          // Keep any remaining data for decryption
+          chunk = ivBuffer.slice(12)
+          ivBuffer = new Uint8Array(0)
+        } else {
+          // Not enough data for IV yet, wait for more
+          return
+        }
+      }
+
+      // If we have the IV and data to decrypt
+      if (iv && chunk.length > 0) {
+        try {
+          const decryptedContentBytes = await crypto.subtle.decrypt(
+            {
+              name: 'AES-CTR',
+              counter: new Uint8Array(iv),
+              length: 128, // Counter block size
+            },
+            key,
+            chunk,
+          )
+          controller.enqueue(decryptedContentBytes)
+        } catch (error) {
+          controller.error(new Error('Decryption failed: ' + error))
+        }
+      }
+    },
+    async flush(_controller) {
+      // Clean up sensitive data
+      if (iv) {
+        secureWipe(iv)
+      }
+      secureWipe(ivBuffer)
+    },
+  })
+
+  // Pipe the response body through our transform stream
+  readable.pipeTo(writable)
+
+  return decryptedReadable
+}
+
+export async function encryptStream(
+  readable: ReadableStream,
+  dek: string,
+): Promise<ReadableStream> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    safeAtob(dek),
+    {name: 'AES-CTR', length: 256},
+    false,
+    ['encrypt'],
+  )
+
+  // Generate a random IV
+  const iv = secureGetRandomValues(new Uint8Array(12))
+  let ivSent = false
+
+  // Create a TransformStream to process chunks as they arrive
+  const {readable: encryptedReadable, writable} = new TransformStream({
+    async transform(chunk, controller) {
+      if (!ivSent) {
+        // Send IV as first chunk
+        controller.enqueue(iv)
+        ivSent = true
+      }
+
+      try {
+        const encryptedContentBytes = await crypto.subtle.encrypt(
+          {
+            name: 'AES-CTR',
+            counter: new Uint8Array(iv),
+            length: 128, // Counter block size
+          },
+          key,
+          chunk,
+        )
+        controller.enqueue(encryptedContentBytes)
+      } catch (error) {
+        controller.error(new Error('Encryption failed: ' + error))
+      }
+    },
+    async flush(_controller) {
+      // Clean up sensitive data
+      secureWipe(iv)
+    },
+  })
+
+  // Pipe the response body through our transform stream
+  readable.pipeTo(writable)
+
+  return encryptedReadable
+}
+
+export async function decryptMediaBlob(mediaPath: string, dek: string) {
+  try {
+    const mediaResponse = await fetch(mediaPath)
+    if (!mediaResponse.body) {
+      throw new Error('Response body is null')
+    }
+
+    if (
+      !dek ||
+      mediaResponse.headers.get('Content-Type') !==
+        'application/x-spkeasy-encrypted-media'
+    ) {
+      return mediaResponse.blob()
+    }
+
+    const mediaStream = await decryptStream(mediaResponse.body, dek)
+
+    // Convert the transformed stream to a Blob
+    return new Response(mediaStream, {
+      headers: {
+        ...mediaResponse.headers,
+        'Content-Type':
+          mediaResponse.headers.get('Content-Type') ||
+          'application/octet-stream',
+      },
+    }).blob()
+  } catch (err) {
+    console.error(err)
+    return null
+  }
+}
+
+export async function getDEKMap(
+  agent: BskyAgent,
+  encryptedSessionKeys: EncryptedSessionKey[],
+) {
+  const privateKey = await getCachedPrivateKey(
+    agent.session!.did,
+    options => callSpeakeasyApiWithAgent(agent, options),
+    false,
+  )
+
+  const dekMap = new Map<string, string>(
+    await Promise.all(
+      encryptedSessionKeys.map(
+        async key =>
+          [
+            key.sessionId,
+            await decryptDEK(key.encryptedDek, privateKey!.privateKey),
+          ] as [string, string],
+      ),
+    ),
+  )
+
+  return dekMap
 }
 
 /**
