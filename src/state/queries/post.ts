@@ -2,6 +2,7 @@ import {useCallback} from 'react'
 import {AppBskyActorDefs, AppBskyFeedDefs, AtUri} from '@atproto/api'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 
+import {deleteEncryptedPost} from '#/lib/api/feed/private-posts'
 import {likePrivatePost, unlikePrivatePost} from '#/lib/api/private-like'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
@@ -310,7 +311,11 @@ export function usePostDeleteMutation() {
   const agent = useAgent()
   return useMutation<void, Error, {uri: string}>({
     mutationFn: async ({uri}) => {
-      await agent.deletePost(uri)
+      if (uri.includes('social.spkeasy.feed.privatePost')) {
+        await deleteEncryptedPost(agent, uri)
+      } else {
+        await agent.deletePost(uri)
+      }
     },
     onSuccess(_, variables) {
       updatePostShadow(queryClient, variables.uri, {isDeleted: true})

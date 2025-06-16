@@ -788,3 +788,14 @@ async function createNestedPostMapFromPosts(
 
   return postMap
 }
+
+export async function deleteEncryptedPost(agent: BskyAgent, uri: string) {
+  const res = await callSpeakeasyApiWithAgent(agent, {
+    api: 'social.spkeasy.privatePost.deletePost',
+    method: 'POST',
+    body: {
+      uri,
+    },
+  })
+  return res
+}
