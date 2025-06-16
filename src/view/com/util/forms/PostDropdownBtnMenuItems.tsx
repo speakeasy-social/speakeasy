@@ -645,7 +645,6 @@ let PostDropdownMenuItems = ({
                     <Menu.ItemIcon icon={Gear} position="right" />
                   </Menu.Item>
                   <Menu.Item
-                    disabled={isPrivate}
                     testID="postDropdownDeleteBtn"
                     label={_(msg`Delete post`)}
                     onPress={() => deletePromptControl.open()}>
