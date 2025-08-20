@@ -39,6 +39,8 @@ export function StepCaptcha() {
 
   const onSuccess = React.useCallback(
     (code: string) => {
+      console.log("ON SUCCESS");
+
       setCompleted(true)
       logEvent('signup:captchaSuccess', {})
       dispatch({
@@ -51,6 +53,8 @@ export function StepCaptcha() {
 
   const onError = React.useCallback(
     (error?: unknown) => {
+      console.log("ON SUCCESS");
+
       dispatch({
         type: 'setError',
         value: _(msg`Error receiving captcha response.`),

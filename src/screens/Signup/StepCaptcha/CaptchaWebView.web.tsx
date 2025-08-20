@@ -16,6 +16,8 @@ export function CaptchaWebView({
   onError: (error: unknown) => void
 }) {
   React.useEffect(() => {
+    console.log("URL: ", url);
+
     const timeout = setTimeout(() => {
       onError({
         errorMessage: 'User did not complete the captcha within 30 seconds',
@@ -28,6 +30,8 @@ export function CaptchaWebView({
   }, [onError])
 
   const onLoad = React.useCallback(() => {
+    console.log("ON LOAD");
+
     // @ts-ignore web
     const frame: HTMLIFrameElement = document.getElementById(
       'captcha-iframe',
@@ -56,12 +60,15 @@ export function CaptchaWebView({
   }, [stateParam, onSuccess, onError])
 
   return (
-    <iframe
-      src={url}
-      style={styles.iframe}
-      id="captcha-iframe"
-      onLoad={onLoad}
-    />
+    <>
+      <span>CAPTCHA IFRAME</span>
+      <iframe
+        src={url}
+        style={styles.iframe}
+        id="captcha-iframe"
+        onLoad={onLoad}
+      />
+    </>
   )
 }
 

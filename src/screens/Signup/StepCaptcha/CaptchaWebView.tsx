@@ -49,38 +49,29 @@ export function CaptchaWebView({
 
   const onNavigationStateChange = React.useCallback(
     (e: WebViewNavigation) => {
-      if (wasSuccessful.current) return
+      // if (wasSuccessful.current) return
 
-      const urlp = new URL(e.url)
-      if (urlp.host !== redirectHost) return
+      // const urlp = new URL(e.url)
+      // if (urlp.host !== redirectHost) return
 
-      const code = urlp.searchParams.get('code')
-      if (urlp.searchParams.get('state') !== stateParam || !code) {
-        onError({error: 'Invalid state or code'})
-        return
-      }
+      // const code = urlp.searchParams.get('code')
+      // if (urlp.searchParams.get('state') !== stateParam || !code) {
+      //   onError({error: 'Invalid state or code'})
+      //   return
+      // }
 
-      wasSuccessful.current = true
-      onSuccess(code)
+      // wasSuccessful.current = true
+      // onSuccess(code)
     },
     [redirectHost, stateParam, onSuccess, onError],
   )
 
   return (
-    <WebView
-      source={{uri: url}}
-      javaScriptEnabled
-      style={styles.webview}
-      onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
-      onNavigationStateChange={onNavigationStateChange}
-      scrollEnabled={false}
-      onError={e => {
-        onError(e.nativeEvent)
-      }}
-      onHttpError={e => {
-        onError(e.nativeEvent)
-      }}
-    />
+    <>
+      <span>CAPTCHA WEB VIEW</span>
+      <WebView
+      />
+    </>
   )
 }
 
