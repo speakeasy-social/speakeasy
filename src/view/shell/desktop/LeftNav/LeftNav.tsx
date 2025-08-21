@@ -1,61 +1,34 @@
 import React from 'react'
 import {StyleSheet, View} from 'react-native'
-import {msg} from '@lingui/macro'
-import {useLingui} from '@lingui/react'
 
 import {IntentionFilter} from '#/lib/hooks/useIntention'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
-import {makeProfileLink} from '#/lib/routes/links'
 import {useGate} from '#/lib/statsig/statsig'
 import {useHomeBadge} from '#/state/home-badge'
 import {useSession} from '#/state/session'
 import {NavSignupCard} from '#/view/shell/NavSignupCard'
 import {atoms as a} from '#/alf'
 import {useDialogControl} from '#/components/Dialog'
-import {
-  Bell_Filled_Corner0_Rounded as BellFilled,
-  Bell_Stroke2_Corner0_Rounded as Bell,
-} from '#/components/icons/Bell'
-import {
-  BulletList_Filled_Corner0_Rounded as ListFilled,
-  BulletList_Stroke2_Corner0_Rounded as List,
-} from '#/components/icons/BulletList'
-import {
-  Group3_Stroke2_Corner0_Rounded as Group,
-  Group3_Stroke2_Corner0_Rounded as GroupFilled,
-} from '#/components/icons/Group'
-import {
-  Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
-  Heart2_Stroke2_Corner0_Rounded as Heart,
-} from '#/components/icons/Heart2'
-import {
-  HomeOpen_Filled_Corner0_Rounded as HomeFilled,
-  HomeOpen_Stoke2_Corner0_Rounded as Home,
-} from '#/components/icons/HomeOpen'
-import {MagnifyingGlass_Filled_Stroke2_Corner0_Rounded as MagnifyingGlassFilled} from '#/components/icons/MagnifyingGlass'
-import {MagnifyingGlass2_Stroke2_Corner0_Rounded as MagnifyingGlass} from '#/components/icons/MagnifyingGlass2'
-import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
-import {
-  SettingsGear2_Filled_Corner0_Rounded as SettingsFilled,
-  SettingsGear2_Stroke2_Corner0_Rounded as Settings,
-} from '#/components/icons/SettingsGear2'
-import {
-  UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
-  UserCircle_Stroke2_Corner0_Rounded as UserCircle,
-} from '#/components/icons/UserCircle'
-import ChatNavItem from './ChatNavItem'
 import ComposeBtn from './ComposeBtn'
-import {NAV_ICON_WIDTH} from './constants'
+import {
+  Chat,
+  Feed,
+  Groups,
+  Home,
+  Lists,
+  MutualAid,
+  Notifications,
+  Profile,
+  Search,
+  Settings,
+} from './items'
 import Modal from './Modal'
-import NavItem from './NavItem'
 import ProfileCard from './ProfileCard'
-//import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
 
 export function LeftNav() {
-  const {hasSession, currentAccount} = useSession()
+  const {hasSession} = useSession()
   const pal = usePalette('default')
-  const {_} = useLingui()
   const {isDesktop, isTablet} = useWebMediaQueries()
   const hasHomeBadge = useHomeBadge()
   const gate = useGate()
@@ -88,107 +61,21 @@ export function LeftNav() {
 
         {hasSession && (
           <>
-            <NavItem
-              href="/"
-              hasNew={hasHomeBadge && gate('remove_show_latest_button')}
-              icon={
-                <Home
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              iconFilled={
-                <HomeFilled
-                  aria-hidden={true}
-                  width={NAV_ICON_WIDTH}
-                  style={pal.text}
-                />
-              }
-              label={_(msg`Home`)}
-            />
+            <Home gate={gate} hasHomeBadge={hasHomeBadge} />
             <IntentionFilter routeName="Feed">
-              <NavItem
-                href="/feed"
-                hasNew={hasHomeBadge && gate('remove_show_latest_button')}
-                icon={
-                  <News
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <News
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Feed`)}
-              />
+              <Feed gate={gate} hasHomeBadge={hasHomeBadge} />
             </IntentionFilter>
             <IntentionFilter routeName="Search">
-              <NavItem
-                href="/search"
-                icon={
-                  <MagnifyingGlass
-                    style={pal.text}
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                  />
-                }
-                iconFilled={
-                  <MagnifyingGlassFilled
-                    style={pal.text}
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                  />
-                }
-                label={_(msg`Search`)}
-              />
+              <Search />
             </IntentionFilter>
             <IntentionFilter routeName="Notifications">
-              <NavItem
-                href="/notifications"
-                icon={
-                  <Bell
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <BellFilled
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Notifications`)}
-              />
+              <Notifications />
             </IntentionFilter>
             <IntentionFilter routeName="Messages">
-              <ChatNavItem />
+              <Chat />
             </IntentionFilter>
             <IntentionFilter routeName="Groups">
-              <NavItem
-                href="/groups"
-                icon={
-                  <Group
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <GroupFilled
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Groups`)}
+              <Groups
                 onPress={() => {
                   setSelectedFeature('groups')
                   groupsDialogControl.open()
@@ -196,113 +83,21 @@ export function LeftNav() {
               />
             </IntentionFilter>
             <IntentionFilter routeName="Mutual">
-              <NavItem
-                href="/mutual"
-                icon={
-                  <Heart
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <HeartFilled
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Mutual Aid`)}
+              <MutualAid
                 onPress={() => {
                   setSelectedFeature('mutual-aid')
                   groupsDialogControl.open()
                 }}
               />
             </IntentionFilter>
-            {/* <IntentionFilter routeName="VideoFeed">
-              <NavItem
-                href="/reels"
-                count="1"
-                icon={
-                  <VideoClipIcon
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <VideoClipIcon
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Reels`)}
-                onPress={() => {
-                  setSelectedFeature('mutual-aid')
-                  groupsDialogControl.open()
-                }}
-              />
-            </IntentionFilter> */}
             <IntentionFilter routeName="Lists">
-              <NavItem
-                href="/lists"
-                icon={
-                  <List
-                    style={pal.text}
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                  />
-                }
-                iconFilled={
-                  <ListFilled
-                    style={pal.text}
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                  />
-                }
-                label={_(msg`Lists`)}
-              />
+              <Lists />
             </IntentionFilter>
             <IntentionFilter routeName="Profile">
-              <NavItem
-                href={currentAccount ? makeProfileLink(currentAccount) : '/'}
-                icon={
-                  <UserCircle
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <UserCircleFilled
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Profile`)}
-              />
+              <Profile />
             </IntentionFilter>
             <IntentionFilter routeName="Settings">
-              <NavItem
-                href="/settings"
-                icon={
-                  <Settings
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                iconFilled={
-                  <SettingsFilled
-                    aria-hidden={true}
-                    width={NAV_ICON_WIDTH}
-                    style={pal.text}
-                  />
-                }
-                label={_(msg`Settings`)}
-              />
+              <Settings />
             </IntentionFilter>
 
             <ComposeBtn />
