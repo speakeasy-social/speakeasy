@@ -13,7 +13,6 @@ import {useSession} from '#/state/session'
 import {NavSignupCard} from '#/view/shell/NavSignupCard'
 import {atoms as a} from '#/alf'
 import {useDialogControl} from '#/components/Dialog'
-import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
 import {
   Bell_Filled_Corner0_Rounded as BellFilled,
   Bell_Stroke2_Corner0_Rounded as Bell,
@@ -48,6 +47,7 @@ import {
 import ChatNavItem from './ChatNavItem'
 import ComposeBtn from './ComposeBtn'
 import {NAV_ICON_WIDTH} from './constants'
+import Modal from './Modal'
 import NavItem from './NavItem'
 import ProfileCard from './ProfileCard'
 //import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
@@ -66,27 +66,9 @@ export function LeftNav() {
 
   return (
     <>
-      <LimitedBetaModal
-        control={groupsDialogControl}
-        featureName={
-          selectedFeature === 'groups' ? _(msg`Groups`) : _(msg`Mutual Aid`)
-        }
-        featureDescription={
-          selectedFeature === 'groups'
-            ? _(
-                msg`We're trialing a new feature to support private discussion groups.`,
-              )
-            : _(msg`We're working on a new feature to support mutual aid.`)
-        }
-        utmParams={{
-          source: 'leftnav',
-          medium:
-            selectedFeature === 'groups'
-              ? 'groups_button'
-              : 'mutual_aid_button',
-          campaign:
-            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
-        }}
+      <Modal
+        groupsDialogControl={groupsDialogControl}
+        selectedFeature={selectedFeature}
       />
       <View
         role="navigation"
