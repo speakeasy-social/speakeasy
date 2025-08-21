@@ -7,8 +7,8 @@ import {
   Message_Stroke2_Corner0_Rounded as Message,
   Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
 } from '#/components/icons/Message'
-import {NAV_ICON_WIDTH} from './constants'
-import NavItem from './NavItem'
+import {NAV_ICON_WIDTH} from '../constants'
+import NavItem from '../NavItem'
 
 function ChatNavItem() {
   const pal = usePalette('default')
