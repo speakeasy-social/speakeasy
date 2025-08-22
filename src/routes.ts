@@ -10,6 +10,7 @@ export const router = new Router({
   Settings: '/settings',
   Lists: '/lists',
   Donate: '/donate',
+  DonateThanks: '/donate/thanks',
   // moderation
   Moderation: '/moderation',
   ModerationModlists: '/moderation/modlists',
