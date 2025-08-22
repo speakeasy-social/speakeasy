@@ -1,4 +1,5 @@
 import Chat from './Chat'
+import Donate from './Donate'
 import Feed from './Feed'
 import Groups from './Groups'
 import Home from './Home'
@@ -11,6 +12,7 @@ import Settings from './Settings'
 
 export {
   Chat,
+  Donate,
   Feed,
   Groups,
   Home,
