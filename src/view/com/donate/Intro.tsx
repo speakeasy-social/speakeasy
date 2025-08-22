@@ -27,9 +27,9 @@ export function Intro({
           accessibilityLabel="Two people sitting on a picnic rug, eating noodles"
           accessibilityHint=""
           accessibilityIgnoresInvertColors
-          style={[{width: '100%', aspectRatio: 1.4}]}
+          style={[{width: '100%', aspectRatio: 1.5}]}
         />
-        <Text style={[t.atoms.text, a.text_2xl, a.px_6xl, a.py_5xl]}>
+        <Text style={[t.atoms.text, a.text_2xl, a.py_5xl, {width: 350}]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans
