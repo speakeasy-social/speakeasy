@@ -13,6 +13,7 @@ import {useDialogControl} from '#/components/Dialog'
 import ComposeBtn from './ComposeBtn'
 import {
   Chat,
+  Donate,
   Feed,
   Groups,
   Home,
@@ -92,6 +93,9 @@ export function LeftNav() {
             </IntentionFilter>
             <IntentionFilter routeName="Lists">
               <Lists />
+            </IntentionFilter>
+            <IntentionFilter routeName="Donate">
+              <Donate />
             </IntentionFilter>
             <IntentionFilter routeName="Profile">
               <Profile />
