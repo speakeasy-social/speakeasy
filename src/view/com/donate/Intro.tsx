@@ -29,7 +29,7 @@ export function Intro({
           accessibilityIgnoresInvertColors
           style={[{width: '100%', aspectRatio: 1.5}]}
         />
-        <Text style={[t.atoms.text, a.text_2xl, a.py_5xl, {width: 350}]}>
+        <Text style={[t.atoms.text, a.text_2xl, a.p_6xl]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans

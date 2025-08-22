@@ -394,6 +394,9 @@ export const atoms = {
   p_5xl: {
     padding: tokens.space._5xl,
   },
+  p_6xl: {
+    padding: tokens.space._5xl,
+  },
   px_0: {
     paddingLeft: 0,
     paddingRight: 0,
