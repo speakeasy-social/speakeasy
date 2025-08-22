@@ -18,16 +18,8 @@ export function Intro({
 
   return (
     <View testID={testID} style={style}>
-      <View
-        style={[
-          a.flex_col,
-          a.align_center,
-          a.gap_sm,
-          a.px_xl,
-          a.pt_xl,
-          a.w_full,
-        ]}>
-        <Text style={[a.text_5xl, t.atoms.text]}>
+      <View style={[a.flex_col, a.align_center, a.gap_sm, a.w_full]}>
+        <Text style={[t.atoms.text, a.text_5xl, a.px_6xl, a.py_2xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -37,7 +29,7 @@ export function Intro({
           accessibilityIgnoresInvertColors
           style={[{width: '100%', aspectRatio: 1.4}]}
         />
-        <Text style={[a.text_2xl, t.atoms.text]}>
+        <Text style={[t.atoms.text, a.text_2xl, a.px_6xl, a.py_5xl]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans
