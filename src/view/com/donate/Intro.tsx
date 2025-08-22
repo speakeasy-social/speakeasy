@@ -1,9 +1,9 @@
-import {StyleProp, Text,View, ViewStyle} from 'react-native'
+import {StyleProp, Text, View, ViewStyle} from 'react-native'
 import {Image} from 'expo-image'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {atoms as a} from '#/alf'
+import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 
 export function Intro({
@@ -14,6 +14,7 @@ export function Intro({
   testID?: string
 }) {
   const {_} = useLingui()
+  const t = useTheme()
 
   return (
     <View testID={testID} style={style}>
@@ -26,7 +27,7 @@ export function Intro({
           a.pt_xl,
           a.w_full,
         ]}>
-        <Text>
+        <Text style={[a.text_5xl, t.atoms.text]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -36,7 +37,7 @@ export function Intro({
           accessibilityIgnoresInvertColors
           style={[{width: '100%', aspectRatio: 1.4}]}
         />
-        <Text>
+        <Text style={[a.text_2xl, t.atoms.text]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans
