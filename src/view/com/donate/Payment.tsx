@@ -6,9 +6,10 @@ import {
 } from '@stripe/react-stripe-js'
 import {loadStripe} from '@stripe/stripe-js'
 
+import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {atoms as a} from '#/alf'
 
-const stripePromise = loadStripe('pk_test_123')
+const stripePromise = loadStripe('PRIVATE_KEY')
 
 export function Payment({
   style,
@@ -17,14 +18,15 @@ export function Payment({
   style?: StyleProp<ViewStyle>
   testID?: string
 }) {
-  const fetchClientSecret = useCallback(() => {
-    // Create a Checkout Session
-    return fetch('/create-checkout-session', {
-      method: 'POST',
-    })
-      .then(res => res.json())
-      .then(data => data.clientSecret)
-  }, [])
+  const {call: speakeasyApi} = useSpeakeasyApi()
+  const fetchClientSecret = useCallback(
+    async () =>
+      await speakeasyApi({
+        api: 'social.spkeasy.actor.createCheckoutSession',
+        method: 'POST',
+      }).then((data: {clientSecret: string}) => data.clientSecret),
+    [speakeasyApi],
+  )
 
   const options = {fetchClientSecret}
 
