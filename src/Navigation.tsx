@@ -105,6 +105,7 @@ import {SettingsScreen} from './screens/Settings/Settings'
 import {ThreadPreferencesScreen} from './screens/Settings/ThreadPreferences'
 import TopicScreen from './screens/Topic'
 import {DonateScreen} from './view/screens/Donate'
+import {DonatePaymentScreen} from './view/screens/DonatePayment'
 import {DonateThanksScreen} from './view/screens/DonateThanks'
 
 const navigationRef = createNavigationContainerRef<AllNavigatorParams>()
@@ -143,6 +144,11 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         name="Donate"
         component={DonateScreen}
         options={{title: title(msg`Donate`)}}
+      />
+      <Stack.Screen
+        name="DonatePayment"
+        component={DonatePaymentScreen}
+        options={{title: title(msg`Payment`)}}
       />
       <Stack.Screen
         name="DonateThanks"

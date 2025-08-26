@@ -4,7 +4,8 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {atoms as a, useTheme} from '#/alf'
-import {Button, ButtonText} from '#/components/Button'
+import {ButtonText} from '#/components/Button'
+import {Link} from '#/components/Link'
 
 export function Intro({
   style,
@@ -35,20 +36,18 @@ export function Intro({
             social media by humans, for humans
           </Trans>
         </Text>
-        <Button
+        <Link
+          to="/donate/payment"
           testID="donateButton"
           size="large"
           color="primary"
           variant="solid"
-          onPress={() => {
-            alert('stripe goes here')
-          }}
           label={_(msg`Donate to Speakeasy`)}
           style={[a.rounded_full]}>
           <ButtonText>
             <Trans>Donate</Trans>
           </ButtonText>
-        </Button>
+        </Link>
       </View>
     </View>
   )
