@@ -16,9 +16,9 @@
     }
   },
   "postCreateCommand": "yarn",
-  "forwardPorts": [3000],
+  "forwardPorts": [19006],
   "portsAttributes": {
-    "3000": {
+    "19006": {
       "label": "Web App",
       "onAutoForward": "openPreview"
     }
