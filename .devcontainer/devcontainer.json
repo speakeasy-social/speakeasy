@@ -1,72 +1,27 @@
 {
-    "name": "Speakeasy Development",
-    "build": {
-        "dockerfile": "Dockerfile"
-    },
-    "customizations": {
-        "codespaces": {
-            "repositories": {
-                "bluesky-social/atproto": "read",
-                "speakeasy-social/services": "write"
-            }
-        }
-    },
-    "postCreateCommand": "bash .devcontainer/post-create.sh",
-    "forwardPorts": [3000, 3001, 3002, 3004, 3005, 4000, 5000, 19006],
-
-    "portsAttributes": {
-        "3001": {
-            "label": "Speakeasy Trusted Users API",
-            "onAutoForward": "silent"
-        },
-        "3002": {
-            "label": "Speakeasy Private Sessions API",
-            "onAutoForward": "silent"
-        },
-        "3004": {
-            "label": "Speakeasy User Keys API",
-            "onAutoForward": "silent"
-        },
-        "3005": {
-            "label": "Speakeasy Service Admin API",
-            "onAutoForward": "silent"
-        },
-        "19006": {
-            "label": "Speakeasy Web App",
-            "onAutoForward": "openBrowser"
-        },
-
-        "2583": {
-            "label": "Personal Data Server",
-            "onAutoForward": "silent"
-        },
-        "2587": {
-            "label": "Ozone Server",
-            "onAutoForward": "silent"
-        },
-        "2584": {
-            "label": "Bsky Appview",
-            "onAutoForward": "silent"
-        },
-        "2582": {
-            "label": "DID Placeholder Server",
-            "onAutoForward": "silent"
-        },
-        "2581": {
-            "label": "Dev-env introspection server",
-            "onAutoForward": "silent"
-        },
-        "2587": {
-            "label": "Ozone Server",
-            "onAutoForward": "silent"
-        },
-        "52679": {
-            "label": "Feed Generator",
-            "onAutoForward": "silent"
-        },
-        "52681": {
-            "label": "Feed Generator",
-            "onAutoForward": "silent"
-        }
+  "name": "Speakeasy Development",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-eslint"
+      ]
     }
+  },
+  "postCreateCommand": "yarn",
+  "forwardPorts": [19006],
+  "portsAttributes": {
+    "19006": {
+      "label": "Web App",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "remoteUser": "node"
 }
