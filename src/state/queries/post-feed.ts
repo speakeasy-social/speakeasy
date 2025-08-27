@@ -30,6 +30,7 @@ import {FeedTuner, FeedTunerFn} from '#/lib/api/feed-manip'
 import {isAnyPostView} from '#/lib/api/speakeasy'
 import {DISCOVER_FEED_URI} from '#/lib/constants'
 import {BSKY_FEED_OWNER_DIDS} from '#/lib/constants'
+import {decryptMediaBlob} from '#/lib/encryption'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {logger} from '#/logger'
 import {STALE} from '#/state/queries'
@@ -656,6 +657,7 @@ export function transformHiddenEmbed(
         JSON.parse(atob(privateMessage.encodedMessage)),
         post.author.did, // Pass the parent post's author DID
         baseUrl,
+        '',
       )
 
       // Store the original record as coverRecord
@@ -744,6 +746,7 @@ function transformImageEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
 ): any {
   if (embed?.$type === 'app.bsky.embed.images' && embed.images?.length > 0) {
     return {
@@ -753,13 +756,27 @@ function transformImageEmbed(
         const blobRef = img.image.ref.$link
         // Use the media key if available, otherwise fall back to the blob ref
         const mediaKey = img.image.key || blobRef
-        return {
-          thumb: `${baseUrl}/${mediaKey}`,
-          fullsize: `${baseUrl}/${mediaKey}`,
+        const image: {
+          mimeType: string
+          alt: string
+          aspectRatio: number
+          thumb?: string
+          fullsize?: string
+        } = {
           mimeType: img.image.mimeType,
           alt: img.alt || '',
           aspectRatio: img.aspectRatio,
         }
+
+        decryptMediaBlob(`${baseUrl}/${mediaKey}`, dek).then(mediaBlob => {
+          if (mediaBlob) {
+            const mediaUrl = URL.createObjectURL(mediaBlob)
+            image.thumb = mediaUrl
+            image.fullsize = mediaUrl
+          }
+        })
+
+        return image
       }),
     }
   }
@@ -828,11 +845,12 @@ function transformRecordWithMediaEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
 ): any {
   if (embed?.$type === 'app.bsky.embed.recordWithMedia') {
     const transformedMedia =
       embed.media?.$type === 'app.bsky.embed.images'
-        ? transformImageEmbed(embed.media, authorDid, baseUrl)
+        ? transformImageEmbed(embed.media, authorDid, baseUrl, dek)
         : embed.media?.$type === 'app.bsky.embed.video'
         ? transformVideoEmbed(embed.media, authorDid, baseUrl)
         : embed.media
@@ -851,6 +869,7 @@ export function transformPrivateEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
   quotedPost?: any,
 ): any {
   // Transform any embeds into view format
@@ -861,6 +880,7 @@ export function transformPrivateEmbed(
         transformedEmbed,
         authorDid,
         baseUrl,
+        dek,
       )
     } else if (transformedEmbed.$type === 'app.bsky.embed.video') {
       transformedEmbed = transformVideoEmbed(
@@ -892,6 +912,7 @@ export function transformPrivateEmbed(
         transformedEmbed,
         authorDid,
         baseUrl,
+        dek,
       )
       // If we have a quoted post, use it to enhance the record embed
       if (quotedPost) {
@@ -913,6 +934,7 @@ export function formatPrivatePostForFeed(
   post: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
 ): AppBskyFeedDefs.PostView {
   try {
     const text = post.record?.text || post.text || ''
@@ -921,6 +943,7 @@ export function formatPrivatePostForFeed(
       post.embed,
       authorDid,
       baseUrl,
+      dek,
     )
 
     // Also transform any embeds in the record
@@ -929,6 +952,7 @@ export function formatPrivatePostForFeed(
         post.record.embed,
         authorDid,
         baseUrl,
+        dek,
       )
     }
 
