@@ -15,7 +15,7 @@
       ]
     }
   },
-  "postCreateCommand": "yarn && yarn web:dev",
+  "postCreateCommand": "yarn",
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
