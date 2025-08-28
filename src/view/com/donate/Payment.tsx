@@ -24,6 +24,7 @@ export function Payment({
       await call({
         api: 'social.spkeasy.actor.createCheckoutSession',
         method: 'POST',
+        body: {unit_amount_decimal: '800'},
       }).then((data: {clientSecret: string}) => data.clientSecret),
     [call],
   )
