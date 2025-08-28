@@ -9,7 +9,7 @@ import {loadStripe} from '@stripe/stripe-js'
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {atoms as a} from '#/alf'
 
-const stripePromise = loadStripe('PRIVATE_KEY')
+const stripePromise = loadStripe(process.env.STRIPE_PUBLISHABLE_KEY)
 
 export function Payment({
   style,
@@ -18,16 +18,15 @@ export function Payment({
   style?: StyleProp<ViewStyle>
   testID?: string
 }) {
-  const {call: speakeasyApi} = useSpeakeasyApi()
+  const {call} = useSpeakeasyApi()
   const fetchClientSecret = useCallback(
     async () =>
-      await speakeasyApi({
+      await call({
         api: 'social.spkeasy.actor.createCheckoutSession',
         method: 'POST',
       }).then((data: {clientSecret: string}) => data.clientSecret),
-    [speakeasyApi],
+    [call],
   )
-
   const options = {fetchClientSecret}
 
   return (
