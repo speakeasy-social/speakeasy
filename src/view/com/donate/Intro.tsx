@@ -5,6 +5,7 @@ import {useLingui} from '@lingui/react'
 
 import {atoms as a, useTheme} from '#/alf'
 import {ButtonText} from '#/components/Button'
+import {Input} from '#/components/forms/TextField'
 import {Link} from '#/components/Link'
 
 export function Intro({
@@ -19,8 +20,8 @@ export function Intro({
 
   return (
     <View testID={testID} style={style}>
-      <View style={[a.flex_col, a.align_center, a.gap_sm, a.w_full]}>
-        <Text style={[t.atoms.text, a.text_5xl, a.px_6xl, a.py_2xl]}>
+      <View style={[a.flex_col, a.align_center, a.w_full, a.px_6xl, a.gap_2xl]}>
+        <Text style={[t.atoms.text, a.text_5xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -30,24 +31,39 @@ export function Intro({
           accessibilityIgnoresInvertColors
           style={[{width: '100%', aspectRatio: 1.5}]}
         />
-        <Text style={[t.atoms.text, a.text_2xl, a.p_6xl]}>
+        <Text style={[t.atoms.text, a.text_2xl]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans
           </Trans>
         </Text>
-        <Link
-          to="/donate/payment"
-          testID="donateButton"
-          size="large"
-          color="primary"
-          variant="solid"
-          label={_(msg`Donate to Speakeasy`)}
-          style={[a.rounded_full]}>
-          <ButtonText>
-            <Trans>Donate</Trans>
-          </ButtonText>
-        </Link>
+        <View style={{width: '80%'}}>
+          <Input label="Enter donation amount" />
+        </View>
+        <View style={[a.flex_row, a.gap_2xl]}>
+          <Link
+            to="/donate/payment"
+            size="large"
+            color="secondary"
+            variant="outline"
+            label={_(msg`Donate one time to Speakeasy`)}
+            style={[a.rounded_full]}>
+            <ButtonText>
+              <Trans>Donate One Time</Trans>
+            </ButtonText>
+          </Link>
+          <Link
+            to="/donate/payment"
+            size="large"
+            color="primary"
+            variant="solid"
+            label={_(msg`Donate monthly to Speakeasy`)}
+            style={[a.rounded_full]}>
+            <ButtonText>
+              <Trans>Donate Monthly</Trans>
+            </ButtonText>
+          </Link>
+        </View>
       </View>
     </View>
   )
