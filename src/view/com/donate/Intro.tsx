@@ -1,3 +1,4 @@
+import {useCallback, useState} from 'react'
 import {StyleProp, Text, View, ViewStyle} from 'react-native'
 import {Image} from 'expo-image'
 import {msg, Trans} from '@lingui/macro'
@@ -8,6 +9,9 @@ import {ButtonText} from '#/components/Button'
 import {Input} from '#/components/forms/TextField'
 import {Link} from '#/components/Link'
 
+const hasCurrencyError = (value: string) =>
+  value === '' ? false : isNaN(Number(value))
+
 export function Intro({
   style,
   testID,
@@ -15,8 +19,19 @@ export function Intro({
   style?: StyleProp<ViewStyle>
   testID?: string
 }) {
+  const [inputState, setInputState] = useState('')
+  const [hasInputError, setInputError] = useState(false)
   const {_} = useLingui()
   const t = useTheme()
+
+  const handleOnChange = useCallback(
+    (event: any) => {
+      const value = event.target.value
+      setInputError(hasCurrencyError(value))
+      setInputState(value)
+    },
+    [setInputState, setInputError],
+  )
 
   return (
     <View testID={testID} style={style}>
@@ -38,7 +53,11 @@ export function Intro({
           </Trans>
         </Text>
         <View style={{width: '80%'}}>
-          <Input label="Enter donation amount" />
+          <Input
+            label="Enter donation amount"
+            onChange={handleOnChange}
+            isInvalid={hasInputError}
+          />
         </View>
         <View style={[a.flex_row, a.gap_2xl]}>
           <Link
@@ -58,7 +77,8 @@ export function Intro({
             color="primary"
             variant="solid"
             label={_(msg`Donate monthly to Speakeasy`)}
-            style={[a.rounded_full]}>
+            style={[a.rounded_full]}
+            onPress={() => alert(`Value: ${inputState}`)}>
             <ButtonText>
               <Trans>Donate Monthly</Trans>
             </ButtonText>
