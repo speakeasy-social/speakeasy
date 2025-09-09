@@ -1,0 +1,883 @@
+import React from 'react'
+import {StyleSheet, View} from 'react-native'
+import {AppBskyActorDefs} from '@atproto/api'
+import {msg, Trans} from '@lingui/macro'
+import {useLingui} from '@lingui/react'
+import {
+  useLinkProps,
+  useNavigation,
+  useNavigationState,
+} from '@react-navigation/native'
+
+import {useAccountSwitcher} from '#/lib/hooks/useAccountSwitcher'
+import {IntentionFilter, useIntention} from '#/lib/hooks/useIntention'
+import {usePalette} from '#/lib/hooks/usePalette'
+import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
+import {getCurrentRoute, isTab} from '#/lib/routes/helpers'
+import {makeProfileLink} from '#/lib/routes/links'
+import {CommonNavigatorParams} from '#/lib/routes/types'
+import {useGate} from '#/lib/statsig/statsig'
+import {sanitizeDisplayName} from '#/lib/strings/display-names'
+import {isInvalidHandle, sanitizeHandle} from '#/lib/strings/handles'
+import {emitSoftReset} from '#/state/events'
+import {useHomeBadge} from '#/state/home-badge'
+import {useFetchHandle} from '#/state/queries/handle'
+import {useUnreadMessageCount} from '#/state/queries/messages/list-conversations'
+import {useProfilesQuery} from '#/state/queries/profile'
+import {SessionAccount, useSession, useSessionApi} from '#/state/session'
+import {useComposerControls} from '#/state/shell/composer'
+import {useLoggedOutViewControls} from '#/state/shell/logged-out'
+import {useCloseAllActiveElements} from '#/state/util'
+import {LoadingPlaceholder} from '#/view/com/util/LoadingPlaceholder'
+import {PressableWithHover} from '#/view/com/util/PressableWithHover'
+import {UserAvatar} from '#/view/com/util/UserAvatar'
+import {NavSignupCard} from '#/view/shell/NavSignupCard'
+import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
+import {Button, ButtonIcon, ButtonText} from '#/components/Button'
+import {DialogControlProps, useDialogControl} from '#/components/Dialog'
+import {LimitedBetaModal} from '#/components/dialogs/LimitedBetaModal'
+import {ArrowBoxLeft_Stroke2_Corner0_Rounded as LeaveIcon} from '#/components/icons/ArrowBoxLeft'
+import {
+  Bell_Filled_Corner0_Rounded as BellFilled,
+  Bell_Stroke2_Corner0_Rounded as Bell,
+} from '#/components/icons/Bell'
+import {
+  BulletList_Filled_Corner0_Rounded as ListFilled,
+  BulletList_Stroke2_Corner0_Rounded as List,
+} from '#/components/icons/BulletList'
+import {DotGrid_Stroke2_Corner0_Rounded as EllipsisIcon} from '#/components/icons/DotGrid'
+import {EditBig_Stroke2_Corner0_Rounded as EditBig} from '#/components/icons/EditBig'
+import {
+  Group3_Stroke2_Corner0_Rounded as Group,
+  Group3_Stroke2_Corner0_Rounded as GroupFilled,
+} from '#/components/icons/Group'
+import {
+  Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
+  Heart2_Stroke2_Corner0_Rounded as Heart,
+} from '#/components/icons/Heart2'
+import {
+  HomeOpen_Filled_Corner0_Rounded as HomeFilled,
+  HomeOpen_Stoke2_Corner0_Rounded as Home,
+} from '#/components/icons/HomeOpen'
+import {MagnifyingGlass_Filled_Stroke2_Corner0_Rounded as MagnifyingGlassFilled} from '#/components/icons/MagnifyingGlass'
+import {MagnifyingGlass2_Stroke2_Corner0_Rounded as MagnifyingGlass} from '#/components/icons/MagnifyingGlass2'
+import {
+  Message_Stroke2_Corner0_Rounded as Message,
+  Message_Stroke2_Corner0_Rounded_Filled as MessageFilled,
+} from '#/components/icons/Message'
+import {News2_Stroke2_Corner0_Rounded as News} from '#/components/icons/News2'
+import {PlusLarge_Stroke2_Corner0_Rounded as PlusIcon} from '#/components/icons/Plus'
+import {
+  SettingsGear2_Filled_Corner0_Rounded as SettingsFilled,
+  SettingsGear2_Stroke2_Corner0_Rounded as Settings,
+} from '#/components/icons/SettingsGear2'
+import {
+  UserCircle_Filled_Corner0_Rounded as UserCircleFilled,
+  UserCircle_Stroke2_Corner0_Rounded as UserCircle,
+} from '#/components/icons/UserCircle'
+//import {VideoClip_Stroke2_Corner0_Rounded as VideoClipIcon} from '#/components/icons/VideoClip'
+import * as Menu from '#/components/Menu'
+import * as Prompt from '#/components/Prompt'
+import {Text} from '#/components/Typography'
+import {PlatformInfo} from '../../../../modules/expo-bluesky-swiss-army'
+import {router} from '../../../routes'
+import {Donate} from './speakeasy-leftnav-items'
+
+export const NAV_ICON_WIDTH = 28
+
+function ProfileCard() {
+  const {currentAccount, accounts} = useSession()
+  const {logoutEveryAccount} = useSessionApi()
+  const {isLoading, data} = useProfilesQuery({
+    handles: accounts.map(acc => acc.did),
+  })
+  const profiles = data?.profiles
+  const signOutPromptControl = Prompt.usePromptControl()
+  const {gtTablet} = useBreakpoints()
+  const {_} = useLingui()
+  const t = useTheme()
+
+  const size = 48
+
+  const profile = profiles?.find(p => p.did === currentAccount!.did)
+  const otherAccounts = accounts
+    .filter(acc => acc.did !== currentAccount!.did)
+    .map(account => ({
+      account,
+      profile: profiles?.find(p => p.did === account.did),
+    }))
+
+  return (
+    <View style={[a.my_md, gtTablet && [a.w_full, a.align_start]]}>
+      {!isLoading && profile ? (
+        <Menu.Root>
+          <Menu.Trigger label={_(msg`Switch accounts`)}>
+            {({props, state, control}) => {
+              const active = state.hovered || state.focused || control.isOpen
+              return (
+                <Button
+                  label={props.accessibilityLabel}
+                  {...props}
+                  style={[
+                    a.w_full,
+                    a.transition_color,
+                    active ? t.atoms.bg_contrast_25 : a.transition_delay_50ms,
+                    a.rounded_full,
+                    a.justify_between,
+                    a.align_center,
+                    a.flex_row,
+                    {gap: 6},
+                    gtTablet && [a.pl_lg, a.pr_md],
+                  ]}>
+                  <View
+                    style={[
+                      !PlatformInfo.getIsReducedMotionEnabled() && [
+                        a.transition_transform,
+                        {transitionDuration: '250ms'},
+                        !active && a.transition_delay_50ms,
+                      ],
+                      a.relative,
+                      a.z_10,
+                      active && {
+                        transform: [
+                          {scale: gtTablet ? 2 / 3 : 0.8},
+                          {translateX: gtTablet ? -22 : 0},
+                        ],
+                      },
+                    ]}>
+                    <UserAvatar
+                      avatar={profile.avatar}
+                      size={size}
+                      type={profile?.associated?.labeler ? 'labeler' : 'user'}
+                    />
+                  </View>
+                  {gtTablet && (
+                    <>
+                      <View
+                        style={[
+                          a.flex_1,
+                          a.transition_opacity,
+                          !active && a.transition_delay_50ms,
+                          {
+                            marginLeft: tokens.space.xl * -1,
+                            opacity: active ? 1 : 0,
+                          },
+                        ]}>
+                        <Text
+                          style={[a.font_heavy, a.text_sm, a.leading_snug]}
+                          numberOfLines={1}>
+                          {sanitizeDisplayName(
+                            profile.displayName || profile.handle,
+                          )}
+                        </Text>
+                        <Text
+                          style={[
+                            a.text_xs,
+                            a.leading_snug,
+                            t.atoms.text_contrast_medium,
+                          ]}
+                          numberOfLines={1}>
+                          {sanitizeHandle(profile.handle, '@')}
+                        </Text>
+                      </View>
+                      <EllipsisIcon
+                        aria-hidden={true}
+                        style={[
+                          t.atoms.text_contrast_medium,
+                          a.transition_opacity,
+                          {opacity: active ? 1 : 0},
+                        ]}
+                        size="sm"
+                      />
+                    </>
+                  )}
+                </Button>
+              )
+            }}
+          </Menu.Trigger>
+          <SwitchMenuItems
+            accounts={otherAccounts}
+            signOutPromptControl={signOutPromptControl}
+          />
+        </Menu.Root>
+      ) : (
+        <LoadingPlaceholder
+          width={size}
+          height={size}
+          style={[{borderRadius: size}, gtTablet && a.ml_lg]}
+        />
+      )}
+      <Prompt.Basic
+        control={signOutPromptControl}
+        title={_(msg`Sign out?`)}
+        description={_(msg`You will be signed out of all your accounts.`)}
+        onConfirm={() => logoutEveryAccount('Settings')}
+        confirmButtonCta={_(msg`Sign out`)}
+        cancelButtonCta={_(msg`Cancel`)}
+        confirmButtonColor="negative"
+      />
+    </View>
+  )
+}
+
+function SwitchMenuItems({
+  accounts,
+  signOutPromptControl,
+}: {
+  accounts:
+    | {
+        account: SessionAccount
+        profile?: AppBskyActorDefs.ProfileView
+      }[]
+    | undefined
+  signOutPromptControl: DialogControlProps
+}) {
+  const {_} = useLingui()
+  const {onPressSwitchAccount, pendingDid} = useAccountSwitcher()
+  const {setShowLoggedOut} = useLoggedOutViewControls()
+  const closeEverything = useCloseAllActiveElements()
+
+  const onAddAnotherAccount = () => {
+    setShowLoggedOut(true)
+    closeEverything()
+  }
+  return (
+    <Menu.Outer>
+      {accounts && accounts.length > 0 && (
+        <>
+          <Menu.Group>
+            <Menu.LabelText>
+              <Trans>Switch account</Trans>
+            </Menu.LabelText>
+            {accounts.map(other => (
+              <Menu.Item
+                disabled={!!pendingDid}
+                style={[{minWidth: 150}]}
+                key={other.account.did}
+                label={_(
+                  msg`Switch to ${sanitizeHandle(
+                    other.profile?.handle ?? other.account.handle,
+                    '@',
+                  )}`,
+                )}
+                onPress={() =>
+                  onPressSwitchAccount(other.account, 'SwitchAccount')
+                }>
+                <View style={[{marginLeft: tokens.space._2xs * -1}]}>
+                  <UserAvatar
+                    avatar={other.profile?.avatar}
+                    size={20}
+                    type={
+                      other.profile?.associated?.labeler ? 'labeler' : 'user'
+                    }
+                  />
+                </View>
+                <Menu.ItemText>
+                  {sanitizeHandle(
+                    other.profile?.handle ?? other.account.handle,
+                    '@',
+                  )}
+                </Menu.ItemText>
+              </Menu.Item>
+            ))}
+          </Menu.Group>
+          <Menu.Divider />
+        </>
+      )}
+      <Menu.Item
+        label={_(msg`Add another account`)}
+        onPress={onAddAnotherAccount}>
+        <Menu.ItemIcon icon={PlusIcon} />
+        <Menu.ItemText>
+          <Trans>Add another account</Trans>
+        </Menu.ItemText>
+      </Menu.Item>
+      <Menu.Item label={_(msg`Sign out`)} onPress={signOutPromptControl.open}>
+        <Menu.ItemIcon icon={LeaveIcon} />
+        <Menu.ItemText>
+          <Trans>Sign out</Trans>
+        </Menu.ItemText>
+      </Menu.Item>
+    </Menu.Outer>
+  )
+}
+
+interface NavItemProps {
+  count?: string
+  hasNew?: boolean
+  href: string
+  icon: JSX.Element
+  iconFilled: JSX.Element
+  label: string
+  onPress?: () => void
+}
+
+export function NavItem({
+  count,
+  hasNew,
+  href,
+  icon,
+  iconFilled,
+  label,
+  onPress,
+}: NavItemProps) {
+  const t = useTheme()
+  const {_} = useLingui()
+  const {currentAccount} = useSession()
+  const {gtMobile, gtTablet} = useBreakpoints()
+  const {setIntention} = useIntention()
+  const isTablet = gtMobile && !gtTablet
+  const [pathName] = React.useMemo(() => router.matchPath(href), [href])
+  const currentRouteInfo = useNavigationState(state => {
+    if (!state) {
+      return {name: 'Intent'}
+    }
+    return getCurrentRoute(state)
+  })
+  let isCurrent =
+    currentRouteInfo.name === 'Profile'
+      ? isTab(currentRouteInfo.name, pathName) &&
+        (currentRouteInfo.params as CommonNavigatorParams['Profile']).name ===
+          currentAccount?.handle
+      : isTab(currentRouteInfo.name, pathName)
+  const {onPress: linkOnPress} = useLinkProps({to: href})
+  const onPressWrapped = React.useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return
+      }
+      e.preventDefault()
+      if (onPress) {
+        onPress()
+      } else if (isCurrent) {
+        emitSoftReset()
+      } else {
+        // Set intention based on route
+        if (['Profile', 'Notifications', 'Settings'].includes(pathName)) {
+          setIntention(pathName)
+        }
+        linkOnPress()
+      }
+    },
+    [linkOnPress, isCurrent, onPress, pathName, setIntention],
+  )
+
+  return (
+    <PressableWithHover
+      style={[
+        a.flex_row,
+        a.align_center,
+        a.p_md,
+        a.rounded_sm,
+        a.gap_sm,
+        a.outline_inset_1,
+        a.transition_color,
+      ]}
+      hoverStyle={t.atoms.bg_contrast_25}
+      // @ts-ignore the function signature differs on web -prf
+      onPress={onPressWrapped}
+      // @ts-ignore web only -prf
+      href={href}
+      dataSet={{noUnderline: 1}}
+      role="link"
+      accessibilityLabel={label}
+      accessibilityHint="">
+      <View
+        style={[
+          a.align_center,
+          a.justify_center,
+          a.z_10,
+          {
+            width: 24,
+            height: 24,
+          },
+          isTablet && {
+            width: 40,
+            height: 40,
+          },
+        ]}>
+        {isCurrent ? iconFilled : icon}
+        {typeof count === 'string' && count ? (
+          <View
+            style={[
+              a.absolute,
+              a.inset_0,
+              {right: -20}, // more breathing room
+            ]}>
+            <Text
+              accessibilityLabel={_(msg`${count} unread items`)}
+              accessibilityHint=""
+              accessible={true}
+              numberOfLines={1}
+              style={[
+                a.absolute,
+                a.text_xs,
+                a.font_bold,
+                a.rounded_full,
+                a.text_center,
+                a.leading_tight,
+                {
+                  top: '-10%',
+                  left: count.length === 1 ? 12 : 8,
+                  backgroundColor: t.palette.primary_500,
+                  color: t.palette.white,
+                  lineHeight: a.text_sm.fontSize,
+                  paddingHorizontal: 4,
+                  paddingVertical: 1,
+                  minWidth: 16,
+                },
+                isTablet && [
+                  {
+                    top: '10%',
+                    left: count.length === 1 ? 20 : 16,
+                  },
+                ],
+              ]}>
+              {count}
+            </Text>
+          </View>
+        ) : hasNew ? (
+          <View
+            style={[
+              a.absolute,
+              a.rounded_full,
+              {
+                backgroundColor: t.palette.primary_500,
+                width: 8,
+                height: 8,
+                right: -1,
+                top: -3,
+              },
+              isTablet && {
+                right: 6,
+                top: 4,
+              },
+            ]}
+          />
+        ) : null}
+      </View>
+      {gtTablet && (
+        <Text style={[a.text_xl, isCurrent ? a.font_heavy : a.font_normal]}>
+          {label}
+        </Text>
+      )}
+    </PressableWithHover>
+  )
+}
+
+function ComposeBtn() {
+  const {currentAccount} = useSession()
+  const {getState} = useNavigation()
+  const {openComposer} = useComposerControls()
+  const {_} = useLingui()
+  const {isTablet} = useWebMediaQueries()
+  const [isFetchingHandle, setIsFetchingHandle] = React.useState(false)
+  const fetchHandle = useFetchHandle()
+
+  const getProfileHandle = async () => {
+    const routes = getState()?.routes
+    const currentRoute = routes?.[routes?.length - 1]
+
+    if (currentRoute?.name === 'Profile') {
+      let handle: string | undefined = (
+        currentRoute.params as CommonNavigatorParams['Profile']
+      ).name
+
+      if (handle.startsWith('did:')) {
+        try {
+          setIsFetchingHandle(true)
+          handle = await fetchHandle(handle)
+        } catch (e) {
+          handle = undefined
+        } finally {
+          setIsFetchingHandle(false)
+        }
+      }
+
+      if (
+        !handle ||
+        handle === currentAccount?.handle ||
+        isInvalidHandle(handle)
+      )
+        return undefined
+
+      return handle
+    }
+
+    return undefined
+  }
+
+  const onPressCompose = async () =>
+    openComposer({mention: await getProfileHandle()})
+
+  if (isTablet) {
+    return null
+  }
+  return (
+    <IntentionFilter routeName="Compose">
+      <View style={[a.flex_row, a.pl_md, a.pt_xl]}>
+        <Button
+          disabled={isFetchingHandle}
+          label={_(msg`Compose new post`)}
+          onPress={onPressCompose}
+          size="large"
+          variant="solid"
+          color="primary"
+          style={[a.rounded_full]}>
+          <ButtonIcon icon={EditBig} position="left" />
+          <ButtonText>
+            <Trans context="action">New Post</Trans>
+          </ButtonText>
+        </Button>
+      </View>
+    </IntentionFilter>
+  )
+}
+
+function ChatNavItem() {
+  const pal = usePalette('default')
+  const {_} = useLingui()
+  const numUnreadMessages = useUnreadMessageCount()
+
+  return (
+    <NavItem
+      href="/messages"
+      count={numUnreadMessages.numUnread}
+      icon={
+        <Message style={pal.text} aria-hidden={true} width={NAV_ICON_WIDTH} />
+      }
+      iconFilled={
+        <MessageFilled
+          style={pal.text}
+          aria-hidden={true}
+          width={NAV_ICON_WIDTH}
+        />
+      }
+      label={_(msg`Chat`)}
+    />
+  )
+}
+
+export function DesktopLeftNav() {
+  const {hasSession, currentAccount} = useSession()
+  const pal = usePalette('default')
+  const {_} = useLingui()
+  const {isDesktop, isTablet} = useWebMediaQueries()
+  const hasHomeBadge = useHomeBadge()
+  const gate = useGate()
+  const groupsDialogControl = useDialogControl()
+  const [selectedFeature, setSelectedFeature] = React.useState<
+    'groups' | 'mutual-aid'
+  >('groups')
+
+  return (
+    <>
+      <LimitedBetaModal
+        control={groupsDialogControl}
+        featureName={
+          selectedFeature === 'groups' ? _(msg`Groups`) : _(msg`Mutual Aid`)
+        }
+        featureDescription={
+          selectedFeature === 'groups'
+            ? _(
+                msg`We're trialing a new feature to support private discussion groups.`,
+              )
+            : _(msg`We're working on a new feature to support mutual aid.`)
+        }
+        utmParams={{
+          source: 'leftnav',
+          medium:
+            selectedFeature === 'groups'
+              ? 'groups_button'
+              : 'mutual_aid_button',
+          campaign:
+            selectedFeature === 'groups' ? 'groups_beta' : 'mutual_aid_beta',
+        }}
+      />
+      <View
+        role="navigation"
+        style={[
+          a.px_xl,
+          styles.leftNav,
+          isTablet && styles.leftNavTablet,
+          pal.border,
+        ]}>
+        {hasSession ? (
+          <ProfileCard />
+        ) : isDesktop ? (
+          <View style={[a.pt_xl]}>
+            <NavSignupCard />
+          </View>
+        ) : null}
+
+        {hasSession && (
+          <>
+            <NavItem
+              href="/"
+              hasNew={hasHomeBadge && gate('remove_show_latest_button')}
+              icon={
+                <Home
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              iconFilled={
+                <HomeFilled
+                  aria-hidden={true}
+                  width={NAV_ICON_WIDTH}
+                  style={pal.text}
+                />
+              }
+              label={_(msg`Home`)}
+            />
+            <IntentionFilter routeName="Feed">
+              <NavItem
+                href="/feed"
+                hasNew={hasHomeBadge && gate('remove_show_latest_button')}
+                icon={
+                  <News
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <News
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Feed`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Search">
+              <NavItem
+                href="/search"
+                icon={
+                  <MagnifyingGlass
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                iconFilled={
+                  <MagnifyingGlassFilled
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                label={_(msg`Search`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Notifications">
+              <NavItem
+                href="/notifications"
+                icon={
+                  <Bell
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <BellFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Notifications`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Messages">
+              <ChatNavItem />
+            </IntentionFilter>
+            <IntentionFilter routeName="Groups">
+              <NavItem
+                href="/groups"
+                icon={
+                  <Group
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <GroupFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Groups`)}
+                onPress={() => {
+                  setSelectedFeature('groups')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Mutual">
+              <NavItem
+                href="/mutual"
+                icon={
+                  <Heart
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <HeartFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Mutual Aid`)}
+                onPress={() => {
+                  setSelectedFeature('mutual-aid')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter>
+            {/* <IntentionFilter routeName="VideoFeed">
+              <NavItem
+                href="/reels"
+                count="1"
+                icon={
+                  <VideoClipIcon
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <VideoClipIcon
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Reels`)}
+                onPress={() => {
+                  setSelectedFeature('mutual-aid')
+                  groupsDialogControl.open()
+                }}
+              />
+            </IntentionFilter> */}
+            <IntentionFilter routeName="Lists">
+              <NavItem
+                href="/lists"
+                icon={
+                  <List
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                iconFilled={
+                  <ListFilled
+                    style={pal.text}
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                  />
+                }
+                label={_(msg`Lists`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Donate">
+              <Donate />
+            </IntentionFilter>
+            <IntentionFilter routeName="Profile">
+              <NavItem
+                href={currentAccount ? makeProfileLink(currentAccount) : '/'}
+                icon={
+                  <UserCircle
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <UserCircleFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Profile`)}
+              />
+            </IntentionFilter>
+            <IntentionFilter routeName="Settings">
+              <NavItem
+                href="/settings"
+                icon={
+                  <Settings
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                iconFilled={
+                  <SettingsFilled
+                    aria-hidden={true}
+                    width={NAV_ICON_WIDTH}
+                    style={pal.text}
+                  />
+                }
+                label={_(msg`Settings`)}
+              />
+            </IntentionFilter>
+
+            <ComposeBtn />
+          </>
+        )}
+      </View>
+    </>
+  )
+}
+
+const styles = StyleSheet.create({
+  leftNav: {
+    // @ts-ignore web only
+    position: 'fixed',
+    top: 10,
+    // @ts-ignore web only
+    left: '50%',
+    transform: [
+      {
+        translateX: -300,
+      },
+      {
+        translateX: '-100%',
+      },
+      ...a.scrollbar_offset.transform,
+    ],
+    width: 240,
+    // @ts-ignore web only
+    maxHeight: 'calc(100vh - 10px)',
+    overflowY: 'auto',
+  },
+  leftNavTablet: {
+    top: 0,
+    left: 0,
+    right: 'auto',
+    borderRightWidth: 1,
+    height: '100%',
+    width: 76,
+    paddingLeft: 0,
+    paddingRight: 0,
+    alignItems: 'center',
+    transform: [],
+  },
+  backBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 30,
+    height: 30,
+  },
+})
