@@ -5,7 +5,7 @@ import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {atoms as a} from '#/alf'
 import * as Layout from '#/components/Layout'
-import {Intro} from '../com/donate/Intro'
+import {DonationFlow} from '../com/donate/DonationFlow'
 import {Logo} from '../icons/Logo'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Donate'>
@@ -26,7 +26,7 @@ export function DonateScreen({}: Props) {
         </Layout.Header.Content>
       </Layout.Header.Outer>
       <Layout.Content>
-        <Intro style={a.flex_grow} />
+        <DonationFlow style={a.flex_grow} />
       </Layout.Content>
     </Layout.Screen>
   )

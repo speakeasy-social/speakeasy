@@ -1,40 +1,28 @@
-import {useCallback, useState} from 'react'
-import {StyleProp, Text, View, ViewStyle} from 'react-native'
+import {Text, View} from 'react-native'
 import {Image} from 'expo-image'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {atoms as a, useTheme} from '#/alf'
-import {ButtonText} from '#/components/Button'
+import {Button, ButtonText} from '#/components/Button'
 import {Input} from '#/components/forms/TextField'
-import {Link} from '#/components/Link'
-
-const hasCurrencyError = (value: string) =>
-  value === '' ? false : isNaN(Number(value))
 
 export function Intro({
-  style,
-  testID,
+  handleOnChange,
+  hasInputError,
+  disableButtons,
+  handleStepForward,
 }: {
-  style?: StyleProp<ViewStyle>
-  testID?: string
+  handleOnChange: (event: any) => void
+  hasInputError: boolean
+  disableButtons: boolean
+  handleStepForward: () => void
 }) {
-  const [inputState, setInputState] = useState('')
-  const [hasInputError, setInputError] = useState(false)
   const {_} = useLingui()
   const t = useTheme()
 
-  const handleOnChange = useCallback(
-    (event: any) => {
-      const value = event.target.value
-      setInputError(hasCurrencyError(value))
-      setInputState(value)
-    },
-    [setInputState, setInputError],
-  )
-
   return (
-    <View testID={testID} style={style}>
+    <View>
       <View style={[a.flex_col, a.align_center, a.w_full, a.px_6xl, a.gap_2xl]}>
         <Text style={[t.atoms.text, a.text_5xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
@@ -60,8 +48,9 @@ export function Intro({
           />
         </View>
         <View style={[a.flex_row, a.gap_2xl]}>
-          <Link
-            to="/donate/payment"
+          <Button
+            onPress={handleStepForward}
+            disabled={disableButtons}
             size="large"
             color="secondary"
             variant="outline"
@@ -70,19 +59,19 @@ export function Intro({
             <ButtonText>
               <Trans>Donate One Time</Trans>
             </ButtonText>
-          </Link>
-          <Link
-            to="/donate/payment"
+          </Button>
+          <Button
+            onPress={handleStepForward}
+            disabled={disableButtons}
             size="large"
             color="primary"
             variant="solid"
             label={_(msg`Donate monthly to Speakeasy`)}
-            style={[a.rounded_full]}
-            onPress={() => alert(`Value: ${inputState}`)}>
+            style={[a.rounded_full]}>
             <ButtonText>
               <Trans>Donate Monthly</Trans>
             </ButtonText>
-          </Link>
+          </Button>
         </View>
       </View>
     </View>

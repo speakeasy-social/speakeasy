@@ -9,16 +9,16 @@ import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 
 const stripePromise = loadStripe(process.env.STRIPE_PUBLISHABLE_KEY)
 
-export function Payment() {
+export function Payment({amount}: {amount: number}) {
   const {call} = useSpeakeasyApi()
   const fetchClientSecret = useCallback(
     async () =>
       await call({
         api: 'social.spkeasy.actor.createCheckoutSession',
         method: 'POST',
-        body: {unit_amount_decimal: '800'},
+        body: {unit_amount: amount},
       }).then((data: {clientSecret: string}) => data.clientSecret),
-    [call],
+    [call, amount],
   )
   const options = {fetchClientSecret}
 
