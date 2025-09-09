@@ -36,7 +36,7 @@ import {Onboarding} from '#/screens/Onboarding'
 import {SignupQueued} from '#/screens/SignupQueued'
 import {atoms as a} from '#/alf'
 import {BottomBarWeb} from './bottom-bar/BottomBarWeb'
-import DesktopLeftNav from './desktop/LeftNav'
+import {DesktopLeftNav} from './desktop/LeftNav'
 import {DesktopRightNav} from './desktop/RightNav'
 
 type NativeStackNavigationOptionsWithAuth = NativeStackNavigationOptions & {
