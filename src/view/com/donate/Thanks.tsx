@@ -15,7 +15,7 @@ export function Thanks({
   return (
     <View testID={testID} style={style}>
       <View style={[a.flex_col, a.align_center, a.gap_sm, a.w_full]}>
-        <Text style={[t.atoms.text, a.text_2xl, a.p_6xl]}>
+        <Text style={[t.atoms.text, a.text_2xl, a.p_5xl]}>
           <Trans>Thank you! Your donation has been processed</Trans>
         </Text>
       </View>

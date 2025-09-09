@@ -1,3 +1,3 @@
 import {LeftNav} from './LeftNav'
 
-export default LeftNav
+export {LeftNav as DesktopLeftNav}
