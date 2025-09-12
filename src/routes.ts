@@ -9,6 +9,8 @@ export const router = new Router({
   NotificationSettings: '/notifications/settings',
   Settings: '/settings',
   Lists: '/lists',
+  Donate: '/donate',
+  DonateThanks: '/donate/thanks',
   // moderation
   Moderation: '/moderation',
   ModerationModlists: '/moderation/modlists',
