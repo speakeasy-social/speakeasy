@@ -1,3 +1,8 @@
+export type StepState = {
+  currentStep: 'intro' | 'payment' | 'subscription'
+  disableButtons: boolean
+}
+
 export const hasCurrencyError = (value: string): boolean => {
   const num = Number(value)
   return value === '' ? false : isNaN(num) || num <= 0

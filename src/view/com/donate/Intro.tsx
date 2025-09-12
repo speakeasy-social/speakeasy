@@ -6,17 +6,18 @@ import {useLingui} from '@lingui/react'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import {Input} from '#/components/forms/TextField'
+import {StepState} from './util'
 
 export function Intro({
   handleOnChange,
   hasInputError,
   disableButtons,
-  handleStepForward,
+  onPress,
 }: {
   handleOnChange: (event: any) => void
   hasInputError: boolean
   disableButtons: boolean
-  handleStepForward: () => void
+  onPress: (step: StepState['currentStep']) => () => void
 }) {
   const {_} = useLingui()
   const t = useTheme()
@@ -50,7 +51,7 @@ export function Intro({
         </View>
         <View style={[a.flex_row, a.gap_2xl, a.px_6xl]}>
           <Button
-            onPress={handleStepForward}
+            onPress={onPress('payment')}
             disabled={disableButtons}
             size="large"
             color="secondary"
@@ -62,7 +63,7 @@ export function Intro({
             </ButtonText>
           </Button>
           <Button
-            onPress={handleStepForward}
+            onPress={onPress('subscription')}
             disabled={disableButtons}
             size="large"
             color="primary"

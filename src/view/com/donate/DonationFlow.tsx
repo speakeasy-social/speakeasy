@@ -3,12 +3,8 @@ import {StyleProp, View, ViewStyle} from 'react-native'
 
 import {Intro} from './Intro'
 import {Payment} from './Payment'
-import {convertAmount, hasCurrencyError} from './util'
-
-type StepState = {
-  currentStep: 'intro' | 'payment'
-  disableButtons: boolean
-}
+import {Subscription} from './Subscription'
+import {convertAmount, hasCurrencyError, StepState} from './util'
 
 export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
   const [stepState, setStepState] = useState<StepState>({
@@ -21,10 +17,10 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
     hasError: false,
   })
 
-  const handleStepForward = () => {
+  const onPress = (step: StepState['currentStep']) => () => {
     setStepState({
       ...stepState,
-      currentStep: 'payment',
+      currentStep: step,
     })
   }
 
@@ -45,13 +41,14 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
   const steps = {
     intro: (
       <Intro
+        handleOnChange={handleOnChange}
         hasInputError={inputState.hasError}
         disableButtons={stepState.disableButtons}
-        handleOnChange={handleOnChange}
-        handleStepForward={handleStepForward}
+        onPress={onPress}
       />
     ),
     payment: <Payment amount={inputState.amount} />,
+    subscription: <Subscription amount={inputState.amount} />,
   }
 
   return <View style={style}>{steps[stepState.currentStep]}</View>
