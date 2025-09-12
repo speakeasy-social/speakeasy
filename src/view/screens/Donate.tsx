@@ -1,4 +1,5 @@
 import React from 'react'
+import {View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
@@ -22,7 +23,9 @@ export function DonateScreen({}: Props) {
     <Layout.Screen testID="donateScreen">
       <Layout.Header.Outer noBottomBorder>
         <Layout.Header.Content align="platform">
-          <Logo />
+          <View style={[a.align_center]}>
+            <Logo />
+          </View>
         </Layout.Header.Content>
       </Layout.Header.Outer>
       <Layout.Content>

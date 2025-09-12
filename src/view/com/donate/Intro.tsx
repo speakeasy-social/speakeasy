@@ -23,8 +23,8 @@ export function Intro({
 
   return (
     <View>
-      <View style={[a.flex_col, a.align_center, a.w_full, a.px_6xl, a.gap_2xl]}>
-        <Text style={[t.atoms.text, a.text_5xl]}>
+      <View style={[a.flex_col, a.align_center, a.w_full, a.gap_2xl]}>
+        <Text style={[t.atoms.text, a.text_5xl, a.px_6xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -34,20 +34,21 @@ export function Intro({
           accessibilityIgnoresInvertColors
           style={[{width: '100%', aspectRatio: 1.5}]}
         />
-        <Text style={[t.atoms.text, a.text_2xl]}>
+        <Text style={[t.atoms.text, a.text_2xl, a.px_6xl]}>
           <Trans>
             Donate monthly what you’d normally spend on a good meal to support
             social media by humans, for humans
           </Trans>
         </Text>
-        <View style={{width: '80%'}}>
+        <View style={[a.px_6xl, {width: '80%'}]}>
           <Input
+            placeholder="$"
             label="Enter donation amount"
             onChange={handleOnChange}
             isInvalid={hasInputError}
           />
         </View>
-        <View style={[a.flex_row, a.gap_2xl]}>
+        <View style={[a.flex_row, a.gap_2xl, a.px_6xl]}>
           <Button
             onPress={handleStepForward}
             disabled={disableButtons}
