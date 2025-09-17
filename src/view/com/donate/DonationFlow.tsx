@@ -1,9 +1,8 @@
 import {useCallback, useState} from 'react'
 import {StyleProp, View, ViewStyle} from 'react-native'
 
+import {Form} from './Form'
 import {Intro} from './Intro'
-import {Payment} from './Payment'
-import {Subscription} from './Subscription'
 import {convertAmount, hasCurrencyError, StepState} from './util'
 
 export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
@@ -47,8 +46,8 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
         onPress={onPress}
       />
     ),
-    payment: <Payment amount={inputState.amount} />,
-    subscription: <Subscription amount={inputState.amount} />,
+    payment: <Form mode="payment" amount={inputState.amount} />,
+    subscription: <Form mode="subscription" amount={inputState.amount} />,
   }
 
   return <View style={style}>{steps[stepState.currentStep]}</View>
