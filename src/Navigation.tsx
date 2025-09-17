@@ -104,6 +104,7 @@ import {PrivacyAndSecuritySettingsScreen} from './screens/Settings/PrivacyAndSec
 import {SettingsScreen} from './screens/Settings/Settings'
 import {ThreadPreferencesScreen} from './screens/Settings/ThreadPreferences'
 import TopicScreen from './screens/Topic'
+import {SupportersScreen} from './view/screens/Supporters'
 
 const navigationRef = createNavigationContainerRef<AllNavigatorParams>()
 
@@ -161,6 +162,11 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         name="Settings"
         getComponent={() => SettingsScreen}
         options={{title: title(msg`Settings`), requireAuth: true}}
+      />
+      <Stack.Screen
+        name="Supporters"
+        component={SupportersScreen}
+        options={{title: title(msg`Supporters`), requireAuth: true}}
       />
       <Stack.Screen
         name="LanguageSettings"
