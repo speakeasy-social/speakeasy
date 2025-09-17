@@ -104,6 +104,8 @@ import {PrivacyAndSecuritySettingsScreen} from './screens/Settings/PrivacyAndSec
 import {SettingsScreen} from './screens/Settings/Settings'
 import {ThreadPreferencesScreen} from './screens/Settings/ThreadPreferences'
 import TopicScreen from './screens/Topic'
+import {DonateScreen} from './view/screens/Donate'
+import {DonateThanksScreen} from './view/screens/DonateThanks'
 
 const navigationRef = createNavigationContainerRef<AllNavigatorParams>()
 
@@ -136,6 +138,16 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         name="Lists"
         component={ListsScreen}
         options={{title: title(msg`Lists`), requireAuth: true}}
+      />
+      <Stack.Screen
+        name="Donate"
+        component={DonateScreen}
+        options={{title: title(msg`Donate`)}}
+      />
+      <Stack.Screen
+        name="DonateThanks"
+        component={DonateThanksScreen}
+        options={{title: title(msg`Thanks`)}}
       />
       <Stack.Screen
         name="Moderation"
