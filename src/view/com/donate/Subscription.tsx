@@ -14,16 +14,19 @@ export function Subscription({amount}: {amount: number}) {
   const fetchClientSecret = useCallback(
     async () =>
       await call({
-        api: 'social.spkeasy.actor.createCheckoutSession',
+        api: 'social.spkeasy.actor.donate',
         method: 'POST',
-        body: {unit_amount: amount},
+        body: {
+          unit_amount: amount,
+          mode: 'subscription',
+        },
       }).then((data: {clientSecret: string}) => data.clientSecret),
     [call, amount],
   )
   const options = {fetchClientSecret}
 
   return (
-    <div id="checkout" style={{width: '100%', backgroundColor: 'blue'}}>
+    <div id="checkout" style={{width: '100%'}}>
       <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
         <EmbeddedCheckout />
       </EmbeddedCheckoutProvider>

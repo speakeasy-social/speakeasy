@@ -14,9 +14,12 @@ export function Payment({amount}: {amount: number}) {
   const fetchClientSecret = useCallback(
     async () =>
       await call({
-        api: 'social.spkeasy.actor.createCheckoutSession',
+        api: 'social.spkeasy.actor.donate',
         method: 'POST',
-        body: {unit_amount: amount},
+        body: {
+          unit_amount: amount,
+          mode: 'payment',
+        },
       }).then((data: {clientSecret: string}) => data.clientSecret),
     [call, amount],
   )
