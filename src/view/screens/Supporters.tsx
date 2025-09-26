@@ -6,7 +6,7 @@ import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {atoms as a} from '#/alf'
 import * as Layout from '#/components/Layout'
-import {Hello} from '../com/supporters/Hello'
+import {CreateTestimonial} from '../com/supporters/CreateTestimonial'
 import {Logo} from '../icons/Logo'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Supporters'>
@@ -30,7 +30,7 @@ export function SupportersScreen({}: Props) {
         </Layout.Header.Content>
       </Layout.Header.Outer>
       <Layout.Content>
-        <Hello style={a.flex_grow} />
+        <CreateTestimonial style={a.flex_grow} />
       </Layout.Content>
     </Layout.Screen>
   )
