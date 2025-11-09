@@ -510,6 +510,14 @@ function createApi({
   } else if (feedDesc.startsWith('author')) {
     const [_, actor, filter] = feedDesc.split('|')
     api = new AuthorFeedAPI({agent, feedParams: {actor, filter}})
+
+    // Wrap author feeds with PrivatePostsWrapper to merge private posts
+    api = new PrivatePostsWrapper({
+      wrappedFeed: api,
+      agent,
+      mergeMethod: 'followers',
+      author: actor,
+    })
   } else if (feedDesc.startsWith('likes')) {
     const [_, actor] = feedDesc.split('|')
     api = new LikesFeedAPI({agent, feedParams: {actor}})

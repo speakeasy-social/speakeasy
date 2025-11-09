@@ -40,29 +40,35 @@ export type EncryptedPost = {
  */
 export class PrivatePostsFeedAPI implements FeedAPI {
   agent: BskyAgent
+  author?: string
 
   /**
    * Creates a new instance of PrivatePostsFeedAPI
    * @param agent - The BskyAgent instance to use for API calls
+   * @param author - Optional author DID to filter private posts by
    */
-  constructor({agent}: {agent: BskyAgent}) {
+  constructor({agent, author}: {agent: BskyAgent; author?: string}) {
     this.agent = agent
+    this.author = author
   }
 
   /**
    * Fetches a page of private posts
    * @param cursor - Optional cursor for pagination
    * @param audience - Optional audience filter ('following' to only show posts from followed users)
+   * @param author - Optional author DID to filter private posts by
    * @param limit - Optional limit for number of posts to fetch
    * @returns Promise resolving to a FeedAPIResponse containing the posts and next cursor
    */
   async fetch({
     cursor,
     audience,
+    author,
     limit,
   }: {
     cursor: string | undefined
     audience?: string
+    author?: string
     limit?: number
   }): Promise<FeedAPIResponse> {
     try {
@@ -74,6 +80,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         cursor,
         limit,
         filterFollowers: audience === 'following',
+        author: author || this.author,
       })
 
       const truncatedPosts = encryptedPosts
@@ -336,10 +343,12 @@ export async function fetchAndFilterEncryptedPosts(
     cursor,
     limit = 50,
     filterFollowers,
+    author,
   }: {
     cursor?: string
     limit?: number
     filterFollowers?: boolean
+    author?: string
   },
 ): Promise<{
   cursor: string
@@ -354,10 +363,12 @@ export async function fetchAndFilterEncryptedPosts(
     cursor?: string
     filter?: string
     limit?: number
+    authors?: string[]
   } = {
     limit,
   }
   if (cursor) query.cursor = cursor
+  if (author) query.authors = [author]
 
   // Fetch posts, private key, and follower dids (if needed)
   const promises = [

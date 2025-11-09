@@ -12,6 +12,7 @@ export class PrivatePostsWrapper implements FeedAPI {
   private wrappedFeed: FeedAPI
   private privatePosts: PrivatePostsFeedAPI
   private mergeMethod: string
+  private author?: string
 
   private postSortIndex: (post: AppBskyFeedDefs.FeedViewPost) => number
   private postDistance: (
@@ -28,19 +29,23 @@ export class PrivatePostsWrapper implements FeedAPI {
    * @param {FeedAPI} params.wrappedFeed - The feed implementation to wrap
    * @param {BskyAgent} params.agent - The Bluesky agent instance
    * @param {string} params.mergeMethod - The method to use for merging feeds ('trusted' or other)
+   * @param {string} params.author - Optional author DID to filter private posts by
    */
   constructor({
     wrappedFeed,
     agent,
     mergeMethod,
+    author,
   }: {
     wrappedFeed: FeedAPI
     agent: BskyAgent
     mergeMethod: string
+    author?: string
   }) {
     this.wrappedFeed = wrappedFeed
-    this.privatePosts = new PrivatePostsFeedAPI({agent})
+    this.privatePosts = new PrivatePostsFeedAPI({agent, author})
     this.mergeMethod = mergeMethod
+    this.author = author
 
     this.postSortIndex = postDate
 
@@ -91,6 +96,7 @@ export class PrivatePostsWrapper implements FeedAPI {
               cursor: privateCursor,
               audience:
                 this.mergeMethod === 'trusted' ? 'trusted' : 'following',
+              author: this.author,
 
               // Fetching private posts and then any quotes / replies
               // is slow. So fetch just enough to fill the page on
