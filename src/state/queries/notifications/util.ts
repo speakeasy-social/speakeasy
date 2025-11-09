@@ -26,6 +26,7 @@ import {
 } from '#/lib/api/private-notifications'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {getCachedPrivateKey} from '#/lib/api/user-keys'
+import {awaitWithTimeout} from '#/lib/async/timeout'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
 import {FeedNotification, FeedPage, NotificationType} from './types'
@@ -80,7 +81,14 @@ export async function fetchPage({
           notifications: [],
           cursor: 'EOF',
         })
-      : listPrivateNotifications(agent, privateCursor, limit),
+      : awaitWithTimeout(
+          listPrivateNotifications(agent, privateCursor, limit),
+          30 * 1000, // 30 second timeout
+          {
+            notifications: [],
+            cursor: 'EOF',
+          },
+        ),
   ])
 
   const mergedCursor = mergeCursors(regularRes.data.cursor, privateRes.cursor)
