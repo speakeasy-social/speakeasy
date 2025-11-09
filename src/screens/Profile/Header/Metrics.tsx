@@ -31,7 +31,8 @@ export function ProfileHeaderMetrics({
     one: 'following',
     other: 'following',
   })
-  const {data: trustedCount} = useTrustedUserCount(currentAccount?.did)
+  const {data: trustedCount, isLoading: isTrustedCountLoading} =
+    useTrustedUserCount(currentAccount?.did)
 
   return (
     <View
@@ -61,8 +62,10 @@ export function ProfileHeaderMetrics({
         <InlineLinkText
           style={[a.flex_row, t.atoms.text]}
           to="/trusted"
-          label={`${trustedCount || 0} trusted`}>
-          <Text style={[a.font_bold, a.text_md]}>{trustedCount || 0} </Text>
+          label={`${isTrustedCountLoading ? '?' : trustedCount || 0} trusted`}>
+          <Text style={[a.font_bold, a.text_md]}>
+            {isTrustedCountLoading ? '?' : trustedCount || 0}{' '}
+          </Text>
           <Text
             style={[t.atoms.text_contrast_medium, a.font_normal, a.text_md]}>
             trusted
