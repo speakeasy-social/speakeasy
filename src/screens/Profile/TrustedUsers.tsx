@@ -74,7 +74,7 @@ export const ProfileTrustedUsersScreen = (_props: Props) => {
     }, [setMinimalShellMode]),
   )
 
-  if (!trustedProfiles?.length) {
+  if (isLoading || !trustedProfiles?.length) {
     return (
       <Layout.Screen>
         <ViewHeader title={_(msg`Trusted Users`)} />
