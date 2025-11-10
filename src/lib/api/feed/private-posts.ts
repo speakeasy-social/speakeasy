@@ -13,7 +13,7 @@ import {
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {getCachedPrivateKey, SpeakeasyPrivateKey} from '#/lib/api/user-keys'
-import {decryptContent, decryptDEK} from '#/lib/encryption'
+import {decryptContent, EncryptedSessionKey, getDEKMap} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
@@ -83,13 +83,15 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         author: author || this.author,
       })
 
+      const dekMap = await getDEKMap(this.agent, encryptedSessionKeys)
+
       const truncatedPosts = encryptedPosts
 
       const {posts, authorProfileMap} =
         await decryptPostsAndFetchAuthorProfiles(
           this.agent,
           truncatedPosts,
-          encryptedSessionKeys,
+          dekMap,
         )
 
       /** fetch supporting posts for replies or embeds **/
@@ -105,6 +107,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         posts,
         postMap,
         authorProfileMap,
+        dekMap,
       )
 
       return {
@@ -248,11 +251,13 @@ export async function fetchMixedPosts(
     },
   )
 
+  const dekMap = await getDEKMap(agent, encryptedSessionKeys)
+
   const {posts: decryptedPosts, authorProfileMap: newAuthorProfileMap} =
     await decryptPostsAndFetchAuthorProfiles(
       agent,
       encryptedPosts,
-      encryptedSessionKeys,
+      dekMap,
       authorProfileMap,
     )
 
@@ -261,6 +266,7 @@ export async function fetchMixedPosts(
     decryptedPosts,
     new Map<string, AppBskyFeedDefs.PostView>(),
     newAuthorProfileMap,
+    dekMap,
   )
 
   const bskyPosts = await bskyPostsPromise
@@ -532,12 +538,6 @@ export type SocialSpkeasyEmbedRecord = {
   }
 }
 
-export type EncryptedSessionKey = {
-  sessionId: string
-  encryptedDek: string
-  recipientDid: string
-}
-
 /**
  * Decrypts encrypted posts and hydrates and formats them to fit the FeedViewPost format
  * @param agent - The BskyAgent instance to use for API calls
@@ -548,18 +548,12 @@ export type EncryptedSessionKey = {
 export async function decryptPostsAndFetchAuthorProfiles(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
-  encryptedSessionKeys: EncryptedSessionKey[],
+  dekMap: Map<string, string>,
   authorProfileMap?: Map<string, AppBskyActorDefs.ProfileViewBasic>,
 ): Promise<{
   posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
-  const privateKey = await getCachedPrivateKey(
-    agent.session!.did,
-    options => callSpeakeasyApiWithAgent(agent, options),
-    false,
-  )
-
   /** Decrypt the posts and fetch author profiles */
   let authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
 
@@ -570,7 +564,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 
   const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey!),
+    decryptPosts(agent, encryptedPosts, dekMap),
   ])
 
   const mergedAuthorProfileMap = authorProfileMap
@@ -591,19 +585,15 @@ export async function decryptPostsAndFetchAuthorProfiles(
 export async function decryptPosts(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
-  encryptedSessionKeys: EncryptedSessionKey[],
-  privateKey: SpeakeasyPrivateKey,
+  dekMap: Map<string, string>,
 ): Promise<DecryptedPost[]> {
   return Promise.all(
     encryptedPosts.map(async (encryptedPost: any) => {
-      const encryptedDek = encryptedSessionKeys.find(
-        key => key.sessionId === encryptedPost.sessionId,
-      )?.encryptedDek
+      const dek = dekMap.get(encryptedPost.sessionId)
       // If we can't find a session to decode it, discard the post
-      if (!encryptedDek) return null
+      if (!dek) return null
       let post
       try {
-        const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
         post = await decryptContent(encryptedPost.encryptedContent, dek)
       } catch (err) {
         // Decryption functions log errors, just bail on this post
@@ -632,6 +622,7 @@ async function formatPostsForFeed(
   decryptedPosts: any[],
   postMap: Map<string, AppBskyFeedDefs.PostView>,
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  dekMap: Map<string, string>,
 ): Promise<AppBskyFeedDefs.FeedViewPost[]> {
   const baseUrl = getBaseCdnUrl(agent)
 
@@ -639,44 +630,48 @@ async function formatPostsForFeed(
   const posts = decryptedPosts.filter(post => !!post)
 
   // Convert private posts to FeedViewPost format
-  const feed = posts.map((post: any) => {
-    if (post.$type === 'social.spkeasy.feed.repost') {
-      const postView: FeedViewPost = {
-        post: postMap.get(post.embed?.record?.uri)!,
-        reason: {
-          $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
-          by: authorProfileMap.get(post.authorDid)!,
-          indexedAt: post.createdAt,
-        },
+  const feed = await Promise.all(
+    posts.map(async (post: any) => {
+      if (post.$type === 'social.spkeasy.feed.repost') {
+        const postView: FeedViewPost = {
+          post: postMap.get(post.embed?.record?.uri)!,
+          reason: {
+            $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
+            by: authorProfileMap.get(post.authorDid)!,
+            indexedAt: post.createdAt,
+          },
+        }
+        return postView
       }
+
+      const dek = dekMap.get(post.sessionId) || ''
+
+      const authorProfile = authorProfileMap.get(post.authorDid)
+      const quotedPost = postMap.get(post.embed?.record?.uri)
+
+      const postView: FeedViewPost = {
+        $type: 'social.spkeasy.feed.defs#privatePostView',
+
+        post: formatPostView(post, authorProfile, baseUrl, dek, quotedPost),
+        reply: post.reply
+          ? {
+              root: postMap.get(post.reply.root?.uri) || {
+                $type: 'app.bsky.feed.defs#notFoundPost',
+                uri: post.reply.root?.uri || '',
+                notFound: true,
+              },
+              parent: postMap.get(post.reply.parent?.uri) || {
+                $type: 'app.bsky.feed.defs#notFoundPost',
+                uri: post.reply.parent?.uri || '',
+                notFound: true,
+              },
+            }
+          : undefined,
+      }
+
       return postView
-    }
-
-    const authorProfile = authorProfileMap.get(post.authorDid)
-    const quotedPost = postMap.get(post.embed?.record?.uri)
-
-    const postView: FeedViewPost = {
-      $type: 'social.spkeasy.feed.defs#privatePostView',
-
-      post: formatPostView(post, authorProfile, baseUrl, quotedPost),
-      reply: post.reply
-        ? {
-            root: postMap.get(post.reply.root?.uri) || {
-              $type: 'app.bsky.feed.defs#notFoundPost',
-              uri: post.reply.root?.uri || '',
-              notFound: true,
-            },
-            parent: postMap.get(post.reply.parent?.uri) || {
-              $type: 'app.bsky.feed.defs#notFoundPost',
-              uri: post.reply.parent?.uri || '',
-              notFound: true,
-            },
-          }
-        : undefined,
-    }
-
-    return postView
-  })
+    }),
+  )
 
   return feed
 }
@@ -685,6 +680,7 @@ export function formatPostView(
   post: DecryptedPost,
   authorProfile: AppBskyActorDefs.ProfileViewBasic | undefined,
   baseUrl: string,
+  dek: string,
   quotedPost: PostView | undefined,
 ): PostView {
   return {
@@ -734,7 +730,13 @@ export function formatPostView(
     },
     embed:
       baseUrl && post.embed
-        ? transformPrivateEmbed(post.embed, post.authorDid, baseUrl, quotedPost)
+        ? transformPrivateEmbed(
+            post.embed,
+            post.authorDid,
+            baseUrl,
+            dek,
+            quotedPost,
+          )
         : undefined,
     replyCount: 0,
     repostCount: 0,

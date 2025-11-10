@@ -20,12 +20,12 @@ import {
   fetchEncryptedPosts,
   formatPostView,
 } from '#/lib/api/feed/private-posts'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {
   listPrivateNotifications,
   PrivateNotification,
 } from '#/lib/api/private-notifications'
-import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getCachedPrivateKey} from '#/lib/api/user-keys'
+import {getDEKMap} from '#/lib/encryption'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
 import {FeedNotification, FeedPage, NotificationType} from './types'
@@ -244,18 +244,12 @@ async function fetchSubjects(
   const privatePostsPromise = fetchEncryptedPosts(agent, {
     uris: Array.from(privatePostUris),
   }).then(async res => {
-    const privateKey = await getCachedPrivateKey(
-      agent.assertDid,
-      options => callSpeakeasyApiWithAgent(agent, options),
-      false,
-    )
     const encryptedSessionKeys = res.encryptedSessionKeys
-    return await decryptPosts(
-      agent,
-      res.encryptedPosts,
-      encryptedSessionKeys,
-      privateKey!,
-    )
+    const dekMap = await getDEKMap(agent, encryptedSessionKeys)
+    return {
+      privatePosts: await decryptPosts(agent, res.encryptedPosts, dekMap),
+      dekMap,
+    }
   })
 
   const postUriChunks = chunk(Array.from(postUris), 25)
@@ -295,14 +289,16 @@ async function fetchSubjects(
     ]),
   )
 
-  const privatePosts = await privatePostsPromise
+  const {privatePosts, dekMap} = await privatePostsPromise
 
   // Merge private posts into the posts map
   for (const post of privatePosts) {
+    const dek = dekMap.get(post.sessionId)
     const postView = formatPostView(
       post,
       authorProfileMap.get(post.authorDid),
-      '',
+      getBaseCdnUrl(agent),
+      dek || '',
       undefined,
     )
     if (post.uri) {
