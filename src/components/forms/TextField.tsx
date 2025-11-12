@@ -15,7 +15,9 @@ import {
   android,
   applyFonts,
   atoms as a,
+  gradientTokenToCss,
   TextStyleProp,
+  tokens,
   useAlf,
   useTheme,
   web,
@@ -329,6 +331,85 @@ export function Icon({icon: Comp}: {icon: React.ComponentType<SVGIconProps>}) {
         ]}
       />
     </View>
+  )
+}
+
+export function PrefixText({
+  children,
+  label,
+  accessibilityHint,
+  gradient,
+  style,
+}: React.PropsWithChildren<
+  TextStyleProp & {
+    label: string
+    accessibilityHint?: AccessibilityProps['accessibilityHint']
+    gradient?:
+      | typeof tokens.gradients.primary
+      | typeof tokens.gradients.sky
+      | typeof tokens.gradients.midnight
+      | typeof tokens.gradients.sunrise
+      | typeof tokens.gradients.sunset
+      | typeof tokens.gradients.bonfire
+      | typeof tokens.gradients.summer
+      | typeof tokens.gradients.nordic
+  }
+>) {
+  const t = useTheme()
+  const ctx = React.useContext(Context)
+
+  const gradientCss = gradient ? gradientTokenToCss(gradient) : undefined
+  // Use last color from gradient as fallback for native, or theme color if no gradient
+  const textColor = gradient
+    ? gradient.values[gradient.values.length - 1][1]
+    : t.atoms.text_contrast_medium.color
+
+  const hoverFocusColor = gradient ? undefined : t.palette.contrast_800
+
+  return (
+    <Text
+      accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
+      numberOfLines={1}
+      style={[
+        a.z_20,
+        a.pl_sm,
+        a.text_md,
+        a.font_bold,
+        {
+          color: textColor,
+          pointerEvents: 'none',
+          textAlign: 'center',
+        },
+        web({
+          marginTop: -2,
+        }),
+        gradient
+          ? web({
+              // @ts-ignore - web-only gradient text styles
+              backgroundImage: gradientCss,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            })
+          : {},
+        ctx.hovered || ctx.focused
+          ? gradient
+            ? web({
+                // @ts-ignore
+                backgroundImage: gradientCss,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              })
+            : {
+                color: hoverFocusColor,
+              }
+          : {},
+        style,
+      ]}>
+      {children}
+    </Text>
   )
 }
 

@@ -142,7 +142,8 @@ export async function preparePost(
     let finalFacets = rt.facets
     if (draft.audience === 'hidden' && rtPublic) {
       const hiddenContent = {
-        realTalk: draft.realTalk,
+        // realTalk: draft.realTalk,
+        realTalk: `No, we're not really storing private posts this way. Since you've come this far, why not help out with the real thing? https://about.spkeasy.social/security aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj00ekdKR2wxODJnUQ==`,
         text: rt.text,
         facets: rt.facets,
         embed: embed,
@@ -151,6 +152,7 @@ export async function preparePost(
       finalFacets = rtPublic.facets
       finalEmbed = {
         $type: 'social.spkeasy.embed.privateMessage',
+        cid: 'owgvuwbnk5924j92d4znhuy11u5p38yzqc39m5v552uisr9xa7rc4is9c3nwcwmojbd7i',
         privateMessage: {
           encodedMessage: btoa(JSON.stringify(hiddenContent)),
         },
@@ -164,6 +166,8 @@ export async function preparePost(
       facets: finalFacets,
       reply,
       embed: finalEmbed,
+      featureLevelAttributeGroup:
+        'aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1pTU1JYktTWnNkdw==',
       langs,
       labels,
     }
