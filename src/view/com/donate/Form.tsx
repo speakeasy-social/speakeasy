@@ -1,4 +1,4 @@
-import {useCallback} from 'react'
+import {useCallback, useMemo} from 'react'
 import {
   EmbeddedCheckout,
   EmbeddedCheckoutProvider,
@@ -6,11 +6,13 @@ import {
 import {loadStripe} from '@stripe/stripe-js'
 
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
-
-const stripePromise = loadStripe(process.env.STRIPE_PUBLISHABLE_KEY)
+import {getStripePublishableKey} from '#/lib/constants'
 
 export function Form({amount, mode}: {amount: number; mode: string}) {
   const {call} = useSpeakeasyApi()
+
+  const stripePromise = useMemo(() => loadStripe(getStripePublishableKey()), [])
+
   const fetchClientSecret = useCallback(
     async () =>
       await call({
