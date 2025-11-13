@@ -81,8 +81,9 @@ import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
 import {PlatformInfo} from '../../../../modules/expo-bluesky-swiss-army'
 import {router} from '../../../routes'
+// import {Donate} from './speakeasy-leftnav-items'
 
-const NAV_ICON_WIDTH = 28
+export const NAV_ICON_WIDTH = 28
 
 function ProfileCard() {
   const {currentAccount, accounts} = useSession()
@@ -311,7 +312,7 @@ interface NavItemProps {
   onPress?: () => void
 }
 
-function NavItem({
+export function NavItem({
   count,
   hasNew,
   href,
@@ -787,6 +788,9 @@ export function DesktopLeftNav() {
                 label={_(msg`Lists`)}
               />
             </IntentionFilter>
+            {/* <IntentionFilter routeName="Donate">
+              <Donate />
+            </IntentionFilter> */}
             <IntentionFilter routeName="Profile">
               <NavItem
                 href={currentAccount ? makeProfileLink(currentAccount) : '/'}

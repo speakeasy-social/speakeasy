@@ -438,6 +438,10 @@ export const atoms = {
     paddingLeft: tokens.space._5xl,
     paddingRight: tokens.space._5xl,
   },
+  px_6xl: {
+    paddingLeft: tokens.space._6xl,
+    paddingRight: tokens.space._6xl,
+  },
   py_0: {
     paddingTop: 0,
     paddingBottom: 0,

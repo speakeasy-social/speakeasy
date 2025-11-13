@@ -9,6 +9,7 @@ export const PROD_CDN = 'https://media.spkeasy.social'
 export const STAGING_SERVICE = 'https://magnetic.spkeasy.social'
 export const BSKY_SERVICE = 'https://bsky.social'
 export const SPEAKEASY_SERVICE = 'https://about.spkeasy.social'
+export const SPEAKEASY_HOST = 'https://bsky.social'
 export const PUBLIC_BSKY_SERVICE = 'https://public.api.bsky.app'
 export const DEFAULT_SERVICE = BSKY_SERVICE
 const HELP_DESK_LANG = 'en-us'
@@ -18,6 +19,15 @@ export const EMBED_SERVICE = 'https://embed.spkeasy.social'
 export const EMBED_SCRIPT = `${EMBED_SERVICE}/static/embed.js`
 export const BSKY_DOWNLOAD_URL = 'https://bsky.app/download'
 export const STARTER_PACK_MAX_SIZE = 150
+
+// Stripe publishable keys
+// These are safe to hardcode as they're meant to be public,
+// and bluesky deployment process isn't friendly to setting
+// environment variables
+const PROD_STRIPE_PUBLISHABLE_KEY =
+  'pk_live_51HtpqpKJcuJq09lTUtkYKlRnoQqMMRT9oA8XNdxCVMKHxHu3eGt7BdyFwEolk5wF0Oy1XmvXSEBKGrNr8KL4Qrn900em1PUkyv'
+const STAGING_STRIPE_PUBLISHABLE_KEY =
+  'pk_test_51HtpqpKJcuJq09lT10rsllN79TvnyaebBWJetgTkhE1iJBtkbdRo7aVxDL9MsM4lfFcdmkdH0l2QP5BEC6Sn3GyN00JuUstUun'
 
 // HACK
 // Yes, this is exactly what it looks like. It's a hard-coded constant
@@ -175,3 +185,11 @@ export const SUPPORTED_MIME_TYPES = [
 ] as const
 
 export type SupportedMimeTypes = (typeof SUPPORTED_MIME_TYPES)[number]
+
+export function getStripePublishableKey(): string {
+  const isProd =
+    typeof window !== 'undefined' &&
+    window.location.hostname === 'spkeasy.social'
+
+  return isProd ? PROD_STRIPE_PUBLISHABLE_KEY : STAGING_STRIPE_PUBLISHABLE_KEY
+}
