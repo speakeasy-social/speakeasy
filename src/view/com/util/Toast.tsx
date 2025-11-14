@@ -207,21 +207,23 @@ function Toast({
             ]}>
             <GestureDetector gesture={panGesture}>
               <View style={[a.flex_1, a.px_md, a.py_lg, a.flex_row, a.gap_md]}>
-                <View
-                  style={[
-                    a.flex_shrink_0,
-                    a.rounded_full,
-                    {width: 32, height: 32},
-                    {backgroundColor: t.palette.primary_50},
-                    a.align_center,
-                    a.justify_center,
-                  ]}>
-                  <FontAwesomeIcon
-                    icon={icon}
-                    size={16}
-                    style={t.atoms.text_contrast_medium}
-                  />
-                </View>
+                {icon && (
+                  <View
+                    style={[
+                      a.flex_shrink_0,
+                      a.rounded_full,
+                      {width: 32, height: 32},
+                      {backgroundColor: t.palette.primary_50},
+                      a.align_center,
+                      a.justify_center,
+                    ]}>
+                    <FontAwesomeIcon
+                      icon={icon}
+                      size={16}
+                      style={t.atoms.text_contrast_medium}
+                    />
+                  </View>
+                )}
                 <View style={[a.h_full, a.justify_center, a.flex_1]}>
                   <Text style={a.text_md} emoji>
                     {message}
