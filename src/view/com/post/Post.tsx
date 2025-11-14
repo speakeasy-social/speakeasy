@@ -56,8 +56,13 @@ export function Post({
   const record = useMemo<AppBskyFeedPost.Record | undefined>(() => {
     // if (post.record?.reply?.parent && !post.record?.reply?.parent?.uri) post.record.reply.parent.uri = 'at://placeholder'
     // Necessary for message to render properly when parent is missing
-    if (post.record?.reply?.parent && !post.record?.reply?.parent?.uri)
+    if (
+      AppBskyFeedPost.isRecord(post.record) &&
+      post.record.reply?.parent &&
+      !post.record.reply?.parent?.uri
+    ) {
       delete post.record.reply
+    }
     return AppBskyFeedPost.isRecord(post.record) &&
       AppBskyFeedPost.validateRecord(post.record).success
       ? post.record
