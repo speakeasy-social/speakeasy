@@ -7,20 +7,43 @@ import {loadStripe} from '@stripe/stripe-js'
 
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {getStripePublishableKey} from '#/lib/constants'
+import {useSession} from '#/state/session'
 
-export function Form({amount, mode}: {amount: number; mode: string}) {
+export function Form({
+  amount,
+  mode,
+  currency,
+  useAccountEmail,
+}: {
+  amount: number
+  mode: string
+  currency: string
+  useAccountEmail: boolean
+}) {
   const {call} = useSpeakeasyApi()
+  const {currentAccount} = useSession()
 
   const stripePromise = useMemo(() => loadStripe(getStripePublishableKey()), [])
 
   const fetchClientSecret = useCallback(
-    async () =>
-      await call({
+    async () => {
+      const donorEmail =
+        useAccountEmail && currentAccount?.email
+          ? currentAccount.email
+          : undefined
+
+      return await call({
         api: 'social.spkeasy.actor.donate',
         method: 'POST',
-        body: {unit_amount: amount, mode},
-      }).then((data: {clientSecret: string}) => data.clientSecret),
-    [call, amount, mode],
+        body: {
+          unit_amount: amount,
+          mode,
+          currency: currency.toLowerCase(),
+          ...(donorEmail ? {donorEmail} : {}),
+        },
+      }).then((data: {clientSecret: string}) => data.clientSecret)
+    },
+    [call, amount, mode, currency, useAccountEmail, currentAccount],
   )
   const options = {fetchClientSecret}
 

@@ -5,26 +5,40 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useFocusEffect} from '@react-navigation/native'
 
+import {useSession} from '#/state/session'
 import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as TextField from '#/components/forms/TextField'
-import {StepState} from './util'
+import * as Toggle from '#/components/forms/Toggle'
+import {STRIPE_CURRENCIES, StepState} from './util'
 
 export function Intro({
   handleOnChange,
   hasInputError,
   disableButtons,
   onPress,
+  currency,
+  onCurrencyChange,
+  useAccountEmail,
+  onUseAccountEmailChange,
 }: {
   handleOnChange: (event: any) => void
   hasInputError: boolean
   disableButtons: boolean
   onPress: (step: StepState['currentStep']) => () => void
+  currency: string
+  onCurrencyChange: (currency: string) => void
+  useAccountEmail: boolean
+  onUseAccountEmailChange: (value: boolean) => void
 }) {
   const {_} = useLingui()
   const t = useTheme()
   const {gtMobile} = useBreakpoints()
+  const {hasSession, currentAccount} = useSession()
   const inputRef = useRef<TextInput>(null)
+
+  const userEmail = currentAccount?.email
+  const showEmailCheckbox = hasSession && !!userEmail
 
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +47,13 @@ export function Intro({
       }, 300)
       return () => clearTimeout(timer)
     }, []),
+  )
+
+  const handleCurrencyChange = useCallback(
+    (event: any) => {
+      onCurrencyChange(event.target.value)
+    },
+    [onCurrencyChange],
   )
 
   return (
@@ -54,7 +75,7 @@ export function Intro({
             social media by humans, for humans
           </Trans>
         </Text>
-        <View style={[a.px_6xl, {width: '80%'}]}>
+        <View style={[a.px_6xl, a.gap_md, {width: '80%'}]}>
           <TextField.Root>
             <TextField.PrefixText
               label="Dollar sign"
@@ -69,6 +90,45 @@ export function Intro({
               autoFocus={true}
             />
           </TextField.Root>
+
+          <View style={[a.gap_xs]}>
+            <Text style={[t.atoms.text_contrast_medium, a.text_sm]}>
+              <Trans>Currency</Trans>
+            </Text>
+            <select
+              value={currency}
+              onChange={handleCurrencyChange}
+              aria-label={_(msg`Select currency`)}
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: t.palette.contrast_300,
+                backgroundColor: t.atoms.bg.backgroundColor,
+                color: t.atoms.text.color,
+                fontSize: 16,
+              }}>
+              {STRIPE_CURRENCIES.map(({code, name}) => (
+                <option key={code} value={code}>
+                  {code} - {name}
+                </option>
+              ))}
+            </select>
+          </View>
+
+          {showEmailCheckbox && (
+            <Toggle.Item
+              type="checkbox"
+              name="useAccountEmail"
+              label={_(msg`Use my account email for the donation`)}
+              value={useAccountEmail}
+              onChange={onUseAccountEmailChange}>
+              <Toggle.Checkbox />
+              <Toggle.LabelText>
+                <Trans>Use my account email for the donation</Trans>
+              </Toggle.LabelText>
+            </Toggle.Item>
+          )}
         </View>
         <View
           style={[
