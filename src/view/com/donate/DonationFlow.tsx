@@ -21,7 +21,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
     hasError: false,
   })
   const [currency, setCurrency] = useState(getCurrencyFromTimezone())
-  const [useAccountEmail, setUseAccountEmail] = useState(false)
+  const [useAccountEmail, setUseAccountEmail] = useState(true)
 
   const onPress = (step: StepState['currentStep']) => () => {
     setStepState({
@@ -29,6 +29,13 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
       currentStep: step,
     })
   }
+
+  const onBack = useCallback(() => {
+    setStepState({
+      ...stepState,
+      currentStep: 'intro',
+    })
+  }, [stepState])
 
   const handleOnChange = useCallback(
     (event: any) => {
@@ -48,6 +55,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
     intro: (
       <Intro
         handleOnChange={handleOnChange}
+        inputValue={inputState.value}
         hasInputError={inputState.hasError}
         disableButtons={stepState.disableButtons}
         onPress={onPress}
@@ -63,6 +71,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
         amount={inputState.amount}
         currency={currency}
         useAccountEmail={useAccountEmail}
+        onBack={onBack}
       />
     ),
     subscription: (
@@ -71,6 +80,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
         amount={inputState.amount}
         currency={currency}
         useAccountEmail={useAccountEmail}
+        onBack={onBack}
       />
     ),
   }

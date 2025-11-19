@@ -41,6 +41,38 @@ export const STRIPE_CURRENCIES = [
   {code: 'USD', name: 'US Dollar'},
 ] as const
 
+// Currency symbols mapping
+export const CURRENCY_SYMBOLS: Record<string, string> = {
+  AED: 'د.إ',
+  AUD: '$',
+  BGN: 'лв',
+  BRL: 'R$',
+  CAD: '$',
+  CHF: 'Fr',
+  CZK: 'Kč',
+  DKK: 'kr',
+  EUR: '€',
+  GBP: '£',
+  HKD: '$',
+  HUF: 'Ft',
+  INR: '₹',
+  JPY: '¥',
+  MXN: '$',
+  MYR: 'RM',
+  NOK: 'kr',
+  NZD: '$',
+  PLN: 'zł',
+  RON: 'lei',
+  SEK: 'kr',
+  SGD: '$',
+  THB: '฿',
+  USD: '$',
+}
+
+export const getCurrencySymbol = (code: string): string => {
+  return CURRENCY_SYMBOLS[code] || '$'
+}
+
 // Timezone to currency mapping
 const TIMEZONE_TO_CURRENCY: Record<string, string> = {
   // United States

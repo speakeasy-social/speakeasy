@@ -10,10 +10,12 @@ import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as TextField from '#/components/forms/TextField'
 import * as Toggle from '#/components/forms/Toggle'
-import {STRIPE_CURRENCIES, StepState} from './util'
+import {CurrencyDropdown} from './CurrencyDropdown'
+import {getCurrencySymbol, StepState} from './util'
 
 export function Intro({
   handleOnChange,
+  inputValue,
   hasInputError,
   disableButtons,
   onPress,
@@ -23,6 +25,7 @@ export function Intro({
   onUseAccountEmailChange,
 }: {
   handleOnChange: (event: any) => void
+  inputValue: string
   hasInputError: boolean
   disableButtons: boolean
   onPress: (step: StepState['currentStep']) => () => void
@@ -50,16 +53,28 @@ export function Intro({
   )
 
   const handleCurrencyChange = useCallback(
-    (event: any) => {
-      onCurrencyChange(event.target.value)
+    (newCurrency: string) => {
+      onCurrencyChange(newCurrency)
     },
     [onCurrencyChange],
   )
 
+  const handleSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (!disableButtons) {
+        onPress('subscription')()
+      }
+    },
+    [disableButtons, onPress],
+  )
+
+  const currencySymbol = getCurrencySymbol(currency)
+
   return (
     <View>
       <View style={[a.flex_col, a.align_center, a.w_full, a.gap_2xl]}>
-        <Text style={[t.atoms.text, a.text_4xl, a.px_6xl]}>
+        <Text style={[t.atoms.text, a.text_3xl, a.px_6xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -75,61 +90,50 @@ export function Intro({
             social media by humans, for humans
           </Trans>
         </Text>
-        <View style={[a.px_6xl, a.gap_md, {width: '80%'}]}>
-          <TextField.Root>
-            <TextField.PrefixText
-              label="Dollar sign"
-              gradient={tokens.gradients.sunset}>
-              $
-            </TextField.PrefixText>
-            <TextField.Input
-              label="Donation Amount"
-              onChange={handleOnChange}
-              isInvalid={hasInputError}
-              inputRef={inputRef}
-              autoFocus={true}
-            />
-          </TextField.Root>
+        <form onSubmit={handleSubmit} style={{width: '100%'}}>
+          <View style={[a.px_lg, a.gap_md]}>
+            <View style={[a.flex_row, a.gap_md, a.align_end, a.justify_center]}>
+              <CurrencyDropdown
+                value={currency}
+                onChange={handleCurrencyChange}
+                style={[a.flex_0]}
+              />
+              <View style={[{maxWidth: 200}]}>
+                <TextField.Root>
+                  <TextField.PrefixText
+                    label={_(msg`Currency symbol`)}
+                    gradient={tokens.gradients.sunset}>
+                    {currencySymbol}
+                  </TextField.PrefixText>
+                  <TextField.Input
+                    label={_(msg`Donation Amount`)}
+                    value={inputValue}
+                    onChange={handleOnChange}
+                    isInvalid={hasInputError}
+                    inputRef={inputRef}
+                    autoFocus={true}
+                  />
+                </TextField.Root>
+              </View>
+            </View>
 
-          <View style={[a.gap_xs]}>
-            <Text style={[t.atoms.text_contrast_medium, a.text_sm]}>
-              <Trans>Currency</Trans>
-            </Text>
-            <select
-              value={currency}
-              onChange={handleCurrencyChange}
-              aria-label={_(msg`Select currency`)}
-              style={{
-                padding: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: t.palette.contrast_300,
-                backgroundColor: t.atoms.bg.backgroundColor,
-                color: t.atoms.text.color,
-                fontSize: 16,
-              }}>
-              {STRIPE_CURRENCIES.map(({code, name}) => (
-                <option key={code} value={code}>
-                  {code} - {name}
-                </option>
-              ))}
-            </select>
+            {showEmailCheckbox && (
+              <View style={[a.flex_row, a.justify_center]}>
+                <Toggle.Item
+                  type="checkbox"
+                  name="useAccountEmail"
+                  label={_(msg`Use my account email for the donation`)}
+                  value={useAccountEmail}
+                  onChange={onUseAccountEmailChange}>
+                  <Toggle.Checkbox />
+                  <Toggle.LabelText>
+                    <Trans>Use my account email for the donation</Trans>
+                  </Toggle.LabelText>
+                </Toggle.Item>
+              </View>
+            )}
           </View>
-
-          {showEmailCheckbox && (
-            <Toggle.Item
-              type="checkbox"
-              name="useAccountEmail"
-              label={_(msg`Use my account email for the donation`)}
-              value={useAccountEmail}
-              onChange={onUseAccountEmailChange}>
-              <Toggle.Checkbox />
-              <Toggle.LabelText>
-                <Trans>Use my account email for the donation</Trans>
-              </Toggle.LabelText>
-            </Toggle.Item>
-          )}
-        </View>
+        </form>
         <View
           style={[
             gtMobile ? a.flex_row : a.flex_col,
