@@ -570,6 +570,21 @@ export function DesktopLeftNav() {
     'groups' | 'mutual-aid'
   >('groups')
 
+  const currentRouteInfo = useNavigationState(state => {
+    if (!state) {
+      return {name: 'Intent'}
+    }
+    return getCurrentRoute(state)
+  })
+
+  const isDonationScreen =
+    currentRouteInfo.name === 'Donate' ||
+    currentRouteInfo.name === 'DonateThanks'
+
+  if (isDonationScreen) {
+    return null
+  }
+
   return (
     <>
       <LimitedBetaModal

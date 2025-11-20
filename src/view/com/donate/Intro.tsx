@@ -5,26 +5,43 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useFocusEffect} from '@react-navigation/native'
 
+import {useSession} from '#/state/session'
 import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as TextField from '#/components/forms/TextField'
-import {StepState} from './util'
+import * as Toggle from '#/components/forms/Toggle'
+import {CurrencyDropdown} from './CurrencyDropdown'
+import {getCurrencySymbol, StepState} from './util'
 
 export function Intro({
   handleOnChange,
+  inputValue,
   hasInputError,
   disableButtons,
   onPress,
+  currency,
+  onCurrencyChange,
+  useAccountEmail,
+  onUseAccountEmailChange,
 }: {
   handleOnChange: (event: any) => void
+  inputValue: string
   hasInputError: boolean
   disableButtons: boolean
   onPress: (step: StepState['currentStep']) => () => void
+  currency: string
+  onCurrencyChange: (currency: string) => void
+  useAccountEmail: boolean
+  onUseAccountEmailChange: (value: boolean) => void
 }) {
   const {_} = useLingui()
   const t = useTheme()
   const {gtMobile} = useBreakpoints()
+  const {hasSession, currentAccount} = useSession()
   const inputRef = useRef<TextInput>(null)
+
+  const userEmail = currentAccount?.email
+  const showEmailCheckbox = hasSession && !!userEmail
 
   useFocusEffect(
     useCallback(() => {
@@ -35,10 +52,29 @@ export function Intro({
     }, []),
   )
 
+  const handleCurrencyChange = useCallback(
+    (newCurrency: string) => {
+      onCurrencyChange(newCurrency)
+    },
+    [onCurrencyChange],
+  )
+
+  const handleSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (!disableButtons) {
+        onPress('subscription')()
+      }
+    },
+    [disableButtons, onPress],
+  )
+
+  const currencySymbol = getCurrencySymbol(currency)
+
   return (
     <View>
       <View style={[a.flex_col, a.align_center, a.w_full, a.gap_2xl]}>
-        <Text style={[t.atoms.text, a.text_4xl, a.px_6xl]}>
+        <Text style={[t.atoms.text, a.text_3xl, a.px_6xl]}>
           <Trans>Feed your hunger for a better internet</Trans>
         </Text>
         <Image
@@ -54,22 +90,51 @@ export function Intro({
             social media by humans, for humans
           </Trans>
         </Text>
-        <View style={[a.px_6xl, {width: '80%'}]}>
-          <TextField.Root>
-            <TextField.PrefixText
-              label="Dollar sign"
-              gradient={tokens.gradients.sunset}>
-              $
-            </TextField.PrefixText>
-            <TextField.Input
-              label="Donation Amount"
-              onChange={handleOnChange}
-              isInvalid={hasInputError}
-              inputRef={inputRef}
-              autoFocus={true}
-            />
-          </TextField.Root>
-        </View>
+        <form onSubmit={handleSubmit} style={{width: '100%'}}>
+          <View style={[a.px_lg, a.gap_md]}>
+            <View
+              style={[a.flex_row, a.gap_md, a.align_center, a.justify_center]}>
+              <CurrencyDropdown
+                value={currency}
+                onChange={handleCurrencyChange}
+                style={[a.flex_0]}
+              />
+              <View style={[{maxWidth: 200}]}>
+                <TextField.Root>
+                  <TextField.PrefixText
+                    label={_(msg`Currency symbol`)}
+                    gradient={tokens.gradients.sunset}>
+                    {currencySymbol}
+                  </TextField.PrefixText>
+                  <TextField.Input
+                    label={_(msg`Donation Amount`)}
+                    value={inputValue}
+                    onChange={handleOnChange}
+                    isInvalid={hasInputError}
+                    inputRef={inputRef}
+                    autoFocus={true}
+                  />
+                </TextField.Root>
+              </View>
+            </View>
+
+            {showEmailCheckbox && (
+              <View style={[a.flex_row, a.justify_center]}>
+                <Toggle.Item
+                  type="checkbox"
+                  name="useAccountEmail"
+                  label={_(msg`Use my account email for the donation`)}
+                  value={useAccountEmail}
+                  onChange={onUseAccountEmailChange}>
+                  <Toggle.Checkbox />
+                  <Toggle.LabelText>
+                    <Trans>Use my account email for the donation</Trans>
+                  </Toggle.LabelText>
+                </Toggle.Item>
+              </View>
+            )}
+          </View>
+        </form>
         <View
           style={[
             gtMobile ? a.flex_row : a.flex_col,
