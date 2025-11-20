@@ -3,23 +3,17 @@ import {StyleProp, View, ViewStyle} from 'react-native'
 
 import {Form} from './Form'
 import {Intro} from './Intro'
-import {
-  convertAmount,
-  getCurrencyFromTimezone,
-  hasCurrencyError,
-  StepState,
-} from './util'
+import {Upsell} from './Upsell'
+import {getCurrencyFromTimezone, hasCurrencyError, StepState} from './util'
 
 export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
   const [stepState, setStepState] = useState<StepState>({
     currentStep: 'intro',
     disableButtons: true,
   })
-  const [inputState, setInputState] = useState({
-    value: '',
-    amount: 0,
-    hasError: false,
-  })
+  const [inputValue, setInputValue] = useState('')
+  const [inputError, setInputError] = useState(false)
+  const [selectedValue, setSelectedValue] = useState('')
   const [currency, setCurrency] = useState(getCurrencyFromTimezone())
   const [useAccountEmail, setUseAccountEmail] = useState(true)
 
@@ -31,6 +25,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
   }
 
   const onBack = useCallback(() => {
+    setSelectedValue('')
     setStepState({
       ...stepState,
       currentStep: 'intro',
@@ -41,22 +36,41 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
     (event: any) => {
       const value = event.target.value
       const hasError = hasCurrencyError(value)
-      const amount = hasError ? inputState.amount : convertAmount(value)
-      setInputState({value, amount, hasError})
+      setInputValue(value)
+      setInputError(hasError)
       setStepState({
         ...stepState,
         disableButtons: value === '' || hasError,
       })
     },
-    [inputState, stepState, setInputState, setStepState],
+    [stepState],
   )
+
+  const handleUpsellMonthly = useCallback(
+    (value: string) => {
+      setSelectedValue(value)
+      setStepState({
+        ...stepState,
+        currentStep: 'subscription',
+      })
+    },
+    [stepState],
+  )
+
+  const handleUpsellOneTime = useCallback(() => {
+    setSelectedValue(inputValue)
+    setStepState({
+      ...stepState,
+      currentStep: 'payment',
+    })
+  }, [stepState, inputValue])
 
   const steps = {
     intro: (
       <Intro
         handleOnChange={handleOnChange}
-        inputValue={inputState.value}
-        hasInputError={inputState.hasError}
+        inputValue={inputValue}
+        hasInputError={inputError}
         disableButtons={stepState.disableButtons}
         onPress={onPress}
         currency={currency}
@@ -65,10 +79,19 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
         onUseAccountEmailChange={setUseAccountEmail}
       />
     ),
+    upsell: (
+      <Upsell
+        value={inputValue}
+        currency={currency}
+        onSelectMonthly={handleUpsellMonthly}
+        onSelectOneTime={handleUpsellOneTime}
+        onBack={onBack}
+      />
+    ),
     payment: (
       <Form
         mode="payment"
-        amount={inputState.amount}
+        value={selectedValue || inputValue}
         currency={currency}
         useAccountEmail={useAccountEmail}
         onBack={onBack}
@@ -77,7 +100,7 @@ export function DonationFlow({style}: {style?: StyleProp<ViewStyle>}) {
     subscription: (
       <Form
         mode="subscription"
-        amount={inputState.amount}
+        value={selectedValue || inputValue}
         currency={currency}
         useAccountEmail={useAccountEmail}
         onBack={onBack}

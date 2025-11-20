@@ -25,27 +25,45 @@ describe('hasCurrencyError', () => {
 })
 
 describe('convertAmount', () => {
-  it('converts integer to cents', () => {
-    expect(convertAmount('123')).toEqual(12300)
+  describe('decimal currencies', () => {
+    it('converts integer to cents', () => {
+      expect(convertAmount('123', 'USD')).toEqual(12300)
+    })
+    it('converts decimal to cents', () => {
+      expect(convertAmount('123.45', 'USD')).toEqual(12345)
+    })
+    it('rounds up decimals to cents', () => {
+      expect(convertAmount('123.45678', 'USD')).toEqual(12346)
+    })
+    it('rounds down decimals to cents', () => {
+      expect(convertAmount('123.452', 'USD')).toEqual(12345)
+    })
+    it('accepts numbers at the start of strings', () => {
+      expect(convertAmount('1a2b3c', 'USD')).toEqual(100)
+    })
   })
-  it('converts decimal to cents', () => {
-    expect(convertAmount('123.45')).toEqual(12345)
+
+  describe('zero-decimal currencies', () => {
+    it('converts integer as-is for JPY', () => {
+      expect(convertAmount('1000', 'JPY')).toEqual(1000)
+    })
+    it('rounds decimals for JPY', () => {
+      expect(convertAmount('1000.67', 'JPY')).toEqual(1001)
+    })
+    it('converts integer as-is for HUF', () => {
+      expect(convertAmount('500', 'HUF')).toEqual(500)
+    })
+    it('rounds decimals for HUF', () => {
+      expect(convertAmount('500.3', 'HUF')).toEqual(500)
+    })
   })
-  it('rounds up decimals to cents', () => {
-    expect(convertAmount('123.45678')).toEqual(12346)
-  })
-  it('rounds down decimals to cents', () => {
-    expect(convertAmount('123.452')).toEqual(12345)
-  })
-  it('accepts numbers at the start of strings', () => {
-    expect(convertAmount('1a2b3c')).toEqual(100)
-  })
+
   describe('returns NaN', () => {
     it('when passed empty string', () => {
-      expect(convertAmount('')).toBeNaN()
+      expect(convertAmount('', 'USD')).toBeNaN()
     })
     it('for strings that start with letters', () => {
-      expect(convertAmount('a1b2c3')).toBeNaN()
+      expect(convertAmount('a1b2c3', 'USD')).toBeNaN()
     })
   })
 })

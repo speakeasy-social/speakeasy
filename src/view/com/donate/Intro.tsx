@@ -145,7 +145,7 @@ export function Intro({
           {gtMobile ? (
             <>
               <Button
-                onPress={onPress('payment')}
+                onPress={onPress('upsell')}
                 disabled={disableButtons}
                 size="large"
                 color="secondary"
@@ -184,7 +184,7 @@ export function Intro({
                 </ButtonText>
               </Button>
               <Button
-                onPress={onPress('payment')}
+                onPress={onPress('upsell')}
                 disabled={disableButtons}
                 size="large"
                 color="secondary"

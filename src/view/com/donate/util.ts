@@ -1,6 +1,13 @@
 export type StepState = {
-  currentStep: 'intro' | 'payment' | 'subscription'
+  currentStep: 'intro' | 'upsell' | 'payment' | 'subscription'
   disableButtons: boolean
+}
+
+// Zero-decimal currencies (amounts are already in smallest unit)
+export const ZERO_DECIMAL_CURRENCIES = ['JPY', 'HUF']
+
+export const isZeroDecimalCurrency = (currency: string): boolean => {
+  return ZERO_DECIMAL_CURRENCIES.includes(currency.toUpperCase())
 }
 
 export const hasCurrencyError = (value: string): boolean => {
@@ -8,9 +15,17 @@ export const hasCurrencyError = (value: string): boolean => {
   return value === '' ? false : isNaN(num) || num <= 0
 }
 
-export const convertAmount = (value: string): number => {
-  const rounded = Number.parseFloat(value).toFixed(2)
-  return Number(rounded) * 100
+export const convertAmount = (value: string, currency: string): number => {
+  const num = Number.parseFloat(value)
+
+  if (isZeroDecimalCurrency(currency)) {
+    // Zero-decimal currencies: return the value as-is (no decimal places)
+    return Math.round(num)
+  } else {
+    // Decimal currencies: convert to smallest unit (cents)
+    const rounded = num.toFixed(2)
+    return Number(rounded) * 100
+  }
 }
 
 // Stripe supported currencies
@@ -140,5 +155,37 @@ export const getCurrencyFromTimezone = (): string => {
     return TIMEZONE_TO_CURRENCY[timezone] || 'NZD'
   } catch {
     return 'NZD'
+  }
+}
+
+// Calculate the upsell amount (amount / 4)
+export const calculateUpsellAmount = (
+  amount: number,
+  currency: string,
+): number => {
+  const quarterAmount = amount / 4
+
+  if (isZeroDecimalCurrency(currency)) {
+    // Round up to nearest 100 for zero-decimal currencies
+    return Math.ceil(quarterAmount / 100) * 100
+  } else {
+    // Round up to nearest dollar (100 cents) for decimal currencies
+    return Math.ceil(quarterAmount / 100) * 100
+  }
+}
+
+// Format amount for display (convert from cents to dollars/units)
+export const formatDisplayAmount = (
+  amount: number,
+  currency: string,
+): string => {
+  if (isZeroDecimalCurrency(currency)) {
+    // Zero-decimal currencies are already in their base unit
+    return amount.toString()
+  } else {
+    // Decimal currencies need to be divided by 100
+    const dollars = amount / 100
+    // Format with appropriate decimal places
+    return dollars % 1 === 0 ? dollars.toFixed(0) : dollars.toFixed(2)
   }
 }
