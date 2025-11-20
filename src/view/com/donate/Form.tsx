@@ -1,6 +1,6 @@
 import {useCallback, useMemo} from 'react'
 import {View} from 'react-native'
-import {msg} from '@lingui/macro'
+import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {
   EmbeddedCheckout,
@@ -12,17 +12,17 @@ import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {getStripePublishableKey} from '#/lib/constants'
 import {useSession} from '#/state/session'
 import {atoms as a} from '#/alf'
-import {Button, ButtonIcon, ButtonText} from '#/components/Button'
-import {ChevronLeft_Stroke2_Corner0_Rounded as ChevronLeft} from '#/components/icons/Chevron'
+import {Button, ButtonText} from '#/components/Button'
+import {convertAmount} from './util'
 
 export function Form({
-  amount,
+  value,
   mode,
   currency,
   useAccountEmail,
   onBack,
 }: {
-  amount: number
+  value: string
   mode: string
   currency: string
   useAccountEmail: boolean
@@ -40,6 +40,9 @@ export function Form({
         ? currentAccount.email
         : undefined
 
+    // Convert the string value to Stripe's smallest unit here
+    const amount = convertAmount(value, currency)
+
     return await call({
       api: 'social.spkeasy.actor.donate',
       method: 'POST',
@@ -50,28 +53,26 @@ export function Form({
         ...(donorEmail ? {donorEmail} : {}),
       },
     }).then((data: {clientSecret: string}) => data.clientSecret)
-  }, [call, amount, mode, currency, useAccountEmail, currentAccount])
+  }, [call, value, mode, currency, useAccountEmail, currentAccount])
   const options = {fetchClientSecret}
 
   return (
-    <View style={[a.w_full]}>
-      <View style={[a.px_6xl, a.pb_lg]}>
-        <Button
-          onPress={onBack}
-          size="small"
-          color="secondary"
-          variant="ghost"
-          label={_(msg`Go back to change donation details`)}
-          style={[a.justify_start, a.px_0]}>
-          <ButtonIcon icon={ChevronLeft} />
-          <ButtonText>{_(msg`Back`)}</ButtonText>
-        </Button>
-      </View>
+    <View style={[a.flex_col, a.align_center, a.w_full, a.gap_2xl]}>
       <div id="checkout" style={{width: '100%'}}>
         <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
           <EmbeddedCheckout />
         </EmbeddedCheckoutProvider>
       </div>
+      <Button
+        onPress={onBack}
+        size="small"
+        color="secondary"
+        variant="ghost"
+        label={_(msg`Go back`)}>
+        <ButtonText>
+          <Trans>Back</Trans>
+        </ButtonText>
+      </Button>
     </View>
   )
 }
