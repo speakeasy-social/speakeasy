@@ -71,7 +71,7 @@ export function Upsell({
         <Button
           onPress={() => onSelectMonthly(displayUpsellAmount)}
           size="large"
-          color="secondary"
+          color="secondary_inverted"
           variant="solid"
           label={_(msg`Give ${currencySymbol}${displayUpsellAmount} monthly`)}
           style={[a.rounded_full]}>
