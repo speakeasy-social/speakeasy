@@ -82,6 +82,13 @@ export function BottomBarWeb() {
 
   // Check if the current route is the Intent route
   const isIntentScreen = currentRouteInfo.name === 'Intent'
+  const isDonationScreen =
+    currentRouteInfo.name === 'Donate' ||
+    currentRouteInfo.name === 'DonateThanks'
+
+  if (isDonationScreen) {
+    return null
+  }
 
   return (
     <>

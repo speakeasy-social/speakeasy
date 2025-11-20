@@ -92,7 +92,8 @@ export function Intro({
         </Text>
         <form onSubmit={handleSubmit} style={{width: '100%'}}>
           <View style={[a.px_lg, a.gap_md]}>
-            <View style={[a.flex_row, a.gap_md, a.align_end, a.justify_center]}>
+            <View
+              style={[a.flex_row, a.gap_md, a.align_center, a.justify_center]}>
               <CurrencyDropdown
                 value={currency}
                 onChange={handleCurrencyChange}

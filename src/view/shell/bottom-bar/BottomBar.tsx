@@ -5,7 +5,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs'
-import {StackActions} from '@react-navigation/native'
+import {StackActions, useNavigationState} from '@react-navigation/native'
 
 import {PressableScale} from '#/lib/custom-animations/PressableScale'
 import {useDedupe} from '#/lib/hooks/useDedupe'
@@ -13,7 +13,7 @@ import {useMinimalShellFooterTransform} from '#/lib/hooks/useMinimalShellTransfo
 import {useNavigationTabState} from '#/lib/hooks/useNavigationTabState'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {clamp} from '#/lib/numbers'
-import {getTabState, TabState} from '#/lib/routes/helpers'
+import {getCurrentRoute, getTabState, TabState} from '#/lib/routes/helpers'
 import {useGate} from '#/lib/statsig/statsig'
 import {emitSoftReset} from '#/state/events'
 import {useHomeBadge} from '#/state/home-badge'
@@ -119,11 +119,20 @@ export function BottomBar({navigation}: BottomTabBarProps) {
     onPressTab('Messages')
   }, [onPressTab])
 
+  const currentRouteInfo = useNavigationState(state => getCurrentRoute(state))
+
   // Check if the current route is the Intent route
   const isIntentScreen = isAtHome // Adjust this logic based on actual route checking
+  const isDonationScreen =
+    currentRouteInfo.name === 'Donate' ||
+    currentRouteInfo.name === 'DonateThanks'
 
   // Conditionally render the bottom bar
   if (hasSession && isIntentScreen) {
+    return null
+  }
+
+  if (isDonationScreen) {
     return null
   }
 

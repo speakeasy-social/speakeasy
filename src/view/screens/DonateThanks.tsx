@@ -1,5 +1,6 @@
 import React from 'react'
-import {useFocusEffect} from '@react-navigation/native'
+import {Pressable} from 'react-native'
+import {useFocusEffect, useLinkProps} from '@react-navigation/native'
 
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useSetMinimalShellMode} from '#/state/shell'
@@ -10,10 +11,11 @@ import {Logo} from '../icons/Logo'
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'DonateThanks'>
 export function DonateThanksScreen({}: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
+  const {onPress: onPressLogo} = useLinkProps({to: '/'})
 
   useFocusEffect(
     React.useCallback(() => {
-      setMinimalShellMode(false)
+      setMinimalShellMode(true)
     }, [setMinimalShellMode]),
   )
 
@@ -21,7 +23,13 @@ export function DonateThanksScreen({}: Props) {
     <Layout.Screen testID="donateThanksScreen">
       <Layout.Header.Outer noBottomBorder>
         <Layout.Header.Content align="platform">
-          <Logo />
+          <Pressable
+            onPress={onPressLogo}
+            accessibilityRole="link"
+            accessibilityLabel="Go to home page"
+            accessibilityHint="Navigate to the home page">
+            <Logo />
+          </Pressable>
         </Layout.Header.Content>
       </Layout.Header.Outer>
       <Layout.Content>
