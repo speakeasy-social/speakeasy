@@ -83,7 +83,7 @@ export async function fetchPage({
         })
       : awaitWithTimeout(
           listPrivateNotifications(agent, privateCursor, limit),
-          30 * 1000, // 30 second timeout
+          3000, // 3 second timeout - ignore private notifications if API is slow
           {
             notifications: [],
             cursor: 'EOF',
