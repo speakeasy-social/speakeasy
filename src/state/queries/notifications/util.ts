@@ -249,22 +249,30 @@ async function fetchSubjects(
     }
   }
 
-  const privatePostsPromise = fetchEncryptedPosts(agent, {
-    uris: Array.from(privatePostUris),
-  }).then(async res => {
-    const privateKey = await getCachedPrivateKey(
-      agent.assertDid,
-      options => callSpeakeasyApiWithAgent(agent, options),
-      false,
-    )
-    const encryptedSessionKeys = res.encryptedSessionKeys
-    return await decryptPosts(
-      agent,
-      res.encryptedPosts,
-      encryptedSessionKeys,
-      privateKey!,
-    )
-  })
+  // Only fetch private posts if there are any to fetch, with timeout protection
+  const privatePostsPromise =
+    privatePostUris.size > 0
+      ? awaitWithTimeout(
+          fetchEncryptedPosts(agent, {
+            uris: Array.from(privatePostUris),
+          }).then(async res => {
+            const privateKey = await getCachedPrivateKey(
+              agent.assertDid,
+              options => callSpeakeasyApiWithAgent(agent, options),
+              false,
+            )
+            const encryptedSessionKeys = res.encryptedSessionKeys
+            return await decryptPosts(
+              agent,
+              res.encryptedPosts,
+              encryptedSessionKeys,
+              privateKey!,
+            )
+          }),
+          3000, // 3 second timeout
+          [], // Return empty array on timeout
+        )
+      : Promise.resolve([])
 
   const postUriChunks = chunk(Array.from(postUris), 25)
   const packUriChunks = chunk(Array.from(packUris), 25)
