@@ -67,7 +67,7 @@ export async function listPrivateNotifications(
     console.error('Error listing private notifications:', error)
     return {
       notifications: [],
-      cursor: undefined,
+      cursor: 'EOF', // Stop retrying on error/timeout
     }
   }
 }
