@@ -59,6 +59,7 @@ export function CurrencyDropdown({
         <ChevronDown fill={t.atoms.text.color} size="xs" style={a.flex_0} />
       </View>
 
+      {/* @ts-ignore web only */}
       <select
         value={value}
         onChange={handleChange}
@@ -74,7 +75,8 @@ export function CurrencyDropdown({
           padding: 12,
           borderRadius: 8,
           maxWidth: '100%',
-        }}>
+        }}
+        className="currency-dropdown-select">
         {STRIPE_CURRENCIES.map(({code, name}) => {
           const symbol = CURRENCY_SYMBOLS[code]
           return (
