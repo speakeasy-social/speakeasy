@@ -45,7 +45,7 @@ export async function listPrivateNotifications(
         },
       }),
       new Promise<PrivateNotificationResponse>((_resolve, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 5000)
+        setTimeout(() => reject(new Error('Timeout')), 4000)
       }),
     ])) as PrivateNotificationResponse
 
