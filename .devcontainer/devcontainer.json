@@ -3,7 +3,10 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    }
   },
   "customizations": {
     "vscode": {
@@ -15,7 +18,7 @@
       ]
     }
   },
-  "postCreateCommand": "yarn",
+  "postAttachCommand": ".devcontainer/welcome.sh",
   "forwardPorts": [19006],
   "portsAttributes": {
     "19006": {
