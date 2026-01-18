@@ -16,10 +16,14 @@ import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
 import {UserBanner} from '#/view/com/util/UserBanner'
 import {atoms as a, useTheme} from '#/alf'
-import {Button, ButtonText} from '#/components/Button'
+import {Admonition} from '#/components/Admonition'
+import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import * as TextField from '#/components/forms/TextField'
+import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
+import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import * as Prompt from '#/components/Prompt'
+import {Text} from '#/components/Typography'
 
 const DISPLAY_NAME_MAX_GRAPHEMES = 64
 const DESCRIPTION_MAX_GRAPHEMES = 256
@@ -113,6 +117,8 @@ function DialogInner({
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const initialDescription = profile.description || ''
   const [description, setDescription] = useState(initialDescription)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [publicDescription, setPublicDescription] = useState('')
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -130,7 +136,9 @@ function DialogInner({
     displayName !== initialDisplayName ||
     description !== initialDescription ||
     userAvatar !== profile.avatar ||
-    userBanner !== profile.banner
+    userBanner !== profile.banner ||
+    isPrivate !== false ||
+    publicDescription !== ''
 
   useEffect(() => {
     setDirty(dirty)
@@ -182,6 +190,10 @@ function DialogInner({
         updates: {
           displayName: displayName.trimEnd(),
           description: description.trimEnd(),
+          isPrivate,
+          publicDescription: isPrivate
+            ? publicDescription.trimEnd()
+            : undefined,
         },
         newUserAvatar,
         newUserBanner,
@@ -199,6 +211,8 @@ function DialogInner({
     control,
     displayName,
     description,
+    isPrivate,
+    publicDescription,
     newUserAvatar,
     newUserBanner,
     setImageError,
@@ -369,6 +383,68 @@ function DialogInner({
             </TextField.SuffixText>
           )}
         </View>
+
+        <View style={[a.gap_sm]}>
+          <View
+            style={[a.flex_row, a.align_center, a.justify_between, a.mb_sm]}>
+            <TextField.LabelText>
+              <Trans>Profile Visibility</Trans>
+            </TextField.LabelText>
+            <Button
+              variant="solid"
+              color="secondary"
+              onPress={() => setIsPrivate(!isPrivate)}
+              style={{
+                borderRadius: 20,
+                paddingVertical: 4,
+                paddingHorizontal: 16,
+                minWidth: 80,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+              accessibilityHint={_(
+                msg`Choose to make your profile visible publicly, or only to people you trust`,
+              )}
+              accessibilityLabel={isPrivate ? _('Private') : _('Public')}
+              label={isPrivate ? _('Private') : _('Public')}>
+              <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
+              <ButtonText
+                style={{fontWeight: '600', fontSize: 15, marginLeft: 6}}>
+                {isPrivate ? _('Private') : _('Public')}
+              </ButtonText>
+            </Button>
+          </View>
+          <Admonition type="info">
+            {isPrivate
+              ? _(
+                  'Only those you trust can see your name, description, avatar and banner',
+                )
+              : _('Your profile is visible to everyone')}
+          </Admonition>
+        </View>
+
+        {isPrivate && (
+          <View>
+            <TextField.LabelText>
+              <Trans>Public Description</Trans>
+            </TextField.LabelText>
+            <TextField.Root>
+              <Dialog.Input
+                value={publicDescription}
+                onChangeText={setPublicDescription}
+                multiline
+                label={_(msg`Public description`)}
+                placeholder={_(
+                  msg`This profile is private and only visible on @spkeasy.social`,
+                )}
+                testID="editProfilePublicDescriptionInput"
+              />
+            </TextField.Root>
+            <Text style={[a.text_sm, t.atoms.text_contrast_medium, a.mt_sm]}>
+              <Trans>A description of your profile visible to everyone</Trans>
+            </Text>
+          </View>
+        )}
       </View>
     </Dialog.ScrollableInner>
   )
