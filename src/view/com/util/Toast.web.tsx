@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     marginLeft: 10,
+    zIndex: 1,
   },
   dismissBackdrop: {
     position: 'absolute',
@@ -118,10 +119,12 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     right: 0,
+    zIndex: 0,
   },
   icon: {
     color: '#fff',
     flexShrink: 0,
+    zIndex: 1,
   },
   text: {
     color: '#fff',
