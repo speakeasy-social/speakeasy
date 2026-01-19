@@ -39,4 +39,5 @@ export function Provider({children}: {children: React.ReactNode}) {
 }
 
 export const useSpeakeasyHealthMonitoring = () => React.useContext(stateContext)
-export const useSetSpeakeasyHealthMonitoring = () => React.useContext(setContext)
+export const useSetSpeakeasyHealthMonitoring = () =>
+  React.useContext(setContext)

@@ -94,7 +94,9 @@ export function isServiceError(error: unknown, response?: Response): boolean {
  * @param fetchFn - The async function that performs the fetch
  * @returns The result of the fetch function
  */
-export async function withHealthMonitoring<T>(fetchFn: () => Promise<T>): Promise<T> {
+export async function withHealthMonitoring<T>(
+  fetchFn: () => Promise<T>,
+): Promise<T> {
   let slowRequestTimeout: ReturnType<typeof setTimeout> | null = null
 
   // Set up timeout to show warning for slow requests
