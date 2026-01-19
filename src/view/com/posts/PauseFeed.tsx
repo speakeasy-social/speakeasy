@@ -87,7 +87,7 @@ export function PauseFeed({
     }
   }, [isReducedMotion])
 
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     gifDialogControl.open()
     fetch(
       'https://api.giphy.com/v1/gifs/random?api_key=YOUR_API_KEY&tag=off+you+go&rating=g',
@@ -100,7 +100,7 @@ export function PauseFeed({
       .catch(error => {
         console.error('Error fetching GIF:', error)
       })
-  }
+  }, [gifDialogControl])
 
   const containerStyle = [
     a.p_lg,
@@ -133,12 +133,33 @@ export function PauseFeed({
     breakText = 'This is an infinite scroll (just so you know)'
   }
 
-  // Mark onboarding as seen when this component renders with isFirstPause
-  React.useEffect(() => {
+  // Mark onboarding as seen when user interacts with the pause feed
+  const markOnboardingSeen = React.useCallback(() => {
     if (isFirstPause && onOnboardingSeen) {
       onOnboardingSeen()
     }
   }, [isFirstPause, onOnboardingSeen])
+
+  const handleKeepScrolling = React.useCallback(() => {
+    markOnboardingSeen()
+    onKeepScrolling?.()
+  }, [markOnboardingSeen, onKeepScrolling])
+
+  const handleLeaveOption = React.useCallback(
+    (option: {link: string}) => {
+      markOnboardingSeen()
+      if (option.link === 'close') {
+        handleClose()
+      } else if (option.link === 'chat') {
+        // Not sure why it doesn't recognise the route
+        // @ts-ignore
+        navigation.navigate('Messages')
+      } else {
+        window.location.href = option.link
+      }
+    },
+    [markOnboardingSeen, handleClose, navigation],
+  )
 
   return (
     <Animated.View style={[containerStyle, animatedStyle]}>
@@ -178,17 +199,7 @@ export function PauseFeed({
                   color="primary"
                   size="large"
                   label={option.title}
-                  onPress={() => {
-                    if (option.link === 'close') {
-                      handleClose()
-                    } else if (option.link === 'chat') {
-                      // Not sure why it doesn't recognise the route
-                      // @ts-ignore
-                      navigation.navigate('Messages')
-                    } else {
-                      window.location.href = option.link
-                    }
-                  }}>
+                  onPress={() => handleLeaveOption(option)}>
                   <ButtonText>{option.title}</ButtonText>
                 </Button>
               ))}
@@ -198,7 +209,10 @@ export function PauseFeed({
                 color="secondary"
                 size="small"
                 label={_(msg`Edit Options`)}
-                onPress={() => leaveDialogControl.open()}>
+                onPress={() => {
+                  markOnboardingSeen()
+                  leaveDialogControl.open()
+                }}>
                 <ButtonText>{_(msg`Edit Options`)}</ButtonText>
               </Button>
             </View>
@@ -210,6 +224,7 @@ export function PauseFeed({
               size="large"
               label={_(msg`Leave`)}
               onPress={() => {
+                markOnboardingSeen()
                 leaveDialogControl.open()
               }}>
               <ButtonText>{_(msg`Leave`)}</ButtonText>
@@ -222,7 +237,7 @@ export function PauseFeed({
             color="primary"
             size="small"
             label={_(msg`Keep Scrolling`)}
-            onPress={onKeepScrolling}>
+            onPress={handleKeepScrolling}>
             <ButtonText>{_(msg`Keep Scrolling`)}</ButtonText>
           </Button>
 
