@@ -167,18 +167,24 @@ export function PauseFeed({
 
   // Native: Check visibility after layout using measureInWindow
   const checkVisibilityNative = React.useCallback(() => {
-    if (isWeb || !isFirstPause || !viewRef.current || onboardingMarkedRef.current) return
+    if (
+      isWeb ||
+      !isFirstPause ||
+      !viewRef.current ||
+      onboardingMarkedRef.current
+    )
+      return
 
-    viewRef.current.measureInWindow((x, y, width, height) => {
-      if (width === 0 && height === 0) return
+    viewRef.current.measureInWindow((x, y, width, measuredHeight) => {
+      if (width === 0 && measuredHeight === 0) return
 
       const windowHeight = Dimensions.get('window').height
       const visibleTop = Math.max(0, y)
-      const visibleBottom = Math.min(windowHeight, y + height)
+      const visibleBottom = Math.min(windowHeight, y + measuredHeight)
       const visibleHeight = Math.max(0, visibleBottom - visibleTop)
 
       // Mark as seen if at least 50% visible
-      if (height > 0 && visibleHeight / height >= 0.5) {
+      if (measuredHeight > 0 && visibleHeight / measuredHeight >= 0.5) {
         markOnboardingSeen()
       }
     })
@@ -218,7 +224,14 @@ export function PauseFeed({
       {isFirstPause && isWeb && (
         <div
           ref={webObserverRef}
-          style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none'}}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+          }}
         />
       )}
       {isFirstPause && !isWeb && (

@@ -28,14 +28,14 @@ import {isIOS, isNative, isWeb} from '#/platform/detection'
 import {listenPostCreated} from '#/state/events'
 import {useFeedFeedbackContext} from '#/state/feed-feedback'
 import {
+  useHasSeenPauseFeedOnboarding,
+  useSetHasSeenPauseFeedOnboarding,
+} from '#/state/preferences'
+import {
   calculateNextPostsPerInterrupt,
   DEFAULT_POSTS_PER_INTERRUPT,
   saveSessionStats,
 } from '#/state/preferences/feed-break-sessions'
-import {
-  useHasSeenPauseFeedOnboarding,
-  useSetHasSeenPauseFeedOnboarding,
-} from '#/state/preferences'
 import {useTrendingSettings} from '#/state/preferences/trending'
 import {STALE} from '#/state/queries'
 import {
