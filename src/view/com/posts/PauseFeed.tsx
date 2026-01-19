@@ -1,5 +1,5 @@
 import React from 'react'
-import {View} from 'react-native'
+import {Dimensions, View} from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -10,6 +10,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigation} from '@react-navigation/native'
 
+import {isWeb} from '#/platform/detection'
 import {useLeaveOptions} from '#/state/preferences/leave-options'
 import {useTheme} from '#/alf'
 import {atoms as a} from '#/alf/atoms'
@@ -133,12 +134,62 @@ export function PauseFeed({
     breakText = 'This is an infinite scroll (just so you know)'
   }
 
-  // Mark onboarding as seen when user interacts with the pause feed
+  // Track if onboarding has been marked as seen
+  const onboardingMarkedRef = React.useRef(false)
+  const viewRef = React.useRef<View>(null)
+  const webObserverRef = React.useRef<HTMLDivElement>(null)
+
+  // Mark onboarding as seen (only once)
   const markOnboardingSeen = React.useCallback(() => {
-    if (isFirstPause && onOnboardingSeen) {
+    if (isFirstPause && onOnboardingSeen && !onboardingMarkedRef.current) {
+      onboardingMarkedRef.current = true
       onOnboardingSeen()
     }
   }, [isFirstPause, onOnboardingSeen])
+
+  // Web: Use IntersectionObserver to detect when component enters viewport
+  React.useEffect(() => {
+    if (!isWeb || !isFirstPause || !webObserverRef.current) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const entry = entries[0]
+        if (entry?.isIntersecting) {
+          markOnboardingSeen()
+        }
+      },
+      {threshold: 0.5},
+    )
+
+    observer.observe(webObserverRef.current)
+    return () => observer.disconnect()
+  }, [isFirstPause, markOnboardingSeen])
+
+  // Native: Check visibility after layout using measureInWindow
+  const checkVisibilityNative = React.useCallback(() => {
+    if (isWeb || !isFirstPause || !viewRef.current || onboardingMarkedRef.current) return
+
+    viewRef.current.measureInWindow((x, y, width, height) => {
+      if (width === 0 && height === 0) return
+
+      const windowHeight = Dimensions.get('window').height
+      const visibleTop = Math.max(0, y)
+      const visibleBottom = Math.min(windowHeight, y + height)
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop)
+
+      // Mark as seen if at least 50% visible
+      if (height > 0 && visibleHeight / height >= 0.5) {
+        markOnboardingSeen()
+      }
+    })
+  }, [isFirstPause, markOnboardingSeen])
+
+  const handleLayout = React.useCallback(() => {
+    if (!isWeb && isFirstPause) {
+      // Small delay to ensure layout is complete
+      setTimeout(checkVisibilityNative, 100)
+    }
+  }, [isFirstPause, checkVisibilityNative])
 
   const handleKeepScrolling = React.useCallback(() => {
     markOnboardingSeen()
@@ -163,6 +214,21 @@ export function PauseFeed({
 
   return (
     <Animated.View style={[containerStyle, animatedStyle]}>
+      {/* Viewport detection element */}
+      {isFirstPause && isWeb && (
+        <div
+          ref={webObserverRef}
+          style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none'}}
+        />
+      )}
+      {isFirstPause && !isWeb && (
+        <View
+          ref={viewRef}
+          onLayout={handleLayout}
+          style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+          pointerEvents="none"
+        />
+      )}
       {isCompact ? (
         <Text
           style={[
