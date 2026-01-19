@@ -1,3 +1,4 @@
+import * as persisted from '#/state/persisted'
 import * as Toast from '#/view/com/util/Toast'
 
 // Constants
@@ -9,10 +10,21 @@ let lastWarningToastTime = 0
 let lastErrorToastTime = 0
 
 /**
+ * Check if health monitoring is enabled in user settings.
+ */
+function isHealthMonitoringEnabled(): boolean {
+  return Boolean(persisted.get('speakeasyHealthMonitoring'))
+}
+
+/**
  * Show a warning toast if a request is taking too long.
  * Debounced to show at most 1 warning per 10 minutes.
+ * Only shows if health monitoring is enabled in settings.
  */
 export function showSlowRequestWarning(): void {
+  if (!isHealthMonitoringEnabled()) {
+    return
+  }
   const now = Date.now()
   if (now - lastWarningToastTime >= TOAST_DEBOUNCE_MS) {
     lastWarningToastTime = now
@@ -26,8 +38,12 @@ export function showSlowRequestWarning(): void {
 /**
  * Show an error toast for service failures.
  * Debounced to show at most 1 error per 10 minutes.
+ * Only shows if health monitoring is enabled in settings.
  */
 export function showServiceErrorToast(): void {
+  if (!isHealthMonitoringEnabled()) {
+    return
+  }
   const now = Date.now()
   if (now - lastErrorToastTime >= TOAST_DEBOUNCE_MS) {
     lastErrorToastTime = now
@@ -106,6 +122,7 @@ export async function withHealthMonitoring<T>(fetchFn: () => Promise<T>): Promis
 /**
  * Check response for 5xx errors and show toast if needed.
  * Call this after getting a response but before checking response.ok
+ * Only shows if health monitoring is enabled in settings.
  */
 export function checkResponseForServiceError(response: Response): void {
   if (response.status >= 500 && response.status < 600) {

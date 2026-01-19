@@ -132,6 +132,7 @@ const schema = z.object({
   useGridLayout: z.boolean().optional(), // Preference for grid vs carousel layout for multiple images
   autoTrustOnFollow: z.boolean().optional(), // Automatically trust when following
   autoUntrustOnUnfollow: z.boolean().optional(), // Automatically untrust when unfollowing
+  speakeasyHealthMonitoring: z.boolean().optional(), // Show toasts for slow/failed Speakeasy API requests
   leaveOptions: z
     .array(
       z.object({
@@ -191,6 +192,7 @@ export const defaults: Schema = {
   useGridLayout: true, // Default to grid layout
   autoTrustOnFollow: undefined, // Start as undefined to show the prompt
   autoUntrustOnUnfollow: true, // Default to true
+  speakeasyHealthMonitoring: false, // Default to disabled
   leaveOptions: DEFAULT_LEAVE_OPTIONS,
 }
 
