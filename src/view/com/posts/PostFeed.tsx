@@ -32,6 +32,10 @@ import {
   DEFAULT_POSTS_PER_INTERRUPT,
   saveSessionStats,
 } from '#/state/preferences/feed-break-sessions'
+import {
+  useHasSeenPauseFeedOnboarding,
+  useSetHasSeenPauseFeedOnboarding,
+} from '#/state/preferences'
 import {useTrendingSettings} from '#/state/preferences/trending'
 import {STALE} from '#/state/queries'
 import {
@@ -337,6 +341,8 @@ let PostFeed = ({
     (followProgressGuide || followAndLikeProgressGuide) && !isDesktop
 
   const {trendingDisabled, trendingVideoDisabled} = useTrendingSettings()
+  const hasSeenPauseFeedOnboarding = useHasSeenPauseFeedOnboarding()
+  const setHasSeenPauseFeedOnboarding = useSetHasSeenPauseFeedOnboarding()
 
   // Function to handle expanding a section
   const handleExpandSection = React.useCallback(() => {
@@ -750,6 +756,8 @@ let PostFeed = ({
           savedStatsSectionsRef.current.add(row.sectionIndex)
         }
 
+        const isFirstPause =
+          row.sectionIndex === 0 && !hasSeenPauseFeedOnboarding
         return (
           <PauseFeed
             onKeepScrolling={() => handleExpandSection()}
@@ -757,6 +765,8 @@ let PostFeed = ({
             sectionIndex={row.sectionIndex}
             postsViewed={rowIndex}
             feedStartTime={feedStartTime}
+            isFirstPause={isFirstPause}
+            onOnboardingSeen={() => setHasSeenPauseFeedOnboarding(true)}
           />
         )
       } else if (row.type === 'feedShutdownMsg') {
@@ -841,6 +851,8 @@ let PostFeed = ({
       handleExpandSection,
       feedStartTime,
       postsPerInterrupt,
+      hasSeenPauseFeedOnboarding,
+      setHasSeenPauseFeedOnboarding,
     ],
   )
 

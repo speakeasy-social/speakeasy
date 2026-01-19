@@ -45,12 +45,16 @@ export function PauseFeed({
   sectionIndex = 0,
   postsViewed = 0,
   feedStartTime,
+  isFirstPause = false,
+  onOnboardingSeen,
 }: {
   onKeepScrolling?: () => void
   isCompact?: boolean
   sectionIndex?: number
   postsViewed?: number
   feedStartTime: number
+  isFirstPause?: boolean
+  onOnboardingSeen?: () => void
 }) {
   const {_} = useLingui()
   const t = useTheme()
@@ -107,6 +111,9 @@ export function PauseFeed({
     isCompact ? a.p_sm : a.pt_5xl,
   ]
 
+  const onboardingMessage =
+    "Infinite scrolling was originally designed to hijack your attention and keep you on digital platforms. Speakeasy is designed to help you consciously choose how you spend your time, so from time to time we'll pause the feed to check if you still want to be here."
+
   const breakTexts = [
     'Take a break, or see more?',
     `Would you like to pause and ${
@@ -126,6 +133,13 @@ export function PauseFeed({
     breakText = 'This is an infinite scroll (just so you know)'
   }
 
+  // Mark onboarding as seen when this component renders with isFirstPause
+  React.useEffect(() => {
+    if (isFirstPause && onOnboardingSeen) {
+      onOnboardingSeen()
+    }
+  }, [isFirstPause, onOnboardingSeen])
+
   return (
     <Animated.View style={[containerStyle, animatedStyle]}>
       {isCompact ? (
@@ -140,8 +154,20 @@ export function PauseFeed({
         </Text>
       ) : (
         <>
+          {isFirstPause && (
+            <Text
+              style={[
+                a.text_center,
+                t.atoms.text_contrast_medium,
+                a.text_sm,
+                a.mb_md,
+                {maxWidth: 400},
+              ]}>
+              {_(msg`${onboardingMessage}`)}
+            </Text>
+          )}
           <Text style={[a.text_center, t.atoms.text_contrast_high, a.text_md]}>
-            {_(msg`${breakText}`)}
+            {_(msg`${isFirstPause ? 'Take a break, or see more?' : breakText}`)}
           </Text>
           {options?.length ? (
             <View style={[a.gap_lg]}>

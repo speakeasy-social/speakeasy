@@ -141,6 +141,7 @@ const schema = z.object({
       }),
     )
     .default(DEFAULT_LEAVE_OPTIONS),
+  hasSeenPauseFeedOnboarding: z.boolean().optional(),
 })
 export type Schema = z.infer<typeof schema>
 
@@ -194,6 +195,7 @@ export const defaults: Schema = {
   autoUntrustOnUnfollow: true, // Default to true
   speakeasyHealthMonitoring: false, // Default to disabled
   leaveOptions: DEFAULT_LEAVE_OPTIONS,
+  hasSeenPauseFeedOnboarding: false,
 }
 
 export function tryParse(rawData: string): Schema | undefined {
