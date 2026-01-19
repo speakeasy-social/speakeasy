@@ -774,6 +774,7 @@ export const ComposePost = ({
             thread={thread}
             dispatch={composerDispatch}
             isReply={!!replyTo}
+            isPrivateReply={!!isPrivateReply}
             privatePostsDialogControl={privatePostsDialogControl}
           />
           <TrustedAudienceBanner
@@ -1919,17 +1920,20 @@ function AudienceBar({
   thread,
   dispatch,
   isReply,
+  isPrivateReply,
   privatePostsDialogControl,
 }: {
   post: PostDraft
   thread: ThreadDraft
   dispatch: (action: ComposerAction) => void
   isReply: boolean
+  isPrivateReply: boolean
   privatePostsDialogControl: Dialog.DialogOuterProps['control']
 }) {
   const {_} = useLingui()
   const t = useTheme()
   const privateQuoteDialogControl = useDialogControl()
+  const privateReplyDialogControl = useDialogControl()
   const {data: features = []} = useFeaturesQuery()
   const canPostPrivate = features.some(
     f => f.key === 'private-posts' && f.value === 'true',
@@ -1941,6 +1945,11 @@ function AudienceBar({
   const onToggleAudience = useCallback(() => {
     if (hasPrivateQuote) {
       privateQuoteDialogControl.open()
+      return
+    }
+    // Prevent switching from private to public when replying to a private post
+    if (isPrivateReply && post.audience === 'trusted') {
+      privateReplyDialogControl.open()
       return
     }
     if (!canPostPrivate && post.audience === 'public') {
@@ -1964,6 +1973,8 @@ function AudienceBar({
     privatePostsDialogControl,
     hasPrivateQuote,
     privateQuoteDialogControl,
+    isPrivateReply,
+    privateReplyDialogControl,
   ])
 
   const getLabel = () => {
@@ -1995,6 +2006,15 @@ function AudienceBar({
         title={_(msg`Private Quote Required`)}
         description={_(
           msg`Posts that quote private posts must also be private.`,
+        )}
+        confirmButtonCta={_(msg`Got it`)}
+        onConfirm={() => {}}
+      />
+      <Prompt.Basic
+        control={privateReplyDialogControl}
+        title={_(msg`Private Reply Required`)}
+        description={_(
+          msg`You are replying to a private post so your reply must also remain private.`,
         )}
         confirmButtonCta={_(msg`Got it`)}
         onConfirm={() => {}}
