@@ -1,16 +1,10 @@
 import {BskyAgent} from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
-import {
-  decryptContent,
-  decryptDEK,
-  encryptContent,
-  encryptDEK,
-  generateDEK,
-} from '#/lib/encryption'
-import {getTrustedUsers, RQKEY} from '#/state/queries/trusted'
+import {decryptContent, decryptDEK, encryptContent} from '#/lib/encryption'
+import {encryptDekForTrustedUsers} from './session-utils'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
-import {getOrCreatePublicKey, getPrivateKey, getPublicKeys} from './user-keys'
+import {getOrCreatePublicKey, getPrivateKey} from './user-keys'
 
 /**
  * Private profile types for encrypted profile data
@@ -114,41 +108,12 @@ async function createNewProfileSession(
   call: SpeakeasyApiCall,
   queryClient: QueryClient,
 ) {
-  const dek = await generateDEK()
-
-  // Get cached trusted users data
-  let trustedUsers: {recipientDid: string}[] | undefined =
-    queryClient.getQueryData(RQKEY(agent.did!))
-
-  if (!trustedUsers) {
-    trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
-  }
-
-  const recipientPublicKeys = await getPublicKeys(
-    trustedUsers.map(user => user.recipientDid),
+  const {encryptedDeks} = await encryptDekForTrustedUsers(
+    myPublicKey,
+    myUserKeyPairId,
+    agent,
     call,
-  )
-
-  // Create a session with the current user and their trusted users
-  const allSessionUsers = [
-    {
-      recipientDid: agent.did!,
-      publicKey: myPublicKey,
-      userKeyPairId: myUserKeyPairId,
-    },
-    ...recipientPublicKeys,
-  ]
-
-  // Encrypt DEK for all trusted users
-  const encryptedDeks = await Promise.all(
-    allSessionUsers.map(async recipient => {
-      const encryptedDek = await encryptDEK(dek, recipient.publicKey)
-      return {
-        encryptedDek,
-        recipientDid: recipient.recipientDid,
-        userKeyPairId: recipient.userKeyPairId,
-      }
-    }),
+    queryClient,
   )
 
   const {sessionId} = await createProfileSession(encryptedDeks, call)
