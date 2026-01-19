@@ -884,7 +884,7 @@ function TrustRequiredBanner({
         <Lock size="sm" fill={t.palette.primary_500} />
         <NewText style={[a.flex_1, a.leading_snug]}>
           {_(
-            msg`To reply to a private post, you must trust the author so that they can see your reply`,
+            msg`To reply with a private post, you must trust the author so that they can see your reply`,
           )}
         </NewText>
         <Button
