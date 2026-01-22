@@ -1,10 +1,18 @@
-import {BskyAgent} from '@atproto/api'
+import {AppBskyActorProfile, BskyAgent} from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
 import {decryptContent, decryptDEK, encryptContent} from '#/lib/encryption'
 import {encryptDekForTrustedUsers} from './session-utils'
-import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
-import {getOrCreatePublicKey, getPrivateKey} from './user-keys'
+import {
+  getErrorCode,
+  SpeakeasyApiCall,
+  uploadMediaToSpeakeasy,
+} from './speakeasy'
+import {
+  getOrCreatePublicKey,
+  getPrivateKey,
+  getPrivateKeyOrWarn,
+} from './user-keys'
 
 /**
  * Private profile types for encrypted profile data
@@ -99,6 +107,46 @@ export async function decryptProfileData(
 }
 
 /**
+ * Decrypts an encrypted profile response if the viewer has access.
+ * Returns null if decryption fails for any reason (no access, missing key, etc.)
+ *
+ * @param encryptedResponse - The encrypted profile from getPrivateProfile
+ * @param userDid - The viewer's DID
+ * @param call - The API call function
+ * @returns Decrypted profile data or null if not accessible
+ */
+export async function decryptProfileIfAccessible(
+  encryptedResponse: EncryptedProfileResponse,
+  userDid: string,
+  call: SpeakeasyApiCall,
+): Promise<PrivateProfileData | null> {
+  // 1. Get viewer's private key (cached)
+  const privateKey = await getPrivateKeyOrWarn(userDid, call)
+  if (!privateKey) {
+    return null
+  }
+
+  try {
+    // 2. Decrypt DEK from encryptedDek
+    const dek = await decryptDEK(
+      encryptedResponse.encryptedDek,
+      privateKey.privateKey,
+    )
+
+    // 3. Decrypt content
+    const profileData = await decryptProfileData(
+      encryptedResponse.encryptedContent,
+      dek,
+    )
+
+    return profileData
+  } catch {
+    // Decryption failed - viewer doesn't have access or data is corrupted
+    return null
+  }
+}
+
+/**
  * Creates a new profile session with the current user and their trusted users.
  */
 async function createNewProfileSession(
@@ -140,6 +188,19 @@ export async function putPrivateProfile(
     api: 'social.spkeasy.actor.putProfile',
     method: 'POST',
     body: params,
+  })
+}
+
+/**
+ * Deletes the current user's private profile.
+ * @param call - The API call function
+ */
+export async function deletePrivateProfile(
+  call: SpeakeasyApiCall,
+): Promise<void> {
+  await call({
+    api: 'social.spkeasy.actor.deleteProfile',
+    method: 'POST',
   })
 }
 
@@ -186,6 +247,56 @@ export async function getPrivateProfiles(
   })
 
   return response.profiles
+}
+
+/**
+ * Profile type that can be merged with private data.
+ * Covers ProfileViewBasic, ProfileViewDetailed, and similar types.
+ */
+type MergeableProfile = {
+  did: string
+  handle: string
+  displayName?: string
+  description?: string
+  avatar?: string
+  banner?: string
+}
+
+/**
+ * Merges private profile data into an AT Protocol profile.
+ * If privateData is provided, overlays displayName, description, avatar, and banner.
+ *
+ * @param atprotoProfile - The base AT Protocol profile
+ * @param privateData - Optional decrypted private profile data
+ * @returns Merged profile with private data overlaid if available
+ */
+export function mergePrivateProfileData<T extends MergeableProfile>(
+  atprotoProfile: T,
+  privateData: PrivateProfileData | null | undefined,
+): T {
+  if (!privateData) {
+    return atprotoProfile
+  }
+
+  return {
+    ...atprotoProfile,
+    displayName: privateData.displayName,
+    description: privateData.description,
+    avatar: privateData.avatarUri ?? atprotoProfile.avatar,
+    banner: privateData.bannerUri ?? atprotoProfile.banner,
+  }
+}
+
+/**
+ * Creates an anonymized ATProto profile record for private profile mode.
+ * Removes avatar/banner and sets placeholder display name and bio.
+ */
+export function anonymizeAtProtoProfile(): AppBskyActorProfile.Record {
+  return {
+    displayName: 'Private User',
+    description:
+      'This is a private profile only visible to trusted followers on @spkeasy.social',
+  }
 }
 
 /**
@@ -239,4 +350,152 @@ export async function getOrCreateProfileSession(
     sessionId,
     sessionKey,
   }
+}
+
+/**
+ * Converts a file path to a Blob for upload.
+ * Handles file://, absolute paths, data:, http:, https:, and blob: URLs.
+ */
+async function pathToBlob(path: string): Promise<Blob> {
+  if (path.startsWith('file:')) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.onload = () => resolve(xhr.response)
+      xhr.onerror = () => reject(new Error('Failed to load blob'))
+      xhr.responseType = 'blob'
+      xhr.open('GET', path, true)
+      xhr.send(null)
+    })
+  } else if (path.startsWith('/')) {
+    return fetch(`file://${path}`).then(r => r.blob())
+  } else if (
+    path.startsWith('data:') ||
+    path.startsWith('http:') ||
+    path.startsWith('https:') ||
+    path.startsWith('blob:')
+  ) {
+    return fetch(path).then(r => r.blob())
+  }
+  throw new TypeError(`Invalid path for blob conversion: ${path}`)
+}
+
+/**
+ * Input type for new avatar/banner media.
+ */
+type NewMedia = {path: string; mime: string}
+
+/**
+ * Saves a private profile by orchestrating session management, media upload, and encryption.
+ *
+ * @param agent - The BskyAgent containing user information
+ * @param call - The API call function
+ * @param queryClient - The React Query client instance
+ * @param profileData - The profile data to save
+ */
+export async function savePrivateProfile(
+  agent: BskyAgent,
+  call: SpeakeasyApiCall,
+  queryClient: QueryClient,
+  profileData: {
+    displayName: string
+    description: string
+    isPublic: boolean
+    newAvatar?: NewMedia | null // null = delete, undefined = keep existing
+    newBanner?: NewMedia | null
+    existingAvatarUri?: string
+    existingBannerUri?: string
+  },
+): Promise<void> {
+  const {isPublic} = profileData
+
+  // When switching to public, delete private profile and return early
+  // Caller must ensure AT Proto save succeeded before calling this
+  if (isPublic) {
+    try {
+      await deletePrivateProfile(call)
+    } catch (error) {
+      // Ignore NotFound - profile may not exist if user was never private
+      if (getErrorCode(error) !== 'NotFound') {
+        throw error
+      }
+    }
+    return
+  }
+
+  // Private profile: get/create session and save encrypted data
+  const {sessionId, sessionKey} = await getOrCreateProfileSession(
+    agent,
+    call,
+    queryClient,
+  )
+
+  const {
+    displayName,
+    description,
+    newAvatar,
+    newBanner,
+    existingAvatarUri,
+    existingBannerUri,
+  } = profileData
+
+  // Resolve avatar URI
+  let avatarUri: string | undefined
+  if (newAvatar === null) {
+    // Explicit deletion
+    avatarUri = undefined
+  } else if (newAvatar) {
+    // Upload new avatar to speakeasy
+    const blob = await pathToBlob(newAvatar.path)
+    const result = await uploadMediaToSpeakeasy(
+      agent,
+      blob,
+      newAvatar.mime,
+      sessionId,
+    )
+    avatarUri = result.data.blob.key
+  } else {
+    // No change - keep existing
+    avatarUri = existingAvatarUri
+  }
+
+  // Resolve banner URI
+  let bannerUri: string | undefined
+  if (newBanner === null) {
+    // Explicit deletion
+    bannerUri = undefined
+  } else if (newBanner) {
+    // Upload new banner to speakeasy
+    const blob = await pathToBlob(newBanner.path)
+    const result = await uploadMediaToSpeakeasy(
+      agent,
+      blob,
+      newBanner.mime,
+      sessionId,
+    )
+    bannerUri = result.data.blob.key
+  } else {
+    // No change - keep existing
+    bannerUri = existingBannerUri
+  }
+
+  // Build and encrypt profile data
+  const privateData: PrivateProfileData = {
+    displayName,
+    description,
+    avatarUri,
+    bannerUri,
+  }
+  const encryptedContent = await encryptProfileData(privateData, sessionKey)
+
+  // Save to API
+  await putPrivateProfile(
+    {
+      sessionId,
+      encryptedContent,
+      isPublic: false,
+      avatarUri,
+      bannerUri,
+    },
+    call,
+  )
 }

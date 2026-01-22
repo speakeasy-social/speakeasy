@@ -1,8 +1,15 @@
 import {BskyAgent} from '@atproto/api'
-import {chunk} from 'lodash'
+import {chunk, throttle} from 'lodash'
 
 import {generateKeyPair} from '#/lib/encryption'
+import {logger} from '#/logger'
+import * as Toast from '#/view/com/util/Toast'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
+
+// Throttled toast for private key errors - only show once per 30 seconds
+const showPrivateKeyErrorToast = throttle(() => {
+  Toast.show('Unable to load private data', 'xmark')
+}, 30_000)
 
 let cachedPrivateKeyPromise:
   | Promise<SpeakeasyPrivateKey | undefined>
@@ -95,7 +102,6 @@ export async function getCachedPrivateKey(
   if (!userDid) return
 
   if (!(cachedPrivateKeyUserDid === userDid && cachedPrivateKeyPromise)) {
-    console.log('getting private key')
     cachedPrivateKeyUserDid = userDid
     cachedPrivateKeyPromise = getPrivateKey(speakeasyApi)
     handledPrivateKeyPromise = cachedPrivateKeyPromise.catch(() => {
@@ -103,6 +109,27 @@ export async function getCachedPrivateKey(
     })
   }
   return ignoreError ? handledPrivateKeyPromise : cachedPrivateKeyPromise
+}
+
+/**
+ * Gets the cached private key, logging and showing a toast on error.
+ * Use this when you need the private key for decryption and want to
+ * gracefully handle errors with user feedback.
+ *
+ * @returns The private key, or null if unavailable/error
+ */
+export async function getPrivateKeyOrWarn(
+  userDid: string,
+  speakeasyApi: SpeakeasyApiCall,
+): Promise<SpeakeasyPrivateKey | null> {
+  try {
+    const privateKey = await getCachedPrivateKey(userDid, speakeasyApi)
+    return privateKey ?? null
+  } catch (error) {
+    logger.error('getPrivateKeyOrWarn: failed to get private key', {error})
+    showPrivateKeyErrorToast()
+    return null
+  }
 }
 
 export async function cachePrivateKey(
