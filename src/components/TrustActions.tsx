@@ -4,8 +4,11 @@ import {View} from 'react-native'
 import ProgressCircle from 'react-native-progress/Circle'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
+import {useQueryClient} from '@tanstack/react-query'
 
 import {bulkTrust, bulkUntrust, getDailyTrustedQuota} from '#/lib/api/trust'
+import {RQKEY as TRUST_STATUS_RQKEY} from '#/state/queries/trust-status'
+import {RQKEY as TRUSTED_RQKEY} from '#/state/queries/trusted'
 import {useAgent} from '#/state/session'
 import {show as showToast} from '#/view/com/util/Toast'
 import {atoms as a, useTheme} from '#/alf'
@@ -30,6 +33,7 @@ export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
   const {_} = useLingui()
   const t = useTheme()
   const agent = useAgent()
+  const queryClient = useQueryClient()
   const confirmDialogControl = Dialog.useDialogControl()
   const progressDialogControl = Dialog.useDialogControl()
   const rateLimitDialogControl = Dialog.useDialogControl()
@@ -122,6 +126,21 @@ export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
     [agent],
   )
 
+  const updateCacheForBulkAction = React.useCallback(
+    (dids: string[], trusted: boolean) => {
+      // Update trust-status cache for each processed DID
+      dids.forEach(did => {
+        queryClient.setQueryData(TRUST_STATUS_RQKEY(did), trusted)
+      })
+
+      // Invalidate the trusted users list so it refetches
+      if (agent.did) {
+        queryClient.invalidateQueries({queryKey: TRUSTED_RQKEY(agent.did)})
+      }
+    },
+    [queryClient, agent.did],
+  )
+
   const handleConfirm = React.useCallback(async () => {
     confirmDialogControl.close()
     progressDialogControl.open()
@@ -173,6 +192,8 @@ export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
           reverseAction,
         )
         if (res.processedDids.length) {
+          // Update cache after undo (reverse of original action)
+          updateCacheForBulkAction(res.processedDids, reverseAction === 'trust')
           showToast(
             _(
               msg`Undid ${lastAction === 'trust' ? 'trusting' : 'untrusting'} ${
@@ -214,10 +235,14 @@ export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
         setTimeout(undoFn, 0)
       } else if (res.moreRemain) {
         setLastTrustCount(allProcessedDids.length)
+        // Update cache for the DIDs that were processed before the rate limit
+        updateCacheForBulkAction(allProcessedDids, lastAction === 'trust')
         const err = new Error('Exceeded daily trust limit') as CustomError
         err.error = 'RateLimitError'
         throw err
       } else {
+        // Update cache after successful completion
+        updateCacheForBulkAction(allProcessedDids, lastAction === 'trust')
         showToastFn()
       }
     } catch (err) {
@@ -251,6 +276,7 @@ export function TrustActions({loadAllProfiles, hideTrustAll}: Props) {
     loadAllProfiles,
     _,
     rateLimitDialogControl,
+    updateCacheForBulkAction,
   ])
 
   const baseUrl = 'https://about.speakeasy.com/donate'
