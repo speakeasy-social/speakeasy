@@ -12,6 +12,7 @@ import {Provider as LanguagesProvider} from './languages'
 import {Provider as LargeAltBadgeProvider} from './large-alt-badge'
 import {Provider as LeaveOptionsProvider} from './leave-options'
 import {Provider as ShowInteractionNumbersProvider} from './show-interaction-numbers'
+import {Provider as SpeakeasyHealthMonitoringProvider} from './speakeasy-health-monitoring'
 import {Provider as SubtitlesProvider} from './subtitles'
 import {Provider as TrendingSettingsProvider} from './trending'
 import {Provider as TrustPreferencesProvider} from './trust'
@@ -41,6 +42,10 @@ export {
   useSetShowInteractionNumbers,
   useShowInteractionNumbers,
 } from './show-interaction-numbers'
+export {
+  useSetSpeakeasyHealthMonitoring,
+  useSpeakeasyHealthMonitoring,
+} from './speakeasy-health-monitoring'
 export {useSetSubtitlesEnabled, useSubtitlesEnabled} from './subtitles'
 
 export function Provider({children}: React.PropsWithChildren<{}>) {
@@ -61,7 +66,9 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
                               <LeaveOptionsProvider>
                                 <ImageLayoutProvider>
                                   <TrustPreferencesProvider>
-                                    {children}
+                                    <SpeakeasyHealthMonitoringProvider>
+                                      {children}
+                                    </SpeakeasyHealthMonitoringProvider>
                                   </TrustPreferencesProvider>
                                 </ImageLayoutProvider>
                               </LeaveOptionsProvider>

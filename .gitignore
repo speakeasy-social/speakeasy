@@ -111,6 +111,10 @@ google-services.json
 src/locale/locales/_build/
 src/locale/locales/**/*.js
 
+# Transpiled JavaScript (TypeScript output)
+src/**/*.js
+modules/**/*.js
+
 # local builds
 *.apk
 *.aab

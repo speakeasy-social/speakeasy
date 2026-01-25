@@ -2,6 +2,12 @@ import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {logger} from '#/logger'
 import {useAgent} from '#/state/session'
+import {
+  checkResponseForServiceError,
+  isServiceError,
+  showServiceErrorToast,
+  withHealthMonitoring,
+} from './speakeasy-health'
 
 export type SpeakeasyApiOptions = {
   api: string
@@ -60,23 +66,37 @@ export async function callSpeakeasyApiWithAgent(
     .join('&')
   const url = `${serverUrl}/xrpc/${api}${queryString ? `?${queryString}` : ''}`
 
-  const response = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${agent.session?.accessJwt}`,
-    },
-    ...(body && {body: JSON.stringify(body)}),
+  return withHealthMonitoring(async () => {
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${agent.session?.accessJwt}`,
+        },
+        ...(body && {body: JSON.stringify(body)}),
+      })
+    } catch (error) {
+      // Network error (failed to fetch, etc.)
+      if (isServiceError(error)) {
+        showServiceErrorToast()
+      }
+      throw error
+    }
+
+    // Check for 5xx server errors
+    checkResponseForServiceError(response)
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      const error = new Error(errorData.message || 'Unknown error')
+      Object.assign(error, errorData)
+      throw error
+    }
+
+    return response.json()
   })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    const error = new Error(errorData.message || 'Unknown error')
-    Object.assign(error, errorData)
-    throw error
-  }
-
-  return response.json()
 }
 
 export function getErrorCode(error: any) {
@@ -142,22 +162,37 @@ export async function uploadMediaToSpeakeasy(
   mime: string,
   sessionId: string,
 ): Promise<any> {
-  try {
-    // Use the appropriate endpoint for Speakeasy uploads
-    const uploadEndpoint = 'social.spkeasy.media.upload'
+  // Use the appropriate endpoint for Speakeasy uploads
+  const uploadEndpoint = 'social.spkeasy.media.upload'
 
-    // Get the host using the host resolution logic
-    const serverUrl = getHost(agent, uploadEndpoint)
+  // Get the host using the host resolution logic
+  const serverUrl = getHost(agent, uploadEndpoint)
 
-    const response = await fetch(`${serverUrl}/xrpc/${uploadEndpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': mime,
-        Authorization: `Bearer ${agent.session?.accessJwt}`,
-        'x-speakeasy-session-id': sessionId,
-      },
-      body: blob,
-    })
+  return withHealthMonitoring(async () => {
+    let response: Response
+    try {
+      response = await fetch(`${serverUrl}/xrpc/${uploadEndpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': mime,
+          Authorization: `Bearer ${agent.session?.accessJwt}`,
+          'x-speakeasy-session-id': sessionId,
+        },
+        body: blob,
+      })
+    } catch (error) {
+      // Network error (failed to fetch, etc.)
+      if (isServiceError(error)) {
+        showServiceErrorToast()
+      }
+      logger.error('Failed to upload blob to Speakeasy', {
+        safeMessage: error instanceof Error ? error.message : 'Unknown error',
+      })
+      throw error
+    }
+
+    // Check for 5xx server errors
+    checkResponseForServiceError(response)
 
     if (!response.ok) {
       const errorData = await response.json()
@@ -186,10 +221,5 @@ export async function uploadMediaToSpeakeasy(
         },
       },
     }
-  } catch (e: any) {
-    logger.error('Failed to upload blob to Speakeasy', {
-      safeMessage: e.message,
-    })
-    throw e
-  }
+  })
 }
