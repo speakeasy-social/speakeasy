@@ -91,6 +91,8 @@ import {
 import {useFeaturesQuery} from '#/state/queries/features'
 import {useProfileQuery} from '#/state/queries/profile'
 import {Gif} from '#/state/queries/tenor'
+import {useTrustMutationQueue} from '#/state/queries/trust'
+import {useTrustStatusQuery} from '#/state/queries/trust-status'
 import {useTrustedUserCount} from '#/state/queries/trusted'
 import {useAgent, useSession} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
@@ -207,6 +209,14 @@ export const ComposePost = ({
     '/social.spkeasy.feed.privatePost/',
   )
   const effectiveAudience = isPrivateReply ? 'trusted' : initAudience
+
+  // Check if user trusts the author when replying to a private post
+  const replyAuthorDid = replyTo?.author?.did
+  const {data: trustsReplyAuthor, isLoading: isTrustStatusLoading} =
+    useTrustStatusQuery(replyAuthorDid ?? '')
+  // Only require trust if replying to a private post and author is not already trusted
+  const requiresTrustForReply =
+    isPrivateReply && !isTrustStatusLoading && !trustsReplyAuthor
 
   // Show private posts modal on load if needed
   useEffect(() => {
@@ -397,6 +407,7 @@ export const ComposePost = ({
 
   const canPost =
     !missingAltError &&
+    !requiresTrustForReply &&
     thread.posts.every(
       post =>
         post.shortenedGraphemeLength <= MAX_GRAPHEME_LENGTH &&
@@ -777,11 +788,15 @@ export const ComposePost = ({
             isPrivateReply={!!isPrivateReply}
             privatePostsDialogControl={privatePostsDialogControl}
           />
-          <TrustedAudienceBanner
-            hasTrusted={hasTrusted}
-            post={activePost}
-            userHandle={currentAccount?.handle}
-          />
+          {requiresTrustForReply && replyTo?.author ? (
+            <TrustRequiredBanner replyAuthor={replyTo.author} />
+          ) : (
+            <TrustedAudienceBanner
+              hasTrusted={hasTrusted}
+              post={activePost}
+              userHandle={currentAccount?.handle}
+            />
+          )}
           <Animated.ScrollView
             ref={scrollViewRef}
             layout={native(LinearTransition)}
@@ -827,6 +842,68 @@ export const ComposePost = ({
         />
       </KeyboardAvoidingView>
     </BottomSheetPortalProvider>
+  )
+}
+
+function TrustRequiredBanner({
+  replyAuthor,
+}: {
+  replyAuthor: {did: string; handle: string; displayName?: string}
+}) {
+  const t = useTheme()
+  const {_} = useLingui()
+  const [queueTrust] = useTrustMutationQueue({did: replyAuthor.did})
+  const [isTrusting, setIsTrusting] = React.useState(false)
+
+  const authorName = replyAuthor.displayName || `@${replyAuthor.handle}`
+
+  const onPressTrust = async () => {
+    setIsTrusting(true)
+    try {
+      await queueTrust()
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        Toast.show(_(msg`An issue occurred, please try again.`), 'xmark')
+      }
+    } finally {
+      setIsTrusting(false)
+    }
+  }
+
+  return (
+    <View style={[a.px_lg, a.py_sm]}>
+      <View
+        style={[
+          a.px_md,
+          a.py_sm,
+          a.rounded_sm,
+          t.atoms.bg_contrast_25,
+          a.flex_row,
+          a.align_center,
+          a.gap_sm,
+        ]}>
+        <Lock size="sm" fill={t.palette.primary_500} />
+        <NewText style={[a.flex_1, a.leading_snug]}>
+          {_(
+            msg`To reply with a private post, you must trust the author so that they can see your reply`,
+          )}
+        </NewText>
+        <Button
+          label={_(msg`Trust ${authorName}`)}
+          size="tiny"
+          variant="solid"
+          color="primary"
+          style={[a.ml_sm]}
+          onPress={onPressTrust}
+          disabled={isTrusting}>
+          {isTrusting ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <ButtonText>{_(msg`Trust ${authorName}`)}</ButtonText>
+          )}
+        </Button>
+      </View>
+    </View>
   )
 }
 
