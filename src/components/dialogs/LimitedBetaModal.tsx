@@ -25,6 +25,7 @@ export interface LimitedBetaModalProps {
   }
   onSuccess?: () => void
   onCancel?: () => void
+  initialCode?: string
 }
 
 export function LimitedBetaModal({
@@ -34,6 +35,7 @@ export function LimitedBetaModal({
   utmParams,
   onSuccess,
   onCancel,
+  initialCode,
 }: LimitedBetaModalProps) {
   const {_} = useLingui()
   const {gtMobile} = useBreakpoints()
@@ -52,11 +54,17 @@ export function LimitedBetaModal({
   React.useEffect(() => {
     if (control.isOpen) {
       wasSuccessfulRef.current = false
-      setShowInviteCode(false)
-      setCode('')
+      // If initialCode is provided, skip to invite code entry with code pre-filled
+      if (initialCode) {
+        setShowInviteCode(true)
+        setCode(initialCode)
+      } else {
+        setShowInviteCode(false)
+        setCode('')
+      }
       setError(null)
     }
-  }, [control.isOpen])
+  }, [control.isOpen, initialCode])
 
   const applyInviteCode = useMutation({
     mutationFn: async (inviteCode: string) => {
