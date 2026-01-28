@@ -25,6 +25,7 @@ export interface LimitedBetaModalProps {
   }
   onSuccess?: () => void
   onCancel?: () => void
+  initialShowInviteCode?: boolean
 }
 
 export function LimitedBetaModal({
@@ -34,6 +35,7 @@ export function LimitedBetaModal({
   utmParams,
   onSuccess,
   onCancel,
+  initialShowInviteCode = false,
 }: LimitedBetaModalProps) {
   const {_} = useLingui()
   const {gtMobile} = useBreakpoints()
@@ -42,7 +44,9 @@ export function LimitedBetaModal({
   const {currentAccount} = useSession()
   const {data: profile} = useProfileQuery({did: currentAccount?.did})
   const {call} = useSpeakeasyApi()
-  const [showInviteCode, setShowInviteCode] = React.useState(false)
+  const [showInviteCode, setShowInviteCode] = React.useState(
+    initialShowInviteCode,
+  )
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const wasSuccessfulRef = React.useRef(false)
@@ -52,11 +56,11 @@ export function LimitedBetaModal({
   React.useEffect(() => {
     if (control.isOpen) {
       wasSuccessfulRef.current = false
-      setShowInviteCode(false)
+      setShowInviteCode(initialShowInviteCode)
       setCode('')
       setError(null)
     }
-  }, [control.isOpen])
+  }, [control.isOpen, initialShowInviteCode])
 
   const applyInviteCode = useMutation({
     mutationFn: async (inviteCode: string) => {
@@ -142,11 +146,11 @@ export function LimitedBetaModal({
                   variant="solid"
                   color="primary"
                   size={gtMobile ? 'small' : 'large'}
-                  label={_(msg`Learn More and Get Early Access`)}
+                  label={_(msg`Learn More and Request Access`)}
                   onPress={handleLearnMore}
                   style={[a.mt_lg]}>
                   <ButtonText>
-                    {_(msg`Learn More and Get Early Access`)}
+                    {_(msg`Learn More and Request Access`)}
                   </ButtonText>
                 </Button>
 
@@ -215,9 +219,13 @@ export function LimitedBetaModal({
                   size={gtMobile ? 'small' : 'large'}
                   label={_(msg`Back`)}
                   onPress={() => {
-                    setShowInviteCode(false)
-                    setCode('')
-                    setError(null)
+                    if (initialShowInviteCode) {
+                      control.close()
+                    } else {
+                      setShowInviteCode(false)
+                      setCode('')
+                      setError(null)
+                    }
                   }}
                   style={[a.mt_sm]}>
                   <ButtonText>{_(msg`Back`)}</ButtonText>

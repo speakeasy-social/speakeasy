@@ -723,7 +723,7 @@ export const ComposePost = ({
       <LimitedBetaModal
         control={privatePostsDialogControl}
         featureDescription={_(
-          msg`We're trialing a new feature to make your posts only visible to your trusted community.`,
+          msg`We're rolling out private posts to make your post access to our community.`,
         )}
         featureName={_(msg`Private Post to Trusted Communities`)}
         utmParams={{
