@@ -1,5 +1,5 @@
 import React from 'react'
-import {View} from 'react-native'
+import {Dimensions, View} from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -10,6 +10,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useNavigation} from '@react-navigation/native'
 
+import {isWeb} from '#/platform/detection'
 import {useLeaveOptions} from '#/state/preferences/leave-options'
 import {useTheme} from '#/alf'
 import {atoms as a} from '#/alf/atoms'
@@ -45,12 +46,16 @@ export function PauseFeed({
   sectionIndex = 0,
   postsViewed = 0,
   feedStartTime,
+  isFirstPause = false,
+  onOnboardingSeen,
 }: {
   onKeepScrolling?: () => void
   isCompact?: boolean
   sectionIndex?: number
   postsViewed?: number
   feedStartTime: number
+  isFirstPause?: boolean
+  onOnboardingSeen?: () => void
 }) {
   const {_} = useLingui()
   const t = useTheme()
@@ -83,7 +88,7 @@ export function PauseFeed({
     }
   }, [isReducedMotion])
 
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     gifDialogControl.open()
     fetch(
       'https://api.giphy.com/v1/gifs/random?api_key=YOUR_API_KEY&tag=off+you+go&rating=g',
@@ -96,7 +101,7 @@ export function PauseFeed({
       .catch(error => {
         console.error('Error fetching GIF:', error)
       })
-  }
+  }, [gifDialogControl])
 
   const containerStyle = [
     a.p_lg,
@@ -106,6 +111,9 @@ export function PauseFeed({
     t.atoms.border_contrast_low,
     isCompact ? a.p_sm : a.pt_5xl,
   ]
+
+  const onboardingMessage =
+    "Infinite scrolling was originally designed to hijack your attention and keep you on digital platforms. Speakeasy is designed to help you consciously choose how you spend your time, so from time to time we'll pause the feed to check if you still want to be here."
 
   const breakTexts = [
     'Take a break, or see more?',
@@ -126,8 +134,114 @@ export function PauseFeed({
     breakText = 'This is an infinite scroll (just so you know)'
   }
 
+  // Track if onboarding has been marked as seen
+  const onboardingMarkedRef = React.useRef(false)
+  const viewRef = React.useRef<View>(null)
+  const webObserverRef = React.useRef<HTMLDivElement>(null)
+
+  // Mark onboarding as seen (only once)
+  const markOnboardingSeen = React.useCallback(() => {
+    if (isFirstPause && onOnboardingSeen && !onboardingMarkedRef.current) {
+      onboardingMarkedRef.current = true
+      onOnboardingSeen()
+    }
+  }, [isFirstPause, onOnboardingSeen])
+
+  // Web: Use IntersectionObserver to detect when component enters viewport
+  React.useEffect(() => {
+    if (!isWeb || !isFirstPause || !webObserverRef.current) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        const entry = entries[0]
+        if (entry?.isIntersecting) {
+          markOnboardingSeen()
+        }
+      },
+      {threshold: 0.5},
+    )
+
+    observer.observe(webObserverRef.current)
+    return () => observer.disconnect()
+  }, [isFirstPause, markOnboardingSeen])
+
+  // Native: Check visibility after layout using measureInWindow
+  const checkVisibilityNative = React.useCallback(() => {
+    if (
+      isWeb ||
+      !isFirstPause ||
+      !viewRef.current ||
+      onboardingMarkedRef.current
+    )
+      return
+
+    viewRef.current.measureInWindow((x, y, width, measuredHeight) => {
+      if (width === 0 && measuredHeight === 0) return
+
+      const windowHeight = Dimensions.get('window').height
+      const visibleTop = Math.max(0, y)
+      const visibleBottom = Math.min(windowHeight, y + measuredHeight)
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop)
+
+      // Mark as seen if at least 50% visible
+      if (measuredHeight > 0 && visibleHeight / measuredHeight >= 0.5) {
+        markOnboardingSeen()
+      }
+    })
+  }, [isFirstPause, markOnboardingSeen])
+
+  const handleLayout = React.useCallback(() => {
+    if (!isWeb && isFirstPause) {
+      // Small delay to ensure layout is complete
+      setTimeout(checkVisibilityNative, 100)
+    }
+  }, [isFirstPause, checkVisibilityNative])
+
+  const handleKeepScrolling = React.useCallback(() => {
+    markOnboardingSeen()
+    onKeepScrolling?.()
+  }, [markOnboardingSeen, onKeepScrolling])
+
+  const handleLeaveOption = React.useCallback(
+    (option: {link: string}) => {
+      markOnboardingSeen()
+      if (option.link === 'close') {
+        handleClose()
+      } else if (option.link === 'chat') {
+        // Not sure why it doesn't recognise the route
+        // @ts-ignore
+        navigation.navigate('Messages')
+      } else {
+        window.location.href = option.link
+      }
+    },
+    [markOnboardingSeen, handleClose, navigation],
+  )
+
   return (
     <Animated.View style={[containerStyle, animatedStyle]}>
+      {/* Viewport detection element */}
+      {isFirstPause && isWeb && (
+        <div
+          ref={webObserverRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {isFirstPause && !isWeb && (
+        <View
+          ref={viewRef}
+          onLayout={handleLayout}
+          style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+          pointerEvents="none"
+        />
+      )}
       {isCompact ? (
         <Text
           style={[
@@ -140,8 +254,20 @@ export function PauseFeed({
         </Text>
       ) : (
         <>
+          {isFirstPause && (
+            <Text
+              style={[
+                a.text_center,
+                t.atoms.text_contrast_medium,
+                a.text_sm,
+                a.mb_md,
+                {maxWidth: 400},
+              ]}>
+              {_(msg`${onboardingMessage}`)}
+            </Text>
+          )}
           <Text style={[a.text_center, t.atoms.text_contrast_high, a.text_md]}>
-            {_(msg`${breakText}`)}
+            {_(msg`${isFirstPause ? 'Take a break, or see more?' : breakText}`)}
           </Text>
           {options?.length ? (
             <View style={[a.gap_lg]}>
@@ -152,17 +278,7 @@ export function PauseFeed({
                   color="primary"
                   size="large"
                   label={option.title}
-                  onPress={() => {
-                    if (option.link === 'close') {
-                      handleClose()
-                    } else if (option.link === 'chat') {
-                      // Not sure why it doesn't recognise the route
-                      // @ts-ignore
-                      navigation.navigate('Messages')
-                    } else {
-                      window.location.href = option.link
-                    }
-                  }}>
+                  onPress={() => handleLeaveOption(option)}>
                   <ButtonText>{option.title}</ButtonText>
                 </Button>
               ))}
@@ -172,7 +288,10 @@ export function PauseFeed({
                 color="secondary"
                 size="small"
                 label={_(msg`Edit Options`)}
-                onPress={() => leaveDialogControl.open()}>
+                onPress={() => {
+                  markOnboardingSeen()
+                  leaveDialogControl.open()
+                }}>
                 <ButtonText>{_(msg`Edit Options`)}</ButtonText>
               </Button>
             </View>
@@ -184,6 +303,7 @@ export function PauseFeed({
               size="large"
               label={_(msg`Leave`)}
               onPress={() => {
+                markOnboardingSeen()
                 leaveDialogControl.open()
               }}>
               <ButtonText>{_(msg`Leave`)}</ButtonText>
@@ -196,7 +316,7 @@ export function PauseFeed({
             color="primary"
             size="small"
             label={_(msg`Keep Scrolling`)}
-            onPress={onKeepScrolling}>
+            onPress={handleKeepScrolling}>
             <ButtonText>{_(msg`Keep Scrolling`)}</ButtonText>
           </Button>
 

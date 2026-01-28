@@ -11,6 +11,7 @@ import {Provider as KawaiiProvider} from './kawaii'
 import {Provider as LanguagesProvider} from './languages'
 import {Provider as LargeAltBadgeProvider} from './large-alt-badge'
 import {Provider as LeaveOptionsProvider} from './leave-options'
+import {Provider as PauseFeedOnboardingProvider} from './pause-feed-onboarding'
 import {Provider as ShowInteractionNumbersProvider} from './show-interaction-numbers'
 import {Provider as SpeakeasyHealthMonitoringProvider} from './speakeasy-health-monitoring'
 import {Provider as SubtitlesProvider} from './subtitles'
@@ -39,6 +40,10 @@ export {
 } from './large-alt-badge'
 export {useLeaveOptions, useSetLeaveOptions} from './leave-options'
 export {
+  useHasSeenPauseFeedOnboarding,
+  useSetHasSeenPauseFeedOnboarding,
+} from './pause-feed-onboarding'
+export {
   useSetShowInteractionNumbers,
   useShowInteractionNumbers,
 } from './show-interaction-numbers'
@@ -64,13 +69,15 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
                           <KawaiiProvider>
                             <ShowInteractionNumbersProvider>
                               <LeaveOptionsProvider>
-                                <ImageLayoutProvider>
-                                  <TrustPreferencesProvider>
-                                    <SpeakeasyHealthMonitoringProvider>
-                                      {children}
-                                    </SpeakeasyHealthMonitoringProvider>
-                                  </TrustPreferencesProvider>
-                                </ImageLayoutProvider>
+                                <PauseFeedOnboardingProvider>
+                                  <ImageLayoutProvider>
+                                    <TrustPreferencesProvider>
+                                      <SpeakeasyHealthMonitoringProvider>
+                                        {children}
+                                      </SpeakeasyHealthMonitoringProvider>
+                                    </TrustPreferencesProvider>
+                                  </ImageLayoutProvider>
+                                </PauseFeedOnboardingProvider>
                               </LeaveOptionsProvider>
                             </ShowInteractionNumbersProvider>
                           </KawaiiProvider>
