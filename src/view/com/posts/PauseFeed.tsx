@@ -52,7 +52,7 @@ export function PauseFeed({
   feedStartTime,
   isFirstPause = false,
   onOnboardingSeen,
-  promotionalCTA,
+  feedPauseCTA,
 }: {
   onKeepScrolling?: () => void
   isCompact?: boolean
@@ -61,7 +61,7 @@ export function PauseFeed({
   feedStartTime: number
   isFirstPause?: boolean
   onOnboardingSeen?: () => void
-  promotionalCTA?: PauseFeedCTA
+  feedPauseCTA?: PauseFeedCTA
 }) {
   const {_} = useLingui()
   const t = useTheme()
@@ -210,12 +210,12 @@ export function PauseFeed({
     onKeepScrolling?.()
   }, [markOnboardingSeen, onKeepScrolling])
 
-  const handlePromotionalCTA = React.useCallback(() => {
-    if (!promotionalCTA?.url) {
+  const handleFeedPauseCTA = React.useCallback(() => {
+    if (!feedPauseCTA?.url) {
       return
     }
 
-    const href = promotionalCTA.url
+    const href = feedPauseCTA.url
 
     // External URLs (http, https, mailto) use openLink
     if (href.startsWith('http') || href.startsWith('mailto')) {
@@ -233,7 +233,7 @@ export function PauseFeed({
       // Fallback for relative URLs that don't match any route
       openLink(href)
     }
-  }, [promotionalCTA, openLink, closeModal, navigation])
+  }, [feedPauseCTA, openLink, closeModal, navigation])
 
   const handleLeaveOption = React.useCallback(
     (option: {link: string}) => {
@@ -285,20 +285,20 @@ export function PauseFeed({
           ]}>
           {_(msg`Onwards!`)}
         </Text>
-      ) : promotionalCTA ? (
+      ) : feedPauseCTA ? (
         <>
           <Text style={[a.text_center, t.atoms.text_contrast_high, a.text_md]}>
-            {promotionalCTA.message}
+            {feedPauseCTA.message}
           </Text>
 
           <Button
             style={[a.mt_xl]}
             variant="solid"
-            color={promotionalCTA.buttonColor || 'primary'}
+            color={feedPauseCTA.buttonColor || 'primary'}
             size="large"
-            label={promotionalCTA.buttonText}
-            onPress={handlePromotionalCTA}>
-            <ButtonText>{promotionalCTA.buttonText}</ButtonText>
+            label={feedPauseCTA.buttonText}
+            onPress={handleFeedPauseCTA}>
+            <ButtonText>{feedPauseCTA.buttonText}</ButtonText>
           </Button>
 
           <Button

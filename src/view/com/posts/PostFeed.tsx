@@ -831,8 +831,8 @@ let PostFeed = ({
           }
         }
 
-        // Get promotional CTA if selected
-        const promotionalCTA =
+        // Get feed pause CTA if selected
+        const feedPauseCTA =
           typeof selectedCTA === 'object' ? selectedCTA : undefined
 
         return (
@@ -844,7 +844,7 @@ let PostFeed = ({
             feedStartTime={feedStartTime}
             isFirstPause={isFirstPause}
             onOnboardingSeen={() => setHasSeenPauseFeedOnboarding(true)}
-            promotionalCTA={promotionalCTA}
+            feedPauseCTA={feedPauseCTA}
           />
         )
       } else if (row.type === 'feedShutdownMsg') {
