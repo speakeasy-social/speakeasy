@@ -8,15 +8,19 @@ import Animated, {
 } from 'react-native-reanimated'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
-import {useNavigation} from '@react-navigation/native'
+import {StackActions, useNavigation} from '@react-navigation/native'
 
+import {useOpenLink} from '#/lib/hooks/useOpenLink'
 import {isWeb} from '#/platform/detection'
+import {useModalControls} from '#/state/modals'
 import {useLeaveOptions} from '#/state/preferences/leave-options'
 import {useTheme} from '#/alf'
 import {atoms as a} from '#/alf/atoms'
 import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {Text} from '#/components/Typography'
+import {PauseFeedCTA} from '#/constants/pause-feed-cta'
+import {router} from '../../../routes'
 import {LeaveDialog} from '../modals/EditLeaveOptionsDialog'
 
 function GoodbyeGifDialog({
@@ -48,6 +52,7 @@ export function PauseFeed({
   feedStartTime,
   isFirstPause = false,
   onOnboardingSeen,
+  promotionalCTA,
 }: {
   onKeepScrolling?: () => void
   isCompact?: boolean
@@ -56,6 +61,7 @@ export function PauseFeed({
   feedStartTime: number
   isFirstPause?: boolean
   onOnboardingSeen?: () => void
+  promotionalCTA?: PauseFeedCTA
 }) {
   const {_} = useLingui()
   const t = useTheme()
@@ -66,6 +72,8 @@ export function PauseFeed({
   const isReducedMotion = useReducedMotion()
   const height = useSharedValue(isCompact ? 60 : 500)
   const navigation = useNavigation()
+  const {closeModal} = useModalControls()
+  const openLink = useOpenLink()
 
   React.useEffect(() => {
     height.value = isCompact ? 60 : 500
@@ -202,6 +210,31 @@ export function PauseFeed({
     onKeepScrolling?.()
   }, [markOnboardingSeen, onKeepScrolling])
 
+  const handlePromotionalCTA = React.useCallback(() => {
+    if (!promotionalCTA?.url) {
+      return
+    }
+
+    const href = promotionalCTA.url
+
+    // External URLs (http, https, mailto) use openLink
+    if (href.startsWith('http') || href.startsWith('mailto')) {
+      openLink(href)
+      return
+    }
+
+    // Relative URLs: try to match with router
+    const [routeName, params] = router.matchPath(href)
+    if (routeName !== 'NotFound') {
+      closeModal()
+      // @ts-ignore we're not able to type check on this one -prf
+      navigation.dispatch(StackActions.push(routeName, params))
+    } else {
+      // Fallback for relative URLs that don't match any route
+      openLink(href)
+    }
+  }, [promotionalCTA, openLink, closeModal, navigation])
+
   const handleLeaveOption = React.useCallback(
     (option: {link: string}) => {
       markOnboardingSeen()
@@ -252,6 +285,32 @@ export function PauseFeed({
           ]}>
           {_(msg`Onwards!`)}
         </Text>
+      ) : promotionalCTA ? (
+        <>
+          <Text style={[a.text_center, t.atoms.text_contrast_high, a.text_md]}>
+            {promotionalCTA.message}
+          </Text>
+
+          <Button
+            style={[a.mt_xl]}
+            variant="solid"
+            color={promotionalCTA.buttonColor || 'primary'}
+            size="large"
+            label={promotionalCTA.buttonText}
+            onPress={handlePromotionalCTA}>
+            <ButtonText>{promotionalCTA.buttonText}</ButtonText>
+          </Button>
+
+          <Button
+            style={[a.mt_xl]}
+            variant="outline"
+            color="primary"
+            size="small"
+            label={_(msg`Keep Scrolling`)}
+            onPress={handleKeepScrolling}>
+            <ButtonText>{_(msg`Keep Scrolling`)}</ButtonText>
+          </Button>
+        </>
       ) : (
         <>
           {isFirstPause && (
