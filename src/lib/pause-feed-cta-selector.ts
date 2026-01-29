@@ -1,12 +1,12 @@
 import {CTADisplayStats} from '#/state/preferences/pause-feed-cta-stats'
-import {FEED_PAUSE_CTAS,PauseFeedCTA} from '#/constants/pause-feed-cta'
+import {FEED_PAUSE_CTAS, PauseFeedCTA} from '#/constants/pause-feed-cta'
 
 const ROLLING_WINDOW_SIZE = 30
 
 /**
  * Selects which CTA to show based on current stats.
  * Returns 'onboarding' for first-time users, 'default' for pauses 2-4,
- * and a promotional CTA or 'default' for pauses 5+.
+ * and a feed pause CTA or 'default' for pauses 5+.
  */
 export function selectCTA(
   stats: CTADisplayStats,
@@ -22,7 +22,7 @@ export function selectCTA(
     return 'default'
   }
 
-  // Pauses 5+: try to show a promotional CTA
+  // Pauses 5+: try to show a feed pause CTA
   const eligible = FEED_PAUSE_CTAS.filter(cta => isEligible(cta, stats))
 
   if (eligible.length === 0) {
@@ -34,7 +34,7 @@ export function selectCTA(
 }
 
 /**
- * Gets the list of eligible promotional CTA IDs based on current stats.
+ * Gets the list of eligible feed pause CTA IDs based on current stats.
  */
 export function getEligibleCTAs(stats: CTADisplayStats): string[] {
   return FEED_PAUSE_CTAS.filter(cta => isEligible(cta, stats)).map(
@@ -110,7 +110,7 @@ function semiRandomlySelect(
   const eligiblePeriodCounts: Record<string, number> = {}
 
   for (const display of relevantDisplays) {
-    // Count displays: if a promotional CTA was displayed, count it
+    // Count displays: if a feed pause CTA was displayed, count it
     // (if it was displayed, it must have been eligible at selection time)
     if (display.ctaId !== 'default' && display.ctaId !== 'onboarding') {
       actualCounts[display.ctaId] = (actualCounts[display.ctaId] || 0) + 1
