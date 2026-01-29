@@ -21,6 +21,11 @@ import {useQueryClient} from '@tanstack/react-query'
 import {DISCOVER_FEED_URI, KNOWN_SHUTDOWN_FEEDS} from '#/lib/constants'
 import {useInitialNumToRender} from '#/lib/hooks/useInitialNumToRender'
 import {useWebMediaQueries} from '#/lib/hooks/useWebMediaQueries'
+import {
+  getEligibleCTAs,
+  selectCTA,
+  startCooldownIfNeeded,
+} from '#/lib/pause-feed-cta-selector'
 import {logEvent} from '#/lib/statsig/statsig'
 import {useTheme} from '#/lib/ThemeContext'
 import {logger} from '#/logger'
@@ -36,6 +41,11 @@ import {
   DEFAULT_POSTS_PER_INTERRUPT,
   saveSessionStats,
 } from '#/state/preferences/feed-break-sessions'
+import {
+  CTADisplayStats,
+  loadCTAStats,
+  recordCTADisplay,
+} from '#/state/preferences/pause-feed-cta-stats'
 import {useTrendingSettings} from '#/state/preferences/trending'
 import {STALE} from '#/state/queries'
 import {
@@ -60,6 +70,7 @@ import {
 } from '#/components/feeds/PostFeedVideoGridRow'
 import {TrendingInterstitial} from '#/components/interstitials/Trending'
 import {TrendingVideos as TrendingVideosInterstitial} from '#/components/interstitials/TrendingVideos'
+import {PauseFeedCTA} from '#/constants/pause-feed-cta'
 import {DiscoverFallbackHeader} from './DiscoverFallbackHeader'
 import {FeedShutdownMsg} from './FeedShutdownMsg'
 import {MediaGrid} from './MediaGrid'
@@ -236,6 +247,12 @@ let PostFeed = ({
   const hasInitializedRef = useRef(false)
   const sessionIdRef = useRef<string>()
   const savedStatsSectionsRef = useRef(new Set<number>())
+  const [ctaStats, setCTAStats] = useState<CTADisplayStats | null>(null)
+  const ctaStatsInitializedRef = useRef(false)
+  const recordedCTASectionsRef = useRef(new Set<number>())
+  const selectedCTAsRef = useRef<
+    Map<number, PauseFeedCTA | 'onboarding' | 'default'>
+  >(new Map())
 
   const feedCacheKey = feedParams?.feedCacheKey
   const opts = React.useMemo(
@@ -717,6 +734,16 @@ let PostFeed = ({
     sessionIdRef.current = Date.now().toString()
   }, [])
 
+  // Load CTA stats on mount
+  useEffect(() => {
+    if (ctaStatsInitializedRef.current) return
+    ctaStatsInitializedRef.current = true
+
+    loadCTAStats().then(stats => {
+      setCTAStats(stats)
+    })
+  }, [])
+
   // rendering
   // =
 
@@ -745,8 +772,6 @@ let PostFeed = ({
       } else if (row.type === 'loading') {
         return <PostFeedLoadingPlaceholder />
       } else if (row.type === 'pauseFeed') {
-        console.log('rendering pause feed', row.sectionIndex, pauseSectionCount)
-
         // Save stats with the current session ID and latest post count
         if (
           sessionIdRef.current &&
@@ -758,6 +783,58 @@ let PostFeed = ({
 
         const isFirstPause =
           row.sectionIndex === 0 && !hasSeenPauseFeedOnboarding
+
+        // Get or select CTA for this pause
+        let selectedCTA: PauseFeedCTA | 'onboarding' | 'default' = 'default'
+        if (ctaStats) {
+          // Check if we already selected a CTA for this section
+          if (selectedCTAsRef.current.has(row.sectionIndex)) {
+            selectedCTA = selectedCTAsRef.current.get(row.sectionIndex)!
+          } else {
+            // Create a temporary stats object with updated totalPausesDisplayed
+            const tempStats = {
+              ...ctaStats,
+              totalPausesDisplayed:
+                ctaStats.totalPausesDisplayed + row.sectionIndex,
+            }
+            selectedCTA = selectCTA(tempStats, hasSeenPauseFeedOnboarding)
+            selectedCTAsRef.current.set(row.sectionIndex, selectedCTA)
+          }
+
+          // Record CTA display (only once per section)
+          if (!recordedCTASectionsRef.current.has(row.sectionIndex)) {
+            recordedCTASectionsRef.current.add(row.sectionIndex)
+            const ctaId =
+              typeof selectedCTA === 'object' ? selectedCTA.id : selectedCTA
+            // Get eligible CTAs at the time of selection (using tempStats to match selection logic)
+            const tempStats = {
+              ...ctaStats,
+              totalPausesDisplayed:
+                ctaStats.totalPausesDisplayed + row.sectionIndex,
+            }
+            const eligibleCTAs = getEligibleCTAs(tempStats)
+            recordCTADisplay(ctaId, ctaStats, eligibleCTAs).then(
+              updatedStats => {
+                // Start cooldown if needed
+                if (typeof selectedCTA === 'object') {
+                  const statsWithCooldown = startCooldownIfNeeded(
+                    selectedCTA.id,
+                    updatedStats,
+                    selectedCTA,
+                  )
+                  setCTAStats(statsWithCooldown)
+                } else {
+                  setCTAStats(updatedStats)
+                }
+              },
+            )
+          }
+        }
+
+        // Get feed pause CTA if selected
+        const feedPauseCTA =
+          typeof selectedCTA === 'object' ? selectedCTA : undefined
+
         return (
           <PauseFeed
             onKeepScrolling={() => handleExpandSection()}
@@ -767,6 +844,7 @@ let PostFeed = ({
             feedStartTime={feedStartTime}
             isFirstPause={isFirstPause}
             onOnboardingSeen={() => setHasSeenPauseFeedOnboarding(true)}
+            feedPauseCTA={feedPauseCTA}
           />
         )
       } else if (row.type === 'feedShutdownMsg') {
@@ -853,6 +931,7 @@ let PostFeed = ({
       postsPerInterrupt,
       hasSeenPauseFeedOnboarding,
       setHasSeenPauseFeedOnboarding,
+      ctaStats,
     ],
   )
 
