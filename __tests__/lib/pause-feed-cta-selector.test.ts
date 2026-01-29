@@ -9,9 +9,9 @@ import {
 } from '../../src/lib/pause-feed-cta-selector'
 import {CTADisplayStats} from '../../src/state/preferences/pause-feed-cta-stats'
 
-// Mock the PROMOTIONAL_CTAS constant
+// Mock the FEED_PAUSE_CTAS constant
 jest.mock('../../src/constants/pause-feed-cta', () => ({
-  PROMOTIONAL_CTAS: [
+  FEED_PAUSE_CTAS: [
     {
       id: 'test-cta-1',
       message: 'Test CTA 1',
