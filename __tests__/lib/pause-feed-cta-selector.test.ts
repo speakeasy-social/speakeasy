@@ -76,8 +76,8 @@ describe('pause-feed-cta-selector', () => {
       }
     })
 
-    it('can return promotional CTA for pause 5+ and respects maxDisplays limit', () => {
-      const promoStats = {...createEmptyStats(), totalPausesDisplayed: 4}
+    it('can return feed pause CTA for pause 5+ and respects maxDisplays limit', () => {
+      const ctaStats = {...createEmptyStats(), totalPausesDisplayed: 4}
       const maxedStats: CTADisplayStats = {
         totalPausesDisplayed: 10,
         displayCounts: {'test-cta-2': 5}, // Already at max
@@ -85,23 +85,23 @@ describe('pause-feed-cta-selector', () => {
         recentDisplays: [], // Empty recent displays
       }
 
-      const promoResults = new Set<string>()
+      const ctaResults = new Set<string>()
       const maxedResults: (PauseFeedCTA | string)[] = []
 
       // Run multiple times to account for randomness while testing both behaviors
       for (let i = 0; i < 100; i++) {
-        const promoResult = selectCTA(promoStats, true)
-        if (typeof promoResult === 'object') {
-          promoResults.add(promoResult.id)
+        const ctaResult = selectCTA(ctaStats, true)
+        if (typeof ctaResult === 'object') {
+          ctaResults.add(ctaResult.id)
         } else {
-          promoResults.add(promoResult)
+          ctaResults.add(ctaResult)
         }
 
         maxedResults.push(selectCTA(maxedStats, true))
       }
 
-      // Should see at least some promotional CTAs or default
-      expect(promoResults.size).toBeGreaterThan(0)
+      // Should see at least some feed pause CTAs or default
+      expect(ctaResults.size).toBeGreaterThan(0)
 
       // test-cta-2 should not appear (at maxDisplays)
       const maxedCTA = maxedResults.find(
@@ -228,11 +228,11 @@ describe('pause-feed-cta-selector', () => {
         counts[key] = (counts[key] || 0) + 1
       }
 
-      // With frequency correction, promotional CTAs should appear
+      // With frequency correction, feed pause CTAs should appear
       // at higher rates than without correction
-      const promotionalCount =
+      const feedPauseCount =
         (counts['test-cta-1'] || 0) + (counts['test-cta-2'] || 0)
-      expect(promotionalCount).toBeGreaterThan(0)
+      expect(feedPauseCount).toBeGreaterThan(0)
     })
   })
 
