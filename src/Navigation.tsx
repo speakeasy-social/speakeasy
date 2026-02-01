@@ -106,6 +106,7 @@ import {ThreadPreferencesScreen} from './screens/Settings/ThreadPreferences'
 import TopicScreen from './screens/Topic'
 import {DonateScreen} from './view/screens/Donate'
 import {DonateThanksScreen} from './view/screens/DonateThanks'
+import {SupportersScreen} from './view/screens/Supporters'
 
 const navigationRef = createNavigationContainerRef<AllNavigatorParams>()
 
@@ -148,6 +149,11 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         name="DonateThanks"
         component={DonateThanksScreen}
         options={{title: title(msg`Thanks`)}}
+      />
+      <Stack.Screen
+        name="Supporters"
+        component={SupportersScreen}
+        options={{title: title(msg`Supporters`)}}
       />
       <Stack.Screen
         name="Moderation"
