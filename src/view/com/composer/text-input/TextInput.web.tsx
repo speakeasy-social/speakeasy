@@ -30,6 +30,7 @@ import {Text} from '../../util/text/Text'
 import {createSuggestion} from './web/Autocomplete'
 import {Emoji} from './web/EmojiPicker.web'
 import {LinkDecorator} from './web/LinkDecorator'
+import {MentionDecorator} from './web/MentionDecorator'
 import {TagDecorator} from './web/TagDecorator'
 
 export interface TextInputRef {
@@ -82,6 +83,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     () => [
       Document,
       LinkDecorator,
+      MentionDecorator,
       TagDecorator,
       Mention.configure({
         HTMLAttributes: {
