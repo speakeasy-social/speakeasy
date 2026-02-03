@@ -1,16 +1,15 @@
-import React, {useMemo} from 'react'
+import React from 'react'
 import {ListRenderItemInfo, View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
+import {useTestimonialsWithProfiles} from '#/state/queries/testimonials'
+import {useSession} from '#/state/session'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {atoms as a, useTheme} from '#/alf'
 import * as Layout from '#/components/Layout'
+import {ListMaybePlaceholder} from '#/components/Lists'
 import {Text} from '#/components/Typography'
-import {
-  mockTestimonials,
-  sortTestimonialsByRelationship,
-} from '../com/supporters/mockData'
 import {TestimonialItem} from '../com/supporters/TestimonialItem'
 import {Testimonial} from '../com/supporters/types'
 import {List} from '../com/util/List'
@@ -20,16 +19,20 @@ type Props = NativeStackScreenProps<CommonNavigatorParams, 'Supporters'>
 export function SupportersScreen({}: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
   const t = useTheme()
+  const {currentAccount} = useSession()
+
+  const {
+    data: testimonials,
+    isLoading,
+    isError,
+    refetch,
+  } = useTestimonialsWithProfiles(currentAccount?.did)
 
   useFocusEffect(
     React.useCallback(() => {
       setMinimalShellMode(false)
     }, [setMinimalShellMode]),
   )
-
-  const sortedTestimonials = useMemo(() => {
-    return sortTestimonialsByRelationship(mockTestimonials)
-  }, [])
 
   const renderItem = React.useCallback(
     ({item}: ListRenderItemInfo<Testimonial>) => {
@@ -52,6 +55,34 @@ export function SupportersScreen({}: Props) {
     [t.atoms.border_contrast_low],
   )
 
+  const onRefresh = React.useCallback(async () => {
+    await refetch()
+  }, [refetch])
+
+  // Show loading/error states
+  if (isLoading || isError || !testimonials?.length) {
+    return (
+      <Layout.Screen testID="supportersScreen">
+        <Layout.Header.Outer>
+          <Layout.Header.BackButton />
+          <Layout.Header.Content align="left">
+            <Layout.Header.TitleText>Supporters</Layout.Header.TitleText>
+          </Layout.Header.Content>
+        </Layout.Header.Outer>
+
+        <ListMaybePlaceholder
+          isLoading={isLoading}
+          isError={isError}
+          noEmpty={testimonials && testimonials.length > 0}
+          emptyTitle="No testimonials yet"
+          emptyMessage="Be the first to share your support for Speakeasy!"
+          emptyType="results"
+          onRetry={refetch}
+        />
+      </Layout.Screen>
+    )
+  }
+
   return (
     <Layout.Screen testID="supportersScreen">
       <Layout.Header.Outer>
@@ -62,12 +93,14 @@ export function SupportersScreen({}: Props) {
       </Layout.Header.Outer>
 
       <List
-        data={sortedTestimonials}
+        data={testimonials}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeader}
         contentContainerStyle={[{paddingBottom: 100}]}
         desktopFixedHeight
+        onRefresh={onRefresh}
+        refreshing={false}
       />
     </Layout.Screen>
   )
