@@ -4,11 +4,16 @@ import {RichText} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {useCheckSupporterQuery} from '#/state/queries/testimonial'
+import {useSession} from '#/state/session'
+import {useLoggedOutViewControls} from '#/state/shell/logged-out'
+import {useCloseAllActiveElements} from '#/state/util'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Toggle from '#/components/forms/Toggle'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
+import {Loader} from '#/components/Loader'
 import {Text} from '#/components/Typography'
 import {CharProgress} from '../composer/char-progress/CharProgress'
 import {TextInput} from '../composer/text-input/TextInput'
@@ -31,8 +36,12 @@ export function Thanks({
 }) {
   const t = useTheme()
   const {_} = useLingui()
+  const {hasSession} = useSession()
+  const {requestSwitchToAccount} = useLoggedOutViewControls()
+  const closeAllActiveElements = useCloseAllActiveElements()
 
   const [donationInfo, setDonationInfo] = useState<DonationInfo | null>(null)
+  const [localStorageChecked, setLocalStorageChecked] = useState(false)
   const [richtext, setRichText] = useState(
     () =>
       new RichText({
@@ -54,7 +63,28 @@ export function Thanks({
     } catch {
       // Ignore parsing errors
     }
+    setLocalStorageChecked(true)
   }, [])
+
+  // Only check supporter status if localStorage didn't have donation info
+  const shouldCheckSupporter =
+    hasSession && localStorageChecked && donationInfo === null
+  const {
+    data: supporterData,
+    isLoading: isCheckingSupporter,
+    isError: supporterCheckError,
+  } = useCheckSupporterQuery({enabled: shouldCheckSupporter})
+
+  // Determine if user is a valid supporter
+  const hasDonationFromLocalStorage = donationInfo !== null
+  const isConfirmedSupporter = supporterData?.isSupporter === true
+  const isValidSupporter = hasDonationFromLocalStorage || isConfirmedSupporter
+
+  // Determine if we should show error (only after all checks complete)
+  const isStillLoading =
+    !localStorageChecked || (shouldCheckSupporter && isCheckingSupporter)
+  const showInvalidAccessError =
+    hasSession && !isStillLoading && !isValidSupporter && !supporterCheckError
 
   const graphemeLength = useMemo(() => {
     return richtext.graphemeLength
@@ -82,6 +112,16 @@ export function Thanks({
     setAudience(prev => (prev === 'public' ? 'trusted' : 'public'))
   }, [])
 
+  const handleSignIn = useCallback(() => {
+    closeAllActiveElements()
+    requestSwitchToAccount({requestedAccount: 'none'})
+  }, [closeAllActiveElements, requestSwitchToAccount])
+
+  const handleCreateAccount = useCallback(() => {
+    closeAllActiveElements()
+    requestSwitchToAccount({requestedAccount: 'new'})
+  }, [closeAllActiveElements, requestSwitchToAccount])
+
   const thankYouMessage = donationInfo
     ? donationInfo.monthly
       ? _(
@@ -96,6 +136,44 @@ export function Thanks({
         )
     : _(msg`Thank you! Your donation has been processed.`)
 
+  // Show loading state while checking supporter status
+  if (hasSession && isStillLoading) {
+    return (
+      <View testID={testID} style={style}>
+        <View style={[a.flex_col, a.align_center, a.gap_lg, a.w_full, a.px_lg]}>
+          <View style={[a.pt_5xl, a.pb_xl]}>
+            <Loader size="xl" />
+          </View>
+        </View>
+      </View>
+    )
+  }
+
+  // Show error if user arrived at this page without being a supporter
+  if (showInvalidAccessError) {
+    return (
+      <View testID={testID} style={style}>
+        <View style={[a.flex_col, a.align_center, a.gap_lg, a.w_full, a.px_lg]}>
+          <Text style={[t.atoms.text, a.text_2xl, a.pt_5xl, a.self_start]}>
+            <Trans>Page not found</Trans>
+          </Text>
+          <Text
+            style={[
+              t.atoms.text_contrast_medium,
+              a.text_md,
+              a.pt_md,
+              a.self_start,
+            ]}>
+            <Trans>
+              This page is for supporters who have recently donated. If you
+              believe this is an error, please try donating again.
+            </Trans>
+          </Text>
+        </View>
+      </View>
+    )
+  }
+
   return (
     <View testID={testID} style={style}>
       <View style={[a.flex_col, a.align_center, a.gap_lg, a.w_full, a.px_lg]}>
@@ -103,109 +181,167 @@ export function Thanks({
           {thankYouMessage}
         </Text>
 
-        <Text
-          style={[
-            t.atoms.text_contrast_high,
-            a.text_lg,
-            a.pt_lg,
-            a.self_start,
-          ]}>
-          <Trans>Can you take a moment to inspire others?</Trans>
-        </Text>
+        {hasSession && isValidSupporter ? (
+          <>
+            <Text
+              style={[
+                t.atoms.text_contrast_high,
+                a.text_lg,
+                a.pt_lg,
+                a.self_start,
+              ]}>
+              <Trans>Can you take a moment to inspire others?</Trans>
+            </Text>
 
-        <View style={[a.w_full, a.gap_md]}>
-          <Text style={[t.atoms.text_contrast_medium, a.text_md]}>
-            <Trans>Tell us why you support Speakeasy</Trans>
-          </Text>
+            <View style={[a.w_full, a.gap_md]}>
+              <Text style={[t.atoms.text_contrast_medium, a.text_md]}>
+                <Trans>Tell us why you support Speakeasy</Trans>
+              </Text>
 
-          <View
-            style={[
-              a.w_full,
-              a.border,
-              a.rounded_sm,
-              t.atoms.border_contrast_low,
-              t.atoms.bg,
-              {minHeight: 120},
-            ]}>
-            <TextInput
-              richtext={richtext}
-              placeholder={_(msg`Share your thoughts...`)}
-              webForceMinHeight={false}
-              hasRightPadding={false}
-              isActive={true}
-              setRichText={setRichText}
-              onPhotoPasted={noOpPhoto}
-              onPressPublish={noOpPublish}
-              onNewLink={noOpLink}
-              onError={noOpError}
-              onFocus={noOpFocus}
-              disableDrop={true}
-              accessible={true}
-              accessibilityLabel={_(msg`Write testimonial`)}
-              accessibilityHint={_(
-                msg`Share why you support Speakeasy, up to ${MAX_TESTIMONIAL_LENGTH} characters`,
-              )}
-            />
-          </View>
+              <View
+                style={[
+                  a.w_full,
+                  a.border,
+                  a.rounded_sm,
+                  t.atoms.border_contrast_low,
+                  t.atoms.bg,
+                  {minHeight: 120},
+                ]}>
+                <TextInput
+                  richtext={richtext}
+                  placeholder={_(msg`Share your thoughts...`)}
+                  webForceMinHeight={false}
+                  hasRightPadding={false}
+                  isActive={true}
+                  setRichText={setRichText}
+                  onPhotoPasted={noOpPhoto}
+                  onPressPublish={noOpPublish}
+                  onNewLink={noOpLink}
+                  onError={noOpError}
+                  onFocus={noOpFocus}
+                  disableDrop={true}
+                  accessible={true}
+                  accessibilityLabel={_(msg`Write testimonial`)}
+                  accessibilityHint={_(
+                    msg`Share why you support Speakeasy, up to ${MAX_TESTIMONIAL_LENGTH} characters`,
+                  )}
+                />
+              </View>
 
-          <CharProgress
-            count={graphemeLength}
-            max={MAX_TESTIMONIAL_LENGTH}
-            size={20}
-          />
-        </View>
-
-        <View
-          style={[a.pt_md, a.flex_row, a.align_center, a.gap_sm, a.self_start]}>
-          <Toggle.Group
-            label={_(msg`Sharing options`)}
-            values={shareAsPost ? ['shareAsPost'] : []}
-            onChange={handleShareToggle}>
-            <Toggle.Item
-              name="shareAsPost"
-              label={_(msg`Also share this in a post`)}>
-              <Toggle.Checkbox />
-              <Toggle.LabelText>
-                <Trans>Also share this in a post</Trans>
-              </Toggle.LabelText>
-            </Toggle.Item>
-          </Toggle.Group>
-
-          {shareAsPost && (
-            <Button
-              variant="solid"
-              color="secondary"
-              onPress={handleAudienceToggle}
-              style={[{borderRadius: 6}, a.py_xs, a.px_sm]}
-              label={audience === 'public' ? _(msg`Public`) : _(msg`Trusted`)}>
-              <ButtonIcon
-                icon={audience === 'public' ? Globe : Lock}
-                size="sm"
+              <CharProgress
+                count={graphemeLength}
+                max={MAX_TESTIMONIAL_LENGTH}
+                size={20}
               />
-              <ButtonText style={[a.ml_xs]}>
-                {audience === 'public' ? (
-                  <Trans>Public</Trans>
-                ) : (
-                  <Trans>Trusted</Trans>
-                )}
-              </ButtonText>
-            </Button>
-          )}
-        </View>
+            </View>
 
-        <View style={[a.w_full, a.pt_lg]}>
-          <Button
-            onPress={handleSave}
-            size="large"
-            color="primary"
-            variant="solid"
-            disabled={isTextEmpty}
-            label={_(msg`Save testimonial`)}>
-            <ButtonText>
-              <Trans>Save</Trans>
-            </ButtonText>
-          </Button>
-        </View>
+            <View
+              style={[
+                a.pt_md,
+                a.flex_row,
+                a.align_center,
+                a.gap_sm,
+                a.self_start,
+              ]}>
+              <Toggle.Group
+                label={_(msg`Sharing options`)}
+                values={shareAsPost ? ['shareAsPost'] : []}
+                onChange={handleShareToggle}>
+                <Toggle.Item
+                  name="shareAsPost"
+                  label={_(msg`Also share this in a post`)}>
+                  <Toggle.Checkbox />
+                  <Toggle.LabelText>
+                    <Trans>Also share this in a post</Trans>
+                  </Toggle.LabelText>
+                </Toggle.Item>
+              </Toggle.Group>
+
+              {shareAsPost && (
+                <Button
+                  variant="solid"
+                  color="secondary"
+                  onPress={handleAudienceToggle}
+                  style={[{borderRadius: 6}, a.py_xs, a.px_sm]}
+                  label={
+                    audience === 'public' ? _(msg`Public`) : _(msg`Trusted`)
+                  }>
+                  <ButtonIcon
+                    icon={audience === 'public' ? Globe : Lock}
+                    size="sm"
+                  />
+                  <ButtonText style={[a.ml_xs]}>
+                    {audience === 'public' ? (
+                      <Trans>Public</Trans>
+                    ) : (
+                      <Trans>Trusted</Trans>
+                    )}
+                  </ButtonText>
+                </Button>
+              )}
+            </View>
+
+            <View style={[a.w_full, a.pt_lg]}>
+              <Button
+                onPress={handleSave}
+                size="large"
+                color="primary"
+                variant="solid"
+                disabled={isTextEmpty}
+                label={_(msg`Save testimonial`)}>
+                <ButtonText>
+                  <Trans>Save</Trans>
+                </ButtonText>
+              </Button>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text
+              style={[
+                t.atoms.text_contrast_high,
+                a.text_lg,
+                a.pt_lg,
+                a.self_start,
+              ]}>
+              <Trans>Can you take a moment to inspire others?</Trans>
+            </Text>
+
+            <Text
+              style={[
+                t.atoms.text_contrast_medium,
+                a.text_md,
+                a.pt_md,
+                a.self_start,
+              ]}>
+              <Trans>Sign in to share why you support Speakeasy</Trans>
+            </Text>
+
+            <View style={[a.w_full, a.flex_col, a.gap_md, a.pt_lg]}>
+              <Button
+                variant="solid"
+                color="primary"
+                size="large"
+                onPress={handleCreateAccount}
+                label={_(msg`Create an account`)}>
+                <ButtonText>
+                  <Trans>Create an account</Trans>
+                </ButtonText>
+              </Button>
+
+              <Button
+                variant="solid"
+                color="secondary"
+                size="large"
+                onPress={handleSignIn}
+                label={_(msg`Sign in`)}>
+                <ButtonText>
+                  <Trans>Sign in</Trans>
+                </ButtonText>
+              </Button>
+            </View>
+          </>
+        )}
       </View>
     </View>
   )
