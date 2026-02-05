@@ -16,7 +16,7 @@ import {List} from '../com/util/List'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Supporters'>
 
-export function SupportersScreen({}: Props) {
+export function SupportersScreen(_props: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
   const t = useTheme()
   const {currentAccount} = useSession()
@@ -26,6 +26,7 @@ export function SupportersScreen({}: Props) {
     isLoading,
     isError,
     refetch,
+    isFetching,
   } = useTestimonialsWithProfiles(currentAccount?.did)
 
   useFocusEffect(
@@ -59,29 +60,7 @@ export function SupportersScreen({}: Props) {
     await refetch()
   }, [refetch])
 
-  // Show loading/error states
-  if (isLoading || isError || !testimonials?.length) {
-    return (
-      <Layout.Screen testID="supportersScreen">
-        <Layout.Header.Outer>
-          <Layout.Header.BackButton />
-          <Layout.Header.Content align="left">
-            <Layout.Header.TitleText>Supporters</Layout.Header.TitleText>
-          </Layout.Header.Content>
-        </Layout.Header.Outer>
-
-        <ListMaybePlaceholder
-          isLoading={isLoading}
-          isError={isError}
-          noEmpty={testimonials && testimonials.length > 0}
-          emptyTitle="No testimonials yet"
-          emptyMessage="Be the first to share your support for Speakeasy!"
-          emptyType="results"
-          onRetry={refetch}
-        />
-      </Layout.Screen>
-    )
-  }
+  const showPlaceholder = isLoading || isError || !testimonials?.length
 
   return (
     <Layout.Screen testID="supportersScreen">
@@ -92,16 +71,27 @@ export function SupportersScreen({}: Props) {
         </Layout.Header.Content>
       </Layout.Header.Outer>
 
-      <List
-        data={testimonials}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        ListHeaderComponent={ListHeader}
-        contentContainerStyle={[{paddingBottom: 100}]}
-        desktopFixedHeight
-        onRefresh={onRefresh}
-        refreshing={false}
-      />
+      {showPlaceholder ? (
+        <ListMaybePlaceholder
+          isLoading={isLoading}
+          isError={isError}
+          emptyTitle="No testimonials yet"
+          emptyMessage="Be the first to share your support for Speakeasy!"
+          emptyType="results"
+          onRetry={refetch}
+        />
+      ) : (
+        <List
+          data={testimonials}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          ListHeaderComponent={ListHeader}
+          contentContainerStyle={[{paddingBottom: 100}]}
+          desktopFixedHeight
+          onRefresh={onRefresh}
+          refreshing={isFetching ?? false}
+        />
+      )}
     </Layout.Screen>
   )
 }
