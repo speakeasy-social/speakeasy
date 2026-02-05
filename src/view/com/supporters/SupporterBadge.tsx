@@ -20,6 +20,18 @@ const TIER_STYLES: Record<
     backgroundColor: '#CD7F32', // bronze
     label: '⚒️ Contributor',
   },
+  engineering: {
+    backgroundColor: '#2563EB', // blue
+    label: '🔨 Code',
+  },
+  qa: {
+    backgroundColor: '#10B981', // emerald
+    label: '👷 Testing & QA',
+  },
+  design: {
+    backgroundColor: '#8B5CF6', // violet
+    label: '🎨 Design',
+  },
 }
 
 export function SupporterBadge({tier}: {tier: SupporterTier}) {
@@ -38,6 +50,7 @@ export function SupporterBadge({tier}: {tier: SupporterTier}) {
         a.justify_center,
       ]}>
       <Text
+        emoji
         style={[
           a.text_xs,
           a.leading_tight,
