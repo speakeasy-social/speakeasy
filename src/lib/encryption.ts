@@ -450,6 +450,69 @@ export async function decryptContent(
   }
 }
 
+// =====================
+// Batch Decryption
+// =====================
+
+/**
+ * An encrypted item with an identifier and a session key reference.
+ */
+export type EncryptedItem = {
+  id: string
+  encryptedContent: string
+  sessionId: string
+}
+
+/**
+ * A session key mapping a session ID to its encrypted DEK.
+ */
+export type EncryptedSessionKey = {
+  sessionId: string
+  encryptedDek: string
+}
+
+/**
+ * Decrypts a batch of encrypted items in parallel.
+ * Looks up each item's DEK from session keys, decrypts content, and returns
+ * a Map of id to decrypted content string.
+ * Items with missing session keys or decryption failures are silently skipped.
+ *
+ * @param items - Array of encrypted items to decrypt
+ * @param sessionKeys - Array of session keys for DEK lookup
+ * @param privateKey - The private key for DEK decryption (SafeText format)
+ * @returns Map of item id to decrypted content string
+ */
+export async function decryptBatch(
+  items: EncryptedItem[],
+  sessionKeys: EncryptedSessionKey[],
+  privateKey: string,
+): Promise<Map<string, string>> {
+  const sessionKeyMap = new Map(
+    sessionKeys.map(k => [k.sessionId, k.encryptedDek]),
+  )
+
+  const results = await Promise.all(
+    items.map(async item => {
+      const encryptedDek = sessionKeyMap.get(item.sessionId)
+      if (!encryptedDek) return null
+
+      try {
+        const dek = await decryptDEK(encryptedDek, privateKey)
+        const content = await decryptContent(item.encryptedContent, dek)
+        return {id: item.id, content}
+      } catch {
+        return null
+      }
+    }),
+  )
+
+  const map = new Map<string, string>()
+  for (const r of results) {
+    if (r) map.set(r.id, r.content)
+  }
+  return map
+}
+
 /**
  * Wipes a Uint8Array from memory by overwriting its contents.
  * @param {Uint8Array} buf - The byte array to wipe.
