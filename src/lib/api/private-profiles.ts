@@ -5,7 +5,7 @@ import {
 } from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
-import {decryptContent, decryptDEK, encryptContent} from '#/lib/encryption'
+import {decryptBatch, decryptDEK, encryptContent} from '#/lib/encryption'
 import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
 import {
@@ -99,20 +99,6 @@ export async function encryptProfileData(
 }
 
 /**
- * Decrypts encrypted profile data using AES-256-GCM with the provided DEK.
- * @param encryptedData - The encrypted profile data in SafeText format
- * @param dek - The Data Encryption Key (SafeText format)
- * @returns Decrypted private profile data
- */
-export async function decryptProfileData(
-  encryptedData: string,
-  dek: string,
-): Promise<PrivateProfileData> {
-  const decrypted = await decryptContent(encryptedData, dek)
-  return JSON.parse(decrypted) as PrivateProfileData
-}
-
-/**
  * Decrypts an encrypted profile response if the viewer has access.
  * Returns null if decryption fails for any reason (no access, missing key, etc.)
  *
@@ -126,30 +112,31 @@ export async function decryptProfileIfAccessible(
   userDid: string,
   call: SpeakeasyApiCall,
 ): Promise<PrivateProfileData | null> {
-  // 1. Get viewer's private key (cached)
   const privateKey = await getPrivateKeyOrWarn(userDid, call)
   if (!privateKey) {
     return null
   }
 
-  try {
-    // 2. Decrypt DEK from encryptedDek
-    const dek = await decryptDEK(
-      encryptedResponse.encryptedDek,
-      privateKey.privateKey,
-    )
+  const decryptedMap = await decryptBatch(
+    [
+      {
+        id: encryptedResponse.did,
+        encryptedContent: encryptedResponse.encryptedContent,
+        sessionId: encryptedResponse.did,
+      },
+    ],
+    [
+      {
+        sessionId: encryptedResponse.did,
+        encryptedDek: encryptedResponse.encryptedDek,
+      },
+    ],
+    privateKey.privateKey,
+  )
 
-    // 3. Decrypt content
-    const profileData = await decryptProfileData(
-      encryptedResponse.encryptedContent,
-      dek,
-    )
-
-    return profileData
-  } catch {
-    // Decryption failed - viewer doesn't have access or data is corrupted
-    return null
-  }
+  const content = decryptedMap.get(encryptedResponse.did)
+  if (!content) return null
+  return JSON.parse(content) as PrivateProfileData
 }
 
 /**
@@ -253,6 +240,51 @@ export async function getPrivateProfiles(
   })
 
   return response.profiles
+}
+
+/**
+ * Fetches and decrypts private profiles for multiple users in a batch.
+ * Returns a Map of DID -> decrypted profile data for all accessible profiles.
+ * Fetches the private key once and decrypts all profiles in parallel.
+ *
+ * @param dids - Array of DIDs to fetch profiles for
+ * @param userDid - The viewer's DID (needed for decryption)
+ * @param call - The API call function
+ * @returns Map of DID to decrypted private profile data
+ */
+export async function fetchPrivateProfiles(
+  dids: string[],
+  userDid: string,
+  call: SpeakeasyApiCall,
+): Promise<Map<string, PrivateProfileData>> {
+  const encrypted = await getPrivateProfiles(dids, call)
+  if (encrypted.length === 0) return new Map()
+
+  const privateKey = await getPrivateKeyOrWarn(userDid, call)
+  if (!privateKey) return new Map()
+
+  // Normalize into decryptBatch shape (use DID as session key)
+  const items = encrypted.map(p => ({
+    id: p.did,
+    encryptedContent: p.encryptedContent,
+    sessionId: p.did,
+  }))
+  const sessionKeys = encrypted.map(p => ({
+    sessionId: p.did,
+    encryptedDek: p.encryptedDek,
+  }))
+
+  const decryptedMap = await decryptBatch(
+    items,
+    sessionKeys,
+    privateKey.privateKey,
+  )
+
+  const result = new Map<string, PrivateProfileData>()
+  for (const [did, content] of decryptedMap) {
+    result.set(did, JSON.parse(content) as PrivateProfileData)
+  }
+  return result
 }
 
 /**

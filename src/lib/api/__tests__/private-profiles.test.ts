@@ -445,6 +445,35 @@ describe('fetchPrivateProfiles', () => {
       userKeyPairId: 'keypair-123',
     })
     mockedEncryption.decryptDEK.mockResolvedValue(mockDek)
+
+    // decryptBatch delegates to decryptDEK + decryptContent mocks
+    // so individual tests can control decryption behavior per-item
+    mockedEncryption.decryptBatch.mockImplementation(
+      async (items: any[], sessionKeys: any[], privateKey: string) => {
+        const keyMap = new Map(
+          sessionKeys.map((k: any) => [k.sessionId, k.encryptedDek]),
+        )
+        const result = new Map<string, string>()
+        for (const item of items) {
+          const encryptedDek = keyMap.get(item.sessionId)
+          if (!encryptedDek) continue
+          try {
+            const dek = await mockedEncryption.decryptDEK(
+              encryptedDek,
+              privateKey,
+            )
+            const content = await mockedEncryption.decryptContent(
+              item.encryptedContent,
+              dek,
+            )
+            result.set(item.id, content)
+          } catch {
+            // skip failed items
+          }
+        }
+        return result
+      },
+    )
   })
 
   function mockGetProfilesResponse(
@@ -477,7 +506,7 @@ describe('fetchPrivateProfiles', () => {
       return {}
     })
 
-    // Mock decryptContent to parse the "encrypted" content back
+    // Mock decryptContent to pass through the "encrypted" content
     mockedEncryption.decryptContent.mockImplementation(
       async (encrypted: string) => encrypted,
     )
