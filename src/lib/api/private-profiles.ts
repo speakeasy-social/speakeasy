@@ -1,13 +1,19 @@
-import {AppBskyActorProfile, BskyAgent} from '@atproto/api'
+import {
+  AppBskyActorProfile,
+  BskyAgent,
+  ComAtprotoRepoUploadBlob,
+} from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
 import {decryptContent, decryptDEK, encryptContent} from '#/lib/encryption'
+import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
 import {
   getErrorCode,
   SpeakeasyApiCall,
   uploadMediaToSpeakeasy,
 } from './speakeasy'
+import {uploadBlob} from './upload-blob'
 import {
   getOrCreatePublicKey,
   getPrivateKey,
@@ -380,6 +386,55 @@ async function pathToBlob(path: string): Promise<Blob> {
 }
 
 /**
+ * Constructs a full Speakeasy media URL from a media key.
+ * @param key - The media key stored in the private profile
+ * @param agent - The BskyAgent to determine the correct CDN
+ * @returns Full URL to the media
+ */
+export function getSpeakeasyMediaUrl(key: string, agent: BskyAgent): string {
+  return `${getBaseCdnUrl(agent)}/${key}`
+}
+
+/**
+ * Migrates media from Speakeasy storage to ATProto blob storage.
+ * Used when switching from private to public profile.
+ * @param speakeasyKey - The media key from the private profile
+ * @param agent - The BskyAgent for uploading
+ * @returns ATProto blob upload response
+ */
+export async function migrateMediaToAtProto(
+  speakeasyKey: string,
+  agent: BskyAgent,
+): Promise<ComAtprotoRepoUploadBlob.Response> {
+  const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
+  const blob = await pathToBlob(url)
+  return uploadBlob(agent, blob, blob.type || 'image/jpeg')
+}
+
+/**
+ * Migrates media from ATProto to Speakeasy storage.
+ * Used when switching from public to private profile.
+ * @param atprotoUrl - The ATProto CDN URL (e.g., https://cdn.bsky.app/...)
+ * @param agent - The BskyAgent for authentication
+ * @param sessionId - The Speakeasy session ID for upload
+ * @returns Speakeasy media key
+ */
+export async function migrateMediaToSpeakeasy(
+  atprotoUrl: string,
+  agent: BskyAgent,
+  sessionId: string,
+): Promise<string> {
+  const blob = await pathToBlob(atprotoUrl)
+  const result = await uploadMediaToSpeakeasy(
+    agent,
+    blob,
+    blob.type || 'image/jpeg',
+    sessionId,
+  )
+  return result.data.blob.key
+}
+
+/**
  * Input type for new avatar/banner media.
  */
 type NewMedia = {path: string; mime: string}
@@ -453,8 +508,15 @@ export async function savePrivateProfile(
       sessionId,
     )
     avatarUri = result.data.blob.key
+  } else if (existingAvatarUri?.startsWith('http')) {
+    // Migration from ATProto: fetch and upload to Speakeasy
+    avatarUri = await migrateMediaToSpeakeasy(
+      existingAvatarUri,
+      agent,
+      sessionId,
+    )
   } else {
-    // No change - keep existing
+    // No change - keep existing Speakeasy key
     avatarUri = existingAvatarUri
   }
 
@@ -473,8 +535,15 @@ export async function savePrivateProfile(
       sessionId,
     )
     bannerUri = result.data.blob.key
+  } else if (existingBannerUri?.startsWith('http')) {
+    // Migration from ATProto: fetch and upload to Speakeasy
+    bannerUri = await migrateMediaToSpeakeasy(
+      existingBannerUri,
+      agent,
+      sessionId,
+    )
   } else {
-    // No change - keep existing
+    // No change - keep existing Speakeasy key
     bannerUri = existingBannerUri
   }
 
