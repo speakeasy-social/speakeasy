@@ -3,10 +3,11 @@ import {Image as RNImage} from 'react-native-image-crop-picker'
 import {AppBskyActorDefs, AppBskyGraphDefs} from '@atproto/api'
 
 import {useNonReactiveCallback} from '#/lib/hooks/useNonReactiveCallback'
+import {ProfileViewDetailedWithPrivate} from '#/state/queries/profile'
 
 export interface EditProfileModal {
   name: 'edit-profile'
-  profile: AppBskyActorDefs.ProfileViewDetailed
+  profile: ProfileViewDetailedWithPrivate
   onUpdate?: () => void
 }
 

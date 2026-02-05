@@ -14,7 +14,10 @@ import {isIOS, isWeb} from '#/platform/detection'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {Shadow} from '#/state/cache/types'
 import {useModalControls} from '#/state/modals'
-import {useProfileBlockMutationQueue} from '#/state/queries/profile'
+import {
+  ProfileViewDetailedWithPrivate,
+  useProfileBlockMutationQueue,
+} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
 import {TrustButton} from '#/view/com/profile/TrustButton'
@@ -44,7 +47,7 @@ import {ProfileHeaderMetrics} from './Metrics'
 import {ProfileHeaderShell} from './Shell'
 
 interface Props {
-  profile: AppBskyActorDefs.ProfileViewDetailed
+  profile: ProfileViewDetailedWithPrivate
   descriptionRT: RichTextAPI | null
   moderationOpts: ModerationOpts
   hideBackButton?: boolean
@@ -149,6 +152,7 @@ let ProfileHeaderStandard = ({
                 color="secondary"
                 variant="solid"
                 onPress={onPressEditProfile}
+                disabled={profileUnshadowed._privateProfile?.loadError === true}
                 label={_(msg`Edit profile`)}
                 style={[a.rounded_full]}>
                 <ButtonText>
