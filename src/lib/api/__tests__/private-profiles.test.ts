@@ -3,7 +3,7 @@ import {beforeEach, describe, expect, it, jest} from '@jest/globals'
 import {QueryClient} from '@tanstack/react-query'
 
 import * as encryption from '#/lib/encryption'
-import {savePrivateProfile} from '../private-profiles'
+import {fetchPrivateProfiles, savePrivateProfile} from '../private-profiles'
 import * as speakeasy from '../speakeasy'
 import * as userKeys from '../user-keys'
 
@@ -425,5 +425,169 @@ describe('savePrivateProfile', () => {
         }),
       ).rejects.toThrow('Save failed')
     })
+  })
+})
+
+describe('fetchPrivateProfiles', () => {
+  const mockUserDid = 'did:plc:viewer123'
+  const mockPrivateKey = 'mock-private-key'
+  const mockDek = 'mock-dek-256bit'
+
+  let mockCall: any
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+
+    mockCall = jest.fn()
+
+    mockedUserKeys.getPrivateKeyOrWarn.mockResolvedValue({
+      privateKey: mockPrivateKey,
+      userKeyPairId: 'keypair-123',
+    })
+    mockedEncryption.decryptDEK.mockResolvedValue(mockDek)
+  })
+
+  function mockGetProfilesResponse(
+    profiles: Array<{
+      did: string
+      displayName: string
+      description: string
+      avatarUri?: string
+      bannerUri?: string
+    }>,
+  ) {
+    mockCall.mockImplementation(async (params: any) => {
+      if (params.api === 'social.spkeasy.actor.getProfiles') {
+        return {
+          profiles: profiles.map(p => ({
+            did: p.did,
+            encryptedContent: JSON.stringify({
+              displayName: p.displayName,
+              description: p.description,
+              avatarUri: p.avatarUri,
+              bannerUri: p.bannerUri,
+            }),
+            encryptedDek: 'encrypted-dek-for-' + p.did,
+            userKeyPairId: 'keypair-123',
+            avatarUri: p.avatarUri,
+            bannerUri: p.bannerUri,
+          })),
+        }
+      }
+      return {}
+    })
+
+    // Mock decryptContent to parse the "encrypted" content back
+    mockedEncryption.decryptContent.mockImplementation(
+      async (encrypted: string) => encrypted,
+    )
+  }
+
+  it('returns empty Map for empty dids array', async () => {
+    mockCall.mockResolvedValue({profiles: []})
+
+    const result = await fetchPrivateProfiles([], mockUserDid, mockCall)
+
+    expect(result.size).toBe(0)
+    // Should not call the API for empty input
+    expect(mockCall).not.toHaveBeenCalled()
+  })
+
+  it('returns Map with decrypted profiles for accessible profiles', async () => {
+    mockGetProfilesResponse([
+      {
+        did: 'did:plc:alice',
+        displayName: 'Alice',
+        description: 'Hello from Alice',
+        avatarUri: 'alice-avatar-key',
+      },
+      {
+        did: 'did:plc:bob',
+        displayName: 'Bob',
+        description: 'Hello from Bob',
+      },
+    ])
+
+    const result = await fetchPrivateProfiles(
+      ['did:plc:alice', 'did:plc:bob'],
+      mockUserDid,
+      mockCall,
+    )
+
+    expect(result.size).toBe(2)
+    expect(result.get('did:plc:alice')).toEqual({
+      displayName: 'Alice',
+      description: 'Hello from Alice',
+      avatarUri: 'alice-avatar-key',
+    })
+    expect(result.get('did:plc:bob')).toEqual({
+      displayName: 'Bob',
+      description: 'Hello from Bob',
+    })
+  })
+
+  it('skips profiles that fail decryption', async () => {
+    mockGetProfilesResponse([
+      {
+        did: 'did:plc:alice',
+        displayName: 'Alice',
+        description: 'Hello from Alice',
+      },
+      {
+        did: 'did:plc:bob',
+        displayName: 'Bob',
+        description: 'Hello from Bob',
+      },
+    ])
+
+    // Make decryption fail for Bob's DEK
+    mockedEncryption.decryptDEK.mockImplementation(
+      async (encryptedDek: string) => {
+        if (encryptedDek === 'encrypted-dek-for-did:plc:bob') {
+          throw new Error('Decryption failed')
+        }
+        return mockDek
+      },
+    )
+
+    const result = await fetchPrivateProfiles(
+      ['did:plc:alice', 'did:plc:bob'],
+      mockUserDid,
+      mockCall,
+    )
+
+    expect(result.size).toBe(1)
+    expect(result.has('did:plc:alice')).toBe(true)
+    expect(result.has('did:plc:bob')).toBe(false)
+  })
+
+  it('propagates API errors from getPrivateProfiles', async () => {
+    const apiError = new Error('Service unavailable')
+    mockCall.mockRejectedValue(apiError)
+
+    await expect(
+      fetchPrivateProfiles(['did:plc:alice'], mockUserDid, mockCall),
+    ).rejects.toThrow('Service unavailable')
+  })
+
+  it('returns empty Map when viewer has no private key', async () => {
+    mockGetProfilesResponse([
+      {
+        did: 'did:plc:alice',
+        displayName: 'Alice',
+        description: 'Hello from Alice',
+      },
+    ])
+
+    // No private key available
+    mockedUserKeys.getPrivateKeyOrWarn.mockResolvedValue(null)
+
+    const result = await fetchPrivateProfiles(
+      ['did:plc:alice'],
+      mockUserDid,
+      mockCall,
+    )
+
+    expect(result.size).toBe(0)
   })
 })
