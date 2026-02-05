@@ -13,7 +13,7 @@ import {
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {getCachedPrivateKey, SpeakeasyPrivateKey} from '#/lib/api/user-keys'
-import {decryptContent, decryptDEK} from '#/lib/encryption'
+import {decryptBatch} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
@@ -581,7 +581,8 @@ export async function decryptPostsAndFetchAuthorProfiles(
 }
 
 /**
- * Decrypts a list of encrypted posts using the provided session keys and private key
+ * Decrypts a list of encrypted posts using the provided session keys and private key.
+ * Uses the shared decryptBatch utility for parallel decryption.
  * @param agent - The BskyAgent instance to use for API calls
  * @param encryptedPosts - Array of encrypted posts to decrypt
  * @param encryptedSessionKeys - Array of session keys for decryption
@@ -594,29 +595,28 @@ export async function decryptPosts(
   encryptedSessionKeys: EncryptedSessionKey[],
   privateKey: SpeakeasyPrivateKey,
 ): Promise<DecryptedPost[]> {
-  return Promise.all(
-    encryptedPosts.map(async (encryptedPost: any) => {
-      const encryptedDek = encryptedSessionKeys.find(
-        key => key.sessionId === encryptedPost.sessionId,
-      )?.encryptedDek
-      // If we can't find a session to decode it, discard the post
-      if (!encryptedDek) return null
-      let post
-      try {
-        const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
-        post = await decryptContent(encryptedPost.encryptedContent, dek)
-      } catch (err) {
-        // Decryption functions log errors, just bail on this post
-        // and try the next one
-        return null
-      }
+  const items = encryptedPosts.map(p => ({
+    id: p.uri,
+    encryptedContent: p.encryptedContent,
+    sessionId: p.sessionId,
+  }))
 
-      return {
-        ...JSON.parse(post),
-        ...encryptedPost,
-      }
-    }),
+  const decryptedMap = await decryptBatch(
+    items,
+    encryptedSessionKeys,
+    privateKey.privateKey,
   )
+
+  return encryptedPosts
+    .map(post => {
+      const content = decryptedMap.get(post.uri)
+      if (!content) return null
+      return {
+        ...JSON.parse(content),
+        ...post,
+      }
+    })
+    .filter(Boolean) as DecryptedPost[]
 }
 
 /**
