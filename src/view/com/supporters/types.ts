@@ -1,4 +1,10 @@
-export type SupporterTier = 'founder' | 'supporter' | 'contributor'
+export type SupporterTier =
+  | 'founder'
+  | 'supporter'
+  | 'contributor'
+  | 'engineering'
+  | 'qa'
+  | 'design'
 
 export type RelationshipPriority =
   | 'self'

@@ -20,12 +20,20 @@ const STALE = {
 export const RQKEY_ROOT = 'testimonials'
 export const RQKEY = () => [RQKEY_ROOT]
 export const RQKEY_PROFILES = () => [RQKEY_ROOT, 'profiles']
-export const RQKEY_TRUSTS_ME = (did: string) => [RQKEY_ROOT, 'trusts-me', did]
+// Internal cache key for individual trusts-me queries
+const RQKEY_TRUSTS_ME = (did: string) => [RQKEY_ROOT, 'trusts-me', did]
 
 // API response types
+type ApiContributionPublicData = {
+  recognition?: string
+  isRegularGift?: boolean
+  feature?: string
+}
+
 type ApiContribution = {
   createdAt: string
   contribution: string
+  public: ApiContributionPublicData | null
 }
 
 type ApiTestimonial = {
@@ -43,9 +51,11 @@ type ListTestimonialsResponse = {
 
 // Badge mapping from API contribution strings to UI tier
 const CONTRIBUTION_TO_BADGE: Record<string, SupporterTier> = {
-  founding_donor: 'founder',
   donor: 'supporter',
   contributor: 'contributor',
+  designer: 'design',
+  engineer: 'engineering',
+  testing: 'qa',
 }
 
 /**
@@ -58,7 +68,14 @@ export function mapContributionsToBadges(
   const seen = new Set<SupporterTier>()
 
   for (const c of contributions) {
-    const badge = CONTRIBUTION_TO_BADGE[c.contribution]
+    let badge: SupporterTier | undefined
+
+    if (c.contribution === 'donor' && c.public?.recognition === 'founding') {
+      badge = 'founder'
+    } else {
+      badge = CONTRIBUTION_TO_BADGE[c.contribution]
+    }
+
     if (badge && !seen.has(badge)) {
       seen.add(badge)
       badges.push(badge)
@@ -265,6 +282,7 @@ export function useTestimonialsWithProfiles(
     isError: isErrorTestimonials,
     error: testimonialsError,
     refetch: refetchTestimonials,
+    isFetching: isFetchingTestimonials,
   } = useTestimonialsQuery()
 
   // Fetch profiles for all authors
@@ -328,5 +346,6 @@ export function useTestimonialsWithProfiles(
     isError: isErrorTestimonials || isErrorProfiles,
     error: testimonialsError,
     refetch: refetchTestimonials,
+    isFetching: isFetchingTestimonials,
   }
 }
