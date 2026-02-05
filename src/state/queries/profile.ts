@@ -85,6 +85,7 @@ export type PrivateProfileMetadata = {
   isPrivate: boolean
   avatarUri?: string // Speakeasy media key for migration
   bannerUri?: string // Speakeasy media key for migration
+  publicDescription?: string // ATProto description before private merge
   loadError?: boolean // true if non-404 error occurred loading private profile
 }
 
@@ -134,10 +135,8 @@ export function useProfileQuery({
             avatarUri: cached.rawAvatarUri,
             bannerUri: cached.rawBannerUri,
           }
-        } else {
-          result._privateProfile = {isPrivate: false}
+          return result
         }
-        return result
       }
 
       // Skip Speakeasy lookup if displayName doesn't match the sentinel
@@ -335,6 +334,7 @@ interface ProfileUpdateParams {
   checkCommitted?: (res: AppBskyActorGetProfile.Response) => boolean
   // Private profile fields
   isPrivate?: boolean
+  publicDescription?: string // Custom ATProto description for private profiles
   existingPrivateAvatarUri?: string // Speakeasy media key for migration
   existingPrivateBannerUri?: string // Speakeasy media key for migration
   pronouns?: {
@@ -356,6 +356,7 @@ export function useProfileUpdateMutation() {
       newUserBanner,
       checkCommitted,
       isPrivate,
+      publicDescription,
       existingPrivateAvatarUri,
       existingPrivateBannerUri,
       pronouns,
@@ -457,13 +458,9 @@ export function useProfileUpdateMutation() {
             newUserAvatar.path,
             newUserAvatar.mime,
           )
-        } else if (
-          newUserAvatar === undefined &&
-          existingPrivateAvatarUri &&
-          !profile.avatar
-        ) {
-          // No new avatar, but we have a private avatar to migrate
-          // (profile.avatar is empty because user was private)
+        } else if (newUserAvatar === undefined && existingPrivateAvatarUri) {
+          // No new avatar selected, but we have a private avatar to migrate
+          // (ATProto avatar was removed when profile was anonymized)
           newUserAvatarPromise = migrateMediaToAtProto(
             existingPrivateAvatarUri,
             agent,
@@ -477,12 +474,9 @@ export function useProfileUpdateMutation() {
             newUserBanner.path,
             newUserBanner.mime,
           )
-        } else if (
-          newUserBanner === undefined &&
-          existingPrivateBannerUri &&
-          !profile.banner
-        ) {
-          // No new banner, but we have a private banner to migrate
+        } else if (newUserBanner === undefined && existingPrivateBannerUri) {
+          // No new banner selected, but we have a private banner to migrate
+          // (ATProto banner was removed when profile was anonymized)
           newUserBannerPromise = migrateMediaToAtProto(
             existingPrivateBannerUri,
             agent,

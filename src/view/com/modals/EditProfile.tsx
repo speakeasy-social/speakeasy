@@ -11,10 +11,10 @@ import {
 import {Image as RNImage} from 'react-native-image-crop-picker'
 import Animated, {FadeOut} from 'react-native-reanimated'
 import {LinearGradient} from 'expo-linear-gradient'
-import {AppBskyActorDefs} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {DEFAULT_PRIVATE_DESCRIPTION} from '#/lib/api/private-profiles'
 import {MAX_DESCRIPTION, MAX_DISPLAY_NAME} from '#/lib/constants'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {compressIfNeeded} from '#/lib/media/manip'
@@ -53,7 +53,7 @@ export function Component({
   profile,
   onUpdate,
 }: {
-  profile: AppBskyActorDefs.ProfileViewDetailed
+  profile: ProfileViewDetailedWithPrivate
   onUpdate?: () => void
 }) {
   const pal = usePalette('default')
@@ -74,7 +74,14 @@ export function Component({
   const [isPrivate, setIsPrivate] = useState(
     privateProfileMeta?.isPrivate ?? false,
   )
-  const [publicDescription, setPublicDescription] = useState('')
+  const [publicDescription, setPublicDescription] = useState(() => {
+    const stored = profile._privateProfile?.publicDescription
+    // Show empty if it matches default, so placeholder displays instead
+    if (!stored || stored === DEFAULT_PRIVATE_DESCRIPTION) return ''
+    return stored
+  })
+  const [privateAvatarUri] = useState(profile._privateProfile?.avatarUri)
+  const [privateBannerUri] = useState(profile._privateProfile?.bannerUri)
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -154,6 +161,9 @@ export function Component({
         newUserAvatar,
         newUserBanner,
         isPrivate,
+        publicDescription: isPrivate
+          ? publicDescription || undefined
+          : undefined,
         existingPrivateAvatarUri: privateProfileMeta?.avatarUri,
         existingPrivateBannerUri: privateProfileMeta?.bannerUri,
         pronouns: {native: nativePronounsValue, sets: parsedSets},
@@ -185,6 +195,8 @@ export function Component({
     pronounsTooLong,
     isPrivate,
     publicDescription,
+    privateAvatarUri,
+    privateBannerUri,
     newUserAvatar,
     newUserBanner,
     setImageError,
@@ -248,7 +260,7 @@ export function Component({
             <Admonition type="info">
               {isPrivate
                 ? _(
-                    'Only those you trust can see your name, description, avatar and banner',
+                    "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
                   )
                 : _('Your profile is visible to everyone')}
             </Admonition>

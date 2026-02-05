@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
 import {Dimensions, View} from 'react-native'
 import {Image as RNImage} from 'react-native-image-crop-picker'
-import {AppBskyActorDefs} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
@@ -44,7 +43,7 @@ export function EditProfileDialog({
   control,
   onUpdate,
 }: {
-  profile: AppBskyActorDefs.ProfileViewDetailed
+  profile: ProfileViewDetailedWithPrivate
   control: Dialog.DialogControlProps
   onUpdate?: () => void
 }) {
@@ -107,7 +106,7 @@ function DialogInner({
   setDirty,
   onPressCancel,
 }: {
-  profile: AppBskyActorDefs.ProfileViewDetailed
+  profile: ProfileViewDetailedWithPrivate
   onUpdate?: () => void
   setDirty: (dirty: boolean) => void
   onPressCancel: () => void
@@ -133,6 +132,9 @@ function DialogInner({
     privateProfileMeta?.isPrivate ?? false,
   )
   const [publicDescription, setPublicDescription] = useState('')
+  // Track private media URIs for migration when switching modes
+  const [privateAvatarUri] = useState(profile._privateProfile?.avatarUri)
+  const [privateBannerUri] = useState(profile._privateProfile?.bannerUri)
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -251,7 +253,8 @@ function DialogInner({
     nativePronounsValue,
     parsedSets,
     isPrivate,
-    publicDescription,
+    privateAvatarUri,
+    privateBannerUri,
     newUserAvatar,
     newUserBanner,
     setImageError,
