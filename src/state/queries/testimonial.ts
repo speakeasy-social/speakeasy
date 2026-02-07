@@ -3,21 +3,21 @@ import {useMutation, useQuery} from '@tanstack/react-query'
 import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 
 const RQKEY_ROOT = 'testimonial'
-export const RQKEY_SUPPORTER = () => [RQKEY_ROOT, 'supporter']
+export const RQKEY_CONTRIBUTION = () => [RQKEY_ROOT, 'contribution']
 
-interface CheckSupporterResponse {
-  isSupporter: boolean
+interface CheckContributionResponse {
+  isContributor: boolean
   contributions: string[]
 }
 
-export function useCheckSupporterQuery(options?: {enabled?: boolean}) {
+export function useCheckContributionQuery(options?: {enabled?: boolean}) {
   const {call} = useSpeakeasyApi()
 
-  return useQuery<CheckSupporterResponse, Error>({
-    queryKey: RQKEY_SUPPORTER(),
+  return useQuery<CheckContributionResponse, Error>({
+    queryKey: RQKEY_CONTRIBUTION(),
     queryFn: async () => {
       return call({
-        api: 'social.spkeasy.actor.checkSupporter',
+        api: 'social.spkeasy.actor.checkContribution',
         method: 'GET',
       })
     },
