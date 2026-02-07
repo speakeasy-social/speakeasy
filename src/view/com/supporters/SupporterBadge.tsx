@@ -1,12 +1,14 @@
+import {capitalize} from '#/lib/strings/capitalize'
 import {Tag, TagVariant} from '#/components/Tag'
 
 /**
- * Maps (contribution, recognition) to display variant and label
+ * Maps (contribution, recognition, isRegularGift) to display variant and label
  */
 function getBadgeStyle(
   contribution: string,
   recognition?: string | null,
-): {variant: TagVariant; label: string} | null {
+  isRegularGift?: boolean,
+): {variant: TagVariant; label: string} {
   // Special case: donor with "Founding Donor" recognition
   if (contribution === 'donor' && recognition === 'Founding Donor') {
     return {
@@ -15,11 +17,19 @@ function getBadgeStyle(
     }
   }
 
+  // Regular (recurring) donor: use a distinct colour
+  if (contribution === 'donor' && isRegularGift) {
+    return {
+      variant: 'gradient_nordic',
+      label: '☀️ Donor',
+    }
+  }
+
   // Map contribution strings to badge styles
   const contributionMap: Record<string, {variant: TagVariant; label: string}> =
     {
       donor: {
-        variant: 'gradient_summer',
+        variant: 'silver',
         label: '☀️ Donor',
       },
       contributor: {
@@ -40,19 +50,23 @@ function getBadgeStyle(
       },
     }
 
-  return contributionMap[contribution] ?? null
+  return (
+    contributionMap[contribution] ?? {
+      variant: 'silver',
+      label: capitalize(contribution.replace(/_/g, ' ')),
+    }
+  )
 }
 
 export function SupporterBadge({
   contribution,
   recognition,
+  isRegularGift,
 }: {
   contribution: string
   recognition?: string | null
+  isRegularGift?: boolean
 }) {
-  const style = getBadgeStyle(contribution, recognition)
-  if (!style) {
-    return null
-  }
+  const style = getBadgeStyle(contribution, recognition, isRegularGift)
   return <Tag variant={style.variant} label={style.label} />
 }

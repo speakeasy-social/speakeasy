@@ -90,6 +90,7 @@ export const TestimonialItem = memo(function TestimonialItem({
                     }:${idx}`}
                     contribution={c.contribution}
                     recognition={c.public?.recognition}
+                    isRegularGift={c.public?.isRegularGift}
                   />
                 ))}
               </View>
