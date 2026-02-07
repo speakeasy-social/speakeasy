@@ -9,8 +9,7 @@ export type CommonNavigatorParams = {
   NotFound: undefined
   Lists: undefined
   Donate: undefined
-  DonateThanks: undefined
-  Supporters: undefined
+  SupportersAdd: undefined
   Moderation: undefined
   ModerationModlists: undefined
   ModerationMutedAccounts: undefined

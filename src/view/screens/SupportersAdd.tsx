@@ -9,8 +9,8 @@ import * as Layout from '#/components/Layout'
 import {Thanks} from '../com/donate/Thanks'
 import {Logo} from '../icons/Logo'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'DonateThanks'>
-export function DonateThanksScreen({}: Props) {
+type Props = NativeStackScreenProps<CommonNavigatorParams, 'SupportersAdd'>
+export function SupportersAddScreen({}: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
   const {onPress: onPressLogo} = useLinkProps({to: '/'})
   const {gtMobile} = useBreakpoints()
@@ -25,7 +25,7 @@ export function DonateThanksScreen({}: Props) {
   )
 
   return (
-    <Layout.Screen testID="donateThanksScreen">
+    <Layout.Screen testID="supportersAddScreen">
       <View
         style={[
           a.w_full,
