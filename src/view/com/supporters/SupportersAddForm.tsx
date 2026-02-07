@@ -8,13 +8,13 @@ import {useQueryClient} from '@tanstack/react-query'
 import {nanoid} from 'nanoid/non-secure'
 
 import * as apilib from '#/lib/api/index'
-import {usePrivateSession} from '#/lib/api/private-sessions'
-import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+// import {usePrivateSession} from '#/lib/api/private-sessions'
+// import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {NavigationProp} from '#/lib/routes/types'
 import {logger} from '#/logger'
 import {createPostgateRecord} from '#/state/queries/postgate/util'
 import {
-  useCheckSupporterQuery,
+  useCheckContributionQuery,
   useCreateTestimonialMutation,
 } from '#/state/queries/testimonial'
 import {useAgent, useSession} from '#/state/session'
@@ -23,17 +23,41 @@ import {useCloseAllActiveElements} from '#/state/util'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Toggle from '#/components/forms/Toggle'
-import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
-import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
+// import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
+// import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {Loader} from '#/components/Loader'
 import {Text} from '#/components/Typography'
 import {CharProgress} from '../composer/char-progress/CharProgress'
 import {ThreadDraft} from '../composer/state/composer'
 import {TextInput} from '../composer/text-input/TextInput'
+import {getCurrencySymbol} from '../donate/util'
 import * as Toast from '../util/Toast'
-import {getCurrencySymbol} from './util'
 
 const MAX_TESTIMONIAL_LENGTH = 300
+
+const CONTRIBUTION_LABELS: Record<string, string> = {
+  engineer: 'code',
+  designer: 'designs',
+  testing: 'testing & qa',
+}
+
+function formatList(items: string[]): string {
+  if (items.length === 1) return items[0]
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
+}
+
+const DONOR_DEFAULT_TEXT =
+  "I donated to @spkeasy.social to support safe social media that's designed for people to thrive"
+function getContributorDefaultText(contributions: string[]): string {
+  const volunteerLabels = contributions
+    .filter(c => c !== 'donor')
+    .map(c => CONTRIBUTION_LABELS[c])
+    .filter(Boolean)
+  const contributionText =
+    volunteerLabels.length > 0 ? formatList(volunteerLabels) : ''
+  return `We deserve social media that is safe, and respects our autonomy and attention.\n\nThat's why I contribute ${contributionText} to @spkeasy.social.`
+}
 
 interface DonationInfo {
   amount: string
@@ -41,7 +65,7 @@ interface DonationInfo {
   monthly: boolean
 }
 
-export function Thanks({
+export function SupportersAddForm({
   style,
   testID,
 }: {
@@ -57,18 +81,19 @@ export function Thanks({
   const {requestSwitchToAccount} = useLoggedOutViewControls()
   const closeAllActiveElements = useCloseAllActiveElements()
   const createTestimonial = useCreateTestimonialMutation()
-  const getPrivateSession = usePrivateSession()
+  // const getPrivateSession = usePrivateSession()
 
   const [donationInfo, setDonationInfo] = useState<DonationInfo | null>(null)
   const [localStorageChecked, setLocalStorageChecked] = useState(false)
   const [richtext, setRichText] = useState(
     () =>
       new RichText({
-        text: "I donated to @spkeasy.social to support safe social media that's designed for people to thrive",
+        text: DONOR_DEFAULT_TEXT,
       }),
   )
   const [shareAsPost, setShareAsPost] = useState(true)
-  const [audience, setAudience] = useState<'public' | 'trusted'>('public')
+  // const [audience, setAudience] = useState<'public' | 'trusted'>('public')
+  const audience = 'public' as const
   const [isSaving, setIsSaving] = useState(false)
 
   // Read donation info from localStorage on mount, then clear it
@@ -86,20 +111,39 @@ export function Thanks({
     setLocalStorageChecked(true)
   }, [])
 
-  // Only check supporter status if localStorage didn't have donation info
-  const shouldCheckSupporter =
+  // Only check contribution status if localStorage didn't have donation info
+  const shouldCheckContribution =
     hasSession && localStorageChecked && donationInfo === null
-  const {data: supporterData, isLoading: isCheckingSupporter} =
-    useCheckSupporterQuery({enabled: shouldCheckSupporter})
+  const {data: contributionData, isLoading: isCheckingContribution} =
+    useCheckContributionQuery({enabled: shouldCheckContribution})
 
-  // Determine if user is a valid supporter
+  // Update default testimonial text for contributors (non-donors)
+  // Uses synchronous state update during render so the correct text is set
+  // before the TextInput mounts (TipTap only reads richtext on initialization)
+  const [prevContributionData, setPrevContributionData] =
+    useState(contributionData)
+  if (contributionData !== prevContributionData) {
+    setPrevContributionData(contributionData)
+    if (contributionData) {
+      const contributions = contributionData.contributions ?? []
+      const hasVolunteerContributions = contributions.some(c => c !== 'donor')
+      if (hasVolunteerContributions && richtext.text === DONOR_DEFAULT_TEXT) {
+        setRichText(
+          new RichText({text: getContributorDefaultText(contributions)}),
+        )
+      }
+    }
+  }
+
+  // Determine if user is a valid contributor
   const hasDonationFromLocalStorage = donationInfo !== null
-  const isConfirmedSupporter = supporterData?.isSupporter === true
-  const isValidSupporter = hasDonationFromLocalStorage || isConfirmedSupporter
+  const isConfirmedContributor = contributionData?.isContributor === true
+  const isValidContributor =
+    hasDonationFromLocalStorage || isConfirmedContributor
 
-  // Determine if we're still loading supporter status
+  // Determine if we're still loading contribution status
   const isStillLoading =
-    !localStorageChecked || (shouldCheckSupporter && isCheckingSupporter)
+    !localStorageChecked || (shouldCheckContribution && isCheckingContribution)
 
   const graphemeLength = useMemo(() => {
     return richtext.graphemeLength
@@ -135,47 +179,48 @@ export function Thanks({
           threadgate: [],
         }
 
-        if (audience === 'trusted') {
-          const {sessionId, sessionKey} = await getPrivateSession({
-            onStateChange: () => {},
-          })
-
-          const {writes, uris, cids} = await apilib.preparePost(
-            agent,
-            queryClient,
-            {
-              thread,
-              onStateChange: () => {},
-              langs: [],
-              collection: 'social.spkeasy.feed.privatePost',
-              sessionId,
-              sessionKey,
-            },
-          )
-
-          const authorDid = agent.assertDid
-
-          const posts = await apilib.formatPrivatePosts(
-            apilib.combinePostGates(authorDid, writes, uris, cids),
-            sessionKey,
-          )
-
-          await callSpeakeasyApiWithAgent(agent, {
-            api: 'social.spkeasy.privatePost.createPosts',
-            method: 'POST',
-            body: {
-              sessionId,
-              encryptedPosts: posts,
-            },
-          })
-        } else {
-          await apilib.post(agent, queryClient, {
-            thread,
-            onStateChange: () => {},
-            langs: [],
-            collection: 'app.bsky.feed.post',
-          })
-        }
+        // TODO: Re-enable when private testimonies are implemented
+        // if (audience === 'trusted') {
+        //   const {sessionId, sessionKey} = await getPrivateSession({
+        //     onStateChange: () => {},
+        //   })
+        //
+        //   const {writes, uris, cids} = await apilib.preparePost(
+        //     agent,
+        //     queryClient,
+        //     {
+        //       thread,
+        //       onStateChange: () => {},
+        //       langs: [],
+        //       collection: 'social.spkeasy.feed.privatePost',
+        //       sessionId,
+        //       sessionKey,
+        //     },
+        //   )
+        //
+        //   const authorDid = agent.assertDid
+        //
+        //   const posts = await apilib.formatPrivatePosts(
+        //     apilib.combinePostGates(authorDid, writes, uris, cids),
+        //     sessionKey,
+        //   )
+        //
+        //   await callSpeakeasyApiWithAgent(agent, {
+        //     api: 'social.spkeasy.privatePost.createPosts',
+        //     method: 'POST',
+        //     body: {
+        //       sessionId,
+        //       encryptedPosts: posts,
+        //     },
+        //   })
+        // } else {
+        await apilib.post(agent, queryClient, {
+          thread,
+          onStateChange: () => {},
+          langs: [],
+          collection: 'app.bsky.feed.post',
+        })
+        // }
       }
 
       Toast.show(_(msg`Testimonial saved!`))
@@ -193,10 +238,8 @@ export function Thanks({
     createTestimonial,
     richtext,
     shareAsPost,
-    audience,
     agent,
     queryClient,
-    getPrivateSession,
     navigation,
     _,
   ])
@@ -212,9 +255,9 @@ export function Thanks({
     setShareAsPost(values.includes('shareAsPost'))
   }, [])
 
-  const handleAudienceToggle = useCallback(() => {
-    setAudience(prev => (prev === 'public' ? 'trusted' : 'public'))
-  }, [])
+  // const handleAudienceToggle = useCallback(() => {
+  //   setAudience(prev => (prev === 'public' ? 'trusted' : 'public'))
+  // }, [])
 
   const handleSignIn = useCallback(() => {
     closeAllActiveElements()
@@ -226,21 +269,51 @@ export function Thanks({
     requestSwitchToAccount({requestedAccount: 'new'})
   }, [closeAllActiveElements, requestSwitchToAccount])
 
-  const thankYouMessage = donationInfo
-    ? donationInfo.monthly
-      ? _(
-          msg`Thank you! Your monthly donation of ${getCurrencySymbol(
-            donationInfo.currency,
-          )}${donationInfo.amount} has been processed.`,
-        )
-      : _(
-          msg`Thank you! Your donation of ${getCurrencySymbol(
-            donationInfo.currency,
-          )}${donationInfo.amount} has been processed.`,
-        )
-    : _(msg`Thank you! Your donation has been processed.`)
+  const thankYouMessage = useMemo(() => {
+    // localStorage donation: show specific amount message
+    if (donationInfo) {
+      return donationInfo.monthly
+        ? _(
+            msg`Thank you! Your monthly donation of ${getCurrencySymbol(
+              donationInfo.currency,
+            )}${donationInfo.amount} has been processed.`,
+          )
+        : _(
+            msg`Thank you! Your donation of ${getCurrencySymbol(
+              donationInfo.currency,
+            )}${donationInfo.amount} has been processed.`,
+          )
+    }
 
-  // Show loading state while checking supporter status
+    // API-based supporter: build contribution-aware message
+    const contributions = contributionData?.contributions ?? []
+    const isDonor = contributions.includes('donor')
+    const volunteerLabels = contributions
+      .filter(c => c !== 'donor')
+      .map(c => CONTRIBUTION_LABELS[c])
+      .filter(Boolean)
+
+    if (isDonor && volunteerLabels.length > 0) {
+      return _(
+        msg`Thank you for donating and contributing ${formatList(
+          volunteerLabels,
+        )} to Speakeasy`,
+      )
+    }
+    if (isDonor) {
+      return _(msg`Thank you for donating to Speakeasy`)
+    }
+    if (volunteerLabels.length > 0) {
+      return _(
+        msg`Thank you for contributing ${formatList(
+          volunteerLabels,
+        )} to Speakeasy`,
+      )
+    }
+    return _(msg`Thank you for contributing to Speakeasy`)
+  }, [donationInfo, contributionData, _])
+
+  // Show loading state while checking contribution status
   if (hasSession && isStillLoading) {
     return (
       <View testID={testID} style={style}>
@@ -310,8 +383,8 @@ export function Thanks({
     )
   }
 
-  // Show error if signed-in user arrived without being a supporter
-  if (!isValidSupporter) {
+  // Show error if signed-in user arrived without being a contributor
+  if (!isValidContributor) {
     return (
       <View testID={testID} style={style}>
         <View style={[a.flex_col, a.align_center, a.gap_lg, a.w_full, a.px_lg]}>
@@ -344,7 +417,7 @@ export function Thanks({
     )
   }
 
-  // Signed in and valid supporter - show testimony form
+  // Signed in and valid contributor - show testimony form
   return (
     <View testID={testID} style={style}>
       <View style={[a.flex_col, a.align_center, a.gap_lg, a.w_full, a.px_lg]}>
@@ -389,6 +462,7 @@ export function Thanks({
               onError={noOpError}
               onFocus={noOpFocus}
               disableDrop={true}
+              autoFocus={false}
               accessible={true}
               accessibilityLabel={_(msg`Write testimonial`)}
               accessibilityHint={_(
@@ -420,7 +494,8 @@ export function Thanks({
             </Toggle.Item>
           </Toggle.Group>
 
-          {shareAsPost && (
+          {/* This toggle is misleading unless we also implement private testimony's (otherwise while shared privately, the testimony itself will be public */}
+          {/* shareAsPost && (
             <Button
               variant="solid"
               color="secondary"
@@ -439,7 +514,7 @@ export function Thanks({
                 )}
               </ButtonText>
             </Button>
-          )}
+          ) */}
         </View>
 
         <View style={[a.w_full, a.pt_lg]}>

@@ -6,7 +6,7 @@ import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {atoms as a, useBreakpoints, useTheme, web} from '#/alf'
 import * as Layout from '#/components/Layout'
-import {Thanks} from '../com/donate/Thanks'
+import {SupportersAddForm} from '../com/supporters/SupportersAddForm'
 import {Logo} from '../icons/Logo'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'SupportersAdd'>
@@ -62,7 +62,7 @@ export function SupportersAddScreen({}: Props) {
       </View>
       <Layout.Content
         contentContainerStyle={[needsPadding && {paddingTop: 100}]}>
-        <Thanks />
+        <SupportersAddForm />
       </Layout.Content>
     </Layout.Screen>
   )
