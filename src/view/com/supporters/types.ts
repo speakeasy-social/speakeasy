@@ -16,7 +16,7 @@ export type RelationshipPriority =
 
 export interface TestimonialContribution {
   contribution: string
-  public?: {recognition?: string} | null
+  public?: {recognition?: string; isRegularGift?: boolean} | null
 }
 
 export interface TestimonialAuthor {
