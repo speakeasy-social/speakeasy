@@ -53,6 +53,7 @@ interface TextInputProps {
   onError: (err: string) => void
   onFocus: () => void
   disableDrop?: boolean
+  autoFocus?: boolean
 }
 
 export const TextInput = React.forwardRef(function TextInputImpl(
@@ -68,6 +69,7 @@ export const TextInput = React.forwardRef(function TextInputImpl(
     onNewLink,
     onFocus,
     disableDrop,
+    autoFocus = true,
   }: // onError, TODO
   TextInputProps,
   ref,
@@ -234,12 +236,27 @@ export const TextInput = React.forwardRef(function TextInputImpl(
           }
         },
       },
-      content: generateJSON(richtext.text.toString(), extensions),
-      autofocus: 'end',
+      content: generateJSON(
+        richtext.text
+          .toString()
+          .split('\n')
+          .map(line =>
+            line.length > 0
+              ? `<p>${line
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')}</p>`
+              : '<p></p>',
+          )
+          .join(''),
+        extensions,
+      ),
+      autofocus: autoFocus ? 'end' : false,
       editable: true,
       injectCSS: true,
       shouldRerenderOnTransaction: false,
       onCreate({editor: editorProp}) {
+        if (!autoFocus) return
         // HACK
         // the 'enter' animation sometimes causes autofocus to fail
         // (see Composer.web.tsx in shell)
