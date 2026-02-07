@@ -125,7 +125,7 @@ export function BottomBar({navigation}: BottomTabBarProps) {
   const isIntentScreen = isAtHome // Adjust this logic based on actual route checking
   const isDonationScreen =
     currentRouteInfo.name === 'Donate' ||
-    currentRouteInfo.name === 'DonateThanks'
+    currentRouteInfo.name === 'SupportersAdd'
 
   // Conditionally render the bottom bar
   if (hasSession && isIntentScreen) {
