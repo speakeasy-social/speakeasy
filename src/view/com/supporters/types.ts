@@ -14,6 +14,11 @@ export type RelationshipPriority =
   | 'follows-me'
   | 'other'
 
+export interface TestimonialContribution {
+  contribution: string
+  public?: {recognition?: string} | null
+}
+
 export interface TestimonialAuthor {
   did: string
   handle: string
@@ -25,6 +30,6 @@ export interface Testimonial {
   id: string
   author: TestimonialAuthor
   message: string
-  badges: SupporterTier[]
+  contributions: TestimonialContribution[]
   relationship: RelationshipPriority
 }

@@ -6,8 +6,8 @@ import {useSpeakeasyApi} from '#/lib/api/speakeasy'
 import {useAgent} from '#/state/session'
 import {
   RelationshipPriority,
-  SupporterTier,
   Testimonial,
+  TestimonialContribution,
 } from '#/view/com/supporters/types'
 import {useTrustedQuery} from './trusted'
 
@@ -47,42 +47,6 @@ type ApiTestimonial = {
 type ListTestimonialsResponse = {
   testimonials: ApiTestimonial[]
   cursor?: string
-}
-
-// Badge mapping from API contribution strings to UI tier
-const CONTRIBUTION_TO_BADGE: Record<string, SupporterTier> = {
-  donor: 'supporter',
-  contributor: 'contributor',
-  designer: 'design',
-  engineer: 'engineering',
-  testing: 'qa',
-}
-
-/**
- * Maps API contribution strings to SupporterTier badges
- */
-export function mapContributionsToBadges(
-  contributions: ApiContribution[],
-): SupporterTier[] {
-  const badges: SupporterTier[] = []
-  const seen = new Set<SupporterTier>()
-
-  for (const c of contributions) {
-    let badge: SupporterTier | undefined
-
-    if (c.contribution === 'donor' && c.public?.recognition === 'founding') {
-      badge = 'founder'
-    } else {
-      badge = CONTRIBUTION_TO_BADGE[c.contribution]
-    }
-
-    if (badge && !seen.has(badge)) {
-      seen.add(badge)
-      badges.push(badge)
-    }
-  }
-
-  return badges
 }
 
 /**
@@ -323,7 +287,12 @@ export function useTestimonialsWithProfiles(
           avatar: profile?.avatar,
         },
         message: apiTestimonial.content.text,
-        badges: mapContributionsToBadges(apiTestimonial.contributions),
+        contributions: apiTestimonial.contributions.map(
+          (c): TestimonialContribution => ({
+            contribution: c.contribution,
+            public: c.public,
+          }),
+        ),
         relationship: computeRelationship(
           apiTestimonial.did,
           currentUserDid,

@@ -1,64 +1,58 @@
-import {View} from 'react-native'
+import {Tag, TagVariant} from '#/components/Tag'
 
-import {atoms as a, useTheme} from '#/alf'
-import {Text} from '#/components/Typography'
-import {SupporterTier} from './types'
+/**
+ * Maps (contribution, recognition) to display variant and label
+ */
+function getBadgeStyle(
+  contribution: string,
+  recognition?: string | null,
+): {variant: TagVariant; label: string} | null {
+  // Special case: donor with "Founding Donor" recognition
+  if (contribution === 'donor' && recognition === 'Founding Donor') {
+    return {
+      variant: 'gold',
+      label: '✊ Founding Donor',
+    }
+  }
 
-const TIER_STYLES: Record<
-  SupporterTier,
-  {backgroundColor: string; label: string}
-> = {
-  founder: {
-    backgroundColor: '#D4AF37', // gold
-    label: '✊ Founding Donor',
-  },
-  supporter: {
-    backgroundColor: '#C0C0C0', // silver
-    label: '💜 Donor',
-  },
-  contributor: {
-    backgroundColor: '#CD7F32', // bronze
-    label: '⚒️ Contributor',
-  },
-  engineering: {
-    backgroundColor: '#2563EB', // blue
-    label: '🔨 Code',
-  },
-  qa: {
-    backgroundColor: '#10B981', // emerald
-    label: '👷 Testing & QA',
-  },
-  design: {
-    backgroundColor: '#8B5CF6', // violet
-    label: '🎨 Design',
-  },
+  // Map contribution strings to badge styles
+  const contributionMap: Record<string, {variant: TagVariant; label: string}> =
+    {
+      donor: {
+        variant: 'gradient_summer',
+        label: '☀️ Donor',
+      },
+      contributor: {
+        variant: 'bronze',
+        label: '⚒️ Contributor',
+      },
+      designer: {
+        variant: 'violet',
+        label: '🎨 Design',
+      },
+      engineer: {
+        variant: 'blue',
+        label: '🔨 Code',
+      },
+      testing: {
+        variant: 'emerald',
+        label: '👷 Testing & QA',
+      },
+    }
+
+  return contributionMap[contribution] ?? null
 }
 
-export function SupporterBadge({tier}: {tier: SupporterTier}) {
-  const t = useTheme()
-  const {backgroundColor, label} = TIER_STYLES[tier]
-
-  return (
-    <View
-      style={[
-        {
-          backgroundColor,
-          paddingHorizontal: 6,
-          paddingVertical: 3,
-          borderRadius: 4,
-        },
-        a.justify_center,
-      ]}>
-      <Text
-        emoji
-        style={[
-          a.text_xs,
-          a.leading_tight,
-          a.font_bold,
-          {color: t.name === 'light' ? '#000' : '#fff'},
-        ]}>
-        {label}
-      </Text>
-    </View>
-  )
+export function SupporterBadge({
+  contribution,
+  recognition,
+}: {
+  contribution: string
+  recognition?: string | null
+}) {
+  const style = getBadgeStyle(contribution, recognition)
+  if (!style) {
+    return null
+  }
+  return <Tag variant={style.variant} label={style.label} />
 }
