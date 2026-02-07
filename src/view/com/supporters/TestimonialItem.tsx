@@ -22,7 +22,7 @@ export const TestimonialItem = memo(function TestimonialItem({
 }: TestimonialItemProps) {
   const pal = usePalette('default')
   const t = useTheme()
-  const {author, message, badges} = testimonial
+  const {author, message, contributions} = testimonial
 
   const profileLink = makeProfileLink({
     did: author.did,
@@ -32,6 +32,17 @@ export const TestimonialItem = memo(function TestimonialItem({
   const displayName = author.displayName
     ? sanitizeDisplayName(author.displayName)
     : sanitizeHandle(author.handle)
+
+  // Dedupe contributions by (contribution, recognition) pair
+  const seen = new Set<string>()
+  const uniqueContributions = contributions.filter(c => {
+    const key = `${c.contribution}:${c.public?.recognition ?? ''}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
 
   return (
     <View
@@ -70,10 +81,16 @@ export const TestimonialItem = memo(function TestimonialItem({
               </Link>
             </ProfileHoverCard>
 
-            {badges.length > 0 && (
+            {uniqueContributions.length > 0 && (
               <View style={styles.badges}>
-                {badges.map(badge => (
-                  <SupporterBadge key={badge} tier={badge} />
+                {uniqueContributions.map((c, idx) => (
+                  <SupporterBadge
+                    key={`${c.contribution}:${
+                      c.public?.recognition ?? ''
+                    }:${idx}`}
+                    contribution={c.contribution}
+                    recognition={c.public?.recognition}
+                  />
                 ))}
               </View>
             )}
