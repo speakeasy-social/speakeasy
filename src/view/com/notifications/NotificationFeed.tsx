@@ -13,7 +13,12 @@ import {cleanError} from '#/lib/strings/errors'
 import {s} from '#/lib/styles'
 import {logger} from '#/logger'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
-import {useNotificationFeedQuery} from '#/state/queries/notifications/feed'
+import {
+  RQKEY,
+  useNotificationFeedQuery,
+} from '#/state/queries/notifications/feed'
+import {useNotificationPrivateProfiles} from '#/state/queries/notifications/private-profiles'
+import {useSession} from '#/state/session'
 import {EmptyState} from '#/view/com/util/EmptyState'
 import {ErrorMessage} from '#/view/com/util/error/ErrorMessage'
 import {List, ListRef} from '#/view/com/util/List'
@@ -46,6 +51,7 @@ export function NotificationFeed({
   const [isPTRing, setIsPTRing] = React.useState(false)
   const {_} = useLingui()
   const moderationOpts = useModerationOpts()
+  const {currentAccount} = useSession()
   const {
     data,
     isFetching,
@@ -59,6 +65,12 @@ export function NotificationFeed({
     enabled: enabled && !!moderationOpts,
     filter,
   })
+
+  // Enhance author profiles with private profile data
+  useNotificationPrivateProfiles(RQKEY(filter), {
+    enabled: !!currentAccount,
+  })
+
   const isEmpty = !isFetching && !data?.pages[0]?.items.length
 
   const items = React.useMemo(() => {
