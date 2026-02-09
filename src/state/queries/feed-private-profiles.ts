@@ -1,17 +1,12 @@
-import {useCallback, useEffect, useRef} from 'react'
 import {AppBskyFeedDefs} from '@atproto/api'
 import {InfiniteData, QueryKey, useQueryClient} from '@tanstack/react-query'
 
 import {
-  fetchPrivateProfiles,
   mergePrivateProfileData,
   PrivateProfileData,
 } from '#/lib/api/private-profiles'
-import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {isServiceError, showServiceErrorToast} from '#/lib/api/speakeasy-health'
-import {logger} from '#/logger'
-import {useAgent, useSession} from '#/state/session'
 import {FeedPageUnselected, RQKEY_ROOT} from './post-feed'
+import {usePrivateProfileEnhancer} from './use-private-profile-enhancer'
 
 /**
  * Extracts unique author DIDs from feed pages.
@@ -132,110 +127,12 @@ export function useFeedPrivateProfiles(
   feedQueryKey: QueryKey,
   options?: {enabled?: boolean},
 ) {
-  const queryClient = useQueryClient()
-  const agent = useAgent()
-  const {currentAccount} = useSession()
-
-  // Track which DIDs we've already fetched to avoid refetching
-  const fetchedDidsRef = useRef<Set<string>>(new Set())
-  const isFetchingRef = useRef(false)
-
-  // Reset fetched DIDs when feed descriptor changes
-  const feedDesc = feedQueryKey[1]
-  useEffect(() => {
-    fetchedDidsRef.current.clear()
-  }, [feedDesc])
-
-  const enhanceProfiles = useCallback(async () => {
-    if (options?.enabled === false) return
-    if (!currentAccount?.did) return
-    if (isFetchingRef.current) return
-
-    // Get current feed data
-    const queryData =
-      queryClient.getQueryData<InfiniteData<FeedPageUnselected>>(feedQueryKey)
-
-    if (!queryData?.pages?.length) return
-
-    // Extract DIDs that haven't been fetched yet
-    const allDids = extractDidsFromFeed(queryData.pages)
-    const newDids = Array.from(allDids).filter(
-      did => !fetchedDidsRef.current.has(did),
-    )
-
-    if (newDids.length === 0) return
-
-    isFetchingRef.current = true
-
-    try {
-      const call = (opts: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
-        callSpeakeasyApiWithAgent(agent, opts)
-
-      const privateProfiles = await fetchPrivateProfiles(
-        newDids,
-        currentAccount.did,
-        call,
-      )
-
-      // Mark all DIDs as fetched (even if no private profile found)
-      for (const did of newDids) {
-        fetchedDidsRef.current.add(did)
-      }
-
-      // Update cache if we got any private profiles
-      if (privateProfiles.size > 0) {
-        updateFeedCacheWithPrivateProfiles(
-          queryClient,
-          feedQueryKey,
-          privateProfiles,
-        )
-      }
-    } catch (error) {
-      logger.error('useFeedPrivateProfiles: failed to fetch', {error})
-      if (isServiceError(error)) {
-        showServiceErrorToast()
-      }
-      // Mark as fetched to avoid retry loops
-      for (const did of newDids) {
-        fetchedDidsRef.current.add(did)
-      }
-    } finally {
-      isFetchingRef.current = false
-    }
-  }, [agent, currentAccount?.did, feedQueryKey, options?.enabled, queryClient])
-
-  // Watch for feed data changes
-  useEffect(() => {
-    // Initial enhancement
-    enhanceProfiles()
-
-    // Subscribe to cache updates for this query
-    const unsubscribe = queryClient.getQueryCache().subscribe(event => {
-      if (
-        event.type === 'updated' &&
-        event.query.queryKey[0] === RQKEY_ROOT &&
-        JSON.stringify(event.query.queryKey) === JSON.stringify(feedQueryKey)
-      ) {
-        enhanceProfiles()
-      }
-    })
-
-    return unsubscribe
-  }, [enhanceProfiles, feedQueryKey, queryClient])
-
-  // Clear fetched DIDs on refetch (pull-to-refresh)
-  useEffect(() => {
-    const unsubscribe = queryClient.getQueryCache().subscribe(event => {
-      if (
-        event.type === 'updated' &&
-        event.action?.type === 'fetch' &&
-        JSON.stringify(event.query.queryKey) === JSON.stringify(feedQueryKey)
-      ) {
-        // Query is refetching - clear tracked DIDs to allow re-enhancement
-        fetchedDidsRef.current.clear()
-      }
-    })
-
-    return unsubscribe
-  }, [feedQueryKey, queryClient])
+  usePrivateProfileEnhancer<FeedPageUnselected>({
+    queryKey: feedQueryKey,
+    rqKeyRoot: RQKEY_ROOT,
+    extractDids: extractDidsFromFeed,
+    updateCache: updateFeedCacheWithPrivateProfiles,
+    enabled: options?.enabled,
+    logPrefix: 'useFeedPrivateProfiles',
+  })
 }
