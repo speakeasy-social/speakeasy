@@ -25,7 +25,7 @@ import {
   PrivateNotification,
 } from '#/lib/api/private-notifications'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getCachedPrivateKey} from '#/lib/api/user-keys'
+import {getPrivateKeyOrWarn} from '#/lib/api/user-keys'
 import {awaitWithTimeout} from '#/lib/async/timeout'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
@@ -256,17 +256,19 @@ async function fetchSubjects(
           fetchEncryptedPosts(agent, {
             uris: Array.from(privatePostUris),
           }).then(async res => {
-            const privateKey = await getCachedPrivateKey(
+            const privateKey = await getPrivateKeyOrWarn(
               agent.assertDid,
               options => callSpeakeasyApiWithAgent(agent, options),
-              false,
             )
+            if (!privateKey) {
+              return []
+            }
             const encryptedSessionKeys = res.encryptedSessionKeys
             return await decryptPosts(
               agent,
               res.encryptedPosts,
               encryptedSessionKeys,
-              privateKey!,
+              privateKey,
             )
           }),
           3000, // 3 second timeout

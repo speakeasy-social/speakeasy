@@ -12,8 +12,12 @@ import {
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getCachedPrivateKey, SpeakeasyPrivateKey} from '#/lib/api/user-keys'
-import {decryptBatch} from '#/lib/encryption'
+import {
+  getCachedPrivateKey,
+  getPrivateKeyOrWarn,
+  SpeakeasyPrivateKey,
+} from '#/lib/api/user-keys'
+import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
@@ -554,11 +558,16 @@ export async function decryptPostsAndFetchAuthorProfiles(
   posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
-  const privateKey = await getCachedPrivateKey(
-    agent.session!.did,
-    options => callSpeakeasyApiWithAgent(agent, options),
-    false,
+  const privateKey = await getPrivateKeyOrWarn(agent.session!.did, options =>
+    callSpeakeasyApiWithAgent(agent, options),
   )
+
+  if (!privateKey) {
+    return {
+      posts: [],
+      authorProfileMap: authorProfileMap ?? new Map(),
+    }
+  }
 
   /** Decrypt the posts and fetch author profiles */
   let authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
@@ -570,7 +579,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 
   const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey!),
+    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey),
   ])
 
   const mergedAuthorProfileMap = authorProfileMap
@@ -581,8 +590,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 }
 
 /**
- * Decrypts a list of encrypted posts using the provided session keys and private key.
- * Uses the shared decryptBatch utility for parallel decryption.
+ * Decrypts a list of encrypted posts using the provided session keys and private key
  * @param agent - The BskyAgent instance to use for API calls
  * @param encryptedPosts - Array of encrypted posts to decrypt
  * @param encryptedSessionKeys - Array of session keys for decryption
@@ -595,28 +603,29 @@ export async function decryptPosts(
   encryptedSessionKeys: EncryptedSessionKey[],
   privateKey: SpeakeasyPrivateKey,
 ): Promise<DecryptedPost[]> {
-  const items = encryptedPosts.map(p => ({
-    id: p.uri,
-    encryptedContent: p.encryptedContent,
-    sessionId: p.sessionId,
-  }))
-
-  const decryptedMap = await decryptBatch(
-    items,
-    encryptedSessionKeys,
-    privateKey.privateKey,
-  )
-
-  return encryptedPosts
-    .map(post => {
-      const content = decryptedMap.get(post.uri)
-      if (!content) return null
-      return {
-        ...JSON.parse(content),
-        ...post,
+  return Promise.all(
+    encryptedPosts.map(async (encryptedPost: any) => {
+      const encryptedDek = encryptedSessionKeys.find(
+        key => key.sessionId === encryptedPost.sessionId,
+      )?.encryptedDek
+      // If we can't find a session to decode it, discard the post
+      if (!encryptedDek) return null
+      let post
+      try {
+        const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
+        post = await decryptContent(encryptedPost.encryptedContent, dek)
+      } catch (err) {
+        // Decryption functions log errors, just bail on this post
+        // and try the next one
+        return null
       }
-    })
-    .filter(Boolean) as DecryptedPost[]
+
+      return {
+        ...JSON.parse(post),
+        ...encryptedPost,
+      }
+    }),
+  )
 }
 
 /**
