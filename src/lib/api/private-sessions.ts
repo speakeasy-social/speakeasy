@@ -8,15 +8,10 @@ import {
   SpeakeasyApiCall,
   useSpeakeasyApi,
 } from '#/lib/api/speakeasy'
-import {decryptDEK, encryptDEK, generateDEK} from '#/lib/encryption'
-import {getTrustedUsers, RQKEY} from '#/state/queries/trusted'
+import {decryptDEK} from '#/lib/encryption'
 import {useAgent} from '#/state/session'
-import {
-  getOrCreatePublicKey,
-  getPrivateKey,
-  getPublicKeys,
-  getSession,
-} from './user-keys'
+import {encryptDekForTrustedUsers} from './session-utils'
+import {getOrCreatePublicKey, getPrivateKey, getSession} from './user-keys'
 
 async function createSession(
   sessionKeys: {recipientDid: string; encryptedDek: string}[],
@@ -35,9 +30,12 @@ async function createSession(
 
 /**
  * Creates a new session with the current user and their trusted users.
- * @param {string} myDid - The DID of the current user
- * @param {string} myPublicKey - The public key of the current user
- * @returns {Promise<{sessionId: string, encryptedDek: string}>} The session ID and encrypted data encryption key
+ * @param myPublicKey - The public key of the current user
+ * @param myUserKeyPairId - The current user's key pair ID
+ * @param agent - The BskyAgent containing user information
+ * @param call - The API call function
+ * @param queryClient - The React Query client instance
+ * @returns The session ID and encrypted DEK for the current user
  */
 async function createNewSession(
   myPublicKey: string,
@@ -46,43 +44,12 @@ async function createNewSession(
   call: SpeakeasyApiCall,
   queryClient: QueryClient,
 ) {
-  const dek = await generateDEK()
-
-  // Get cached trusted users data
-  let trustedUsers: {recipientDid: string}[] | undefined =
-    queryClient.getQueryData(RQKEY(agent.did!))
-
-  if (trustedUsers) {
-    trustedUsers = trustedUsers
-  } else {
-    trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
-  }
-
-  const recipientPublicKeys = await getPublicKeys(
-    trustedUsers.map(user => user.recipientDid),
+  const {encryptedDeks} = await encryptDekForTrustedUsers(
+    myPublicKey,
+    myUserKeyPairId,
+    agent,
     call,
-  )
-
-  // Create a session with the current user and their trusted users
-  const allSessionUsers = [
-    {
-      recipientDid: agent.did!,
-      publicKey: myPublicKey,
-      userKeyPairId: myUserKeyPairId,
-    },
-    ...recipientPublicKeys,
-  ]
-
-  // Fetch all trusted users
-  const encryptedDeks = await Promise.all(
-    allSessionUsers.map(async recipient => {
-      const encryptedDek = await encryptDEK(dek, recipient.publicKey)
-      return {
-        encryptedDek,
-        recipientDid: recipient.recipientDid,
-        userKeyPairId: recipient.userKeyPairId,
-      }
-    }),
+    queryClient,
   )
 
   const {sessionId} = await createSession(encryptedDeks, call)
