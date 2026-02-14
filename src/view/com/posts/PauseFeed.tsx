@@ -19,9 +19,14 @@ import {atoms as a} from '#/alf/atoms'
 import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {Text} from '#/components/Typography'
-import {PauseFeedCTA} from '#/constants/pause-feed-cta'
+import {
+  isDonateCTA,
+  isSimplePauseFeedCTA,
+  PauseFeedCTA,
+} from '#/constants/pause-feed-cta'
 import {router} from '../../../routes'
 import {LeaveDialog} from '../modals/EditLeaveOptionsDialog'
+import {DonateCTA} from './DonateCTA'
 
 function GoodbyeGifDialog({
   control,
@@ -75,10 +80,6 @@ export function PauseFeed({
   const {closeModal} = useModalControls()
   const openLink = useOpenLink()
 
-  React.useEffect(() => {
-    height.value = isCompact ? 60 : 500
-  }, [isCompact, height])
-
   const animatedStyle = useAnimatedStyle(() => {
     if (isReducedMotion) {
       return {
@@ -96,20 +97,9 @@ export function PauseFeed({
     }
   }, [isReducedMotion])
 
-  const handleClose = React.useCallback(() => {
-    gifDialogControl.open()
-    fetch(
-      'https://api.giphy.com/v1/gifs/random?api_key=YOUR_API_KEY&tag=off+you+go&rating=g',
-    )
-      .then(response => response.json())
-      .then(data => {
-        setGifUrl(data.data.images.original.url)
-        setTimeout(() => window.close(), 3000)
-      })
-      .catch(error => {
-        console.error('Error fetching GIF:', error)
-      })
-  }, [gifDialogControl])
+  React.useEffect(() => {
+    height.value = isCompact ? 60 : 500
+  }, [isCompact, height])
 
   const containerStyle = [
     a.p_lg,
@@ -211,7 +201,7 @@ export function PauseFeed({
   }, [markOnboardingSeen, onKeepScrolling])
 
   const handleFeedPauseCTA = React.useCallback(() => {
-    if (!feedPauseCTA?.url) {
+    if (!feedPauseCTA || !('url' in feedPauseCTA)) {
       return
     }
 
@@ -227,13 +217,27 @@ export function PauseFeed({
     const [routeName, params] = router.matchPath(href)
     if (routeName !== 'NotFound') {
       closeModal()
-      // @ts-ignore we're not able to type check on this one -prf
       navigation.dispatch(StackActions.push(routeName, params))
     } else {
       // Fallback for relative URLs that don't match any route
       openLink(href)
     }
   }, [feedPauseCTA, openLink, closeModal, navigation])
+
+  const handleClose = React.useCallback(() => {
+    gifDialogControl.open()
+    fetch(
+      'https://api.giphy.com/v1/gifs/random?api_key=YOUR_API_KEY&tag=off+you+go&rating=g',
+    )
+      .then(response => response.json())
+      .then(data => {
+        setGifUrl(data.data.images.original.url)
+        setTimeout(() => window.close(), 3000)
+      })
+      .catch(error => {
+        console.error('Error fetching GIF:', error)
+      })
+  }, [gifDialogControl])
 
   const handleLeaveOption = React.useCallback(
     (option: {link: string}) => {
@@ -250,6 +254,10 @@ export function PauseFeed({
     },
     [markOnboardingSeen, handleClose, navigation],
   )
+
+  if (feedPauseCTA && isDonateCTA(feedPauseCTA)) {
+    return <DonateCTA onKeepScrolling={handleKeepScrolling} />
+  }
 
   return (
     <Animated.View style={[containerStyle, animatedStyle]}>
@@ -285,31 +293,31 @@ export function PauseFeed({
           ]}>
           {_(msg`Onwards!`)}
         </Text>
-      ) : feedPauseCTA ? (
+      ) : feedPauseCTA && isSimplePauseFeedCTA(feedPauseCTA) ? (
         <>
           <Text style={[a.text_center, t.atoms.text_contrast_high, a.text_md]}>
             {feedPauseCTA.message}
           </Text>
 
-          <Button
-            style={[a.mt_xl]}
-            variant="solid"
-            color={feedPauseCTA.buttonColor || 'primary'}
-            size="large"
-            label={feedPauseCTA.buttonText}
-            onPress={handleFeedPauseCTA}>
-            <ButtonText>{feedPauseCTA.buttonText}</ButtonText>
-          </Button>
+          <View style={[a.flex_row, a.gap_md, a.mt_xl]}>
+            <Button
+              variant="solid"
+              color={feedPauseCTA.buttonColor ?? 'primary'}
+              size="small"
+              label={feedPauseCTA.buttonText}
+              onPress={handleFeedPauseCTA}>
+              <ButtonText>{feedPauseCTA.buttonText}</ButtonText>
+            </Button>
 
-          <Button
-            style={[a.mt_xl]}
-            variant="outline"
-            color="primary"
-            size="small"
-            label={_(msg`Keep Scrolling`)}
-            onPress={handleKeepScrolling}>
-            <ButtonText>{_(msg`Keep Scrolling`)}</ButtonText>
-          </Button>
+            <Button
+              variant="outline"
+              color="primary"
+              size="small"
+              label={_(msg`Keep Scrolling`)}
+              onPress={handleKeepScrolling}>
+              <ButtonText>{_(msg`Keep Scrolling`)}</ButtonText>
+            </Button>
+          </View>
         </>
       ) : (
         <>

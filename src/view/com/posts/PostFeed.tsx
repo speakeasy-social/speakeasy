@@ -70,7 +70,7 @@ import {
 } from '#/components/feeds/PostFeedVideoGridRow'
 import {TrendingInterstitial} from '#/components/interstitials/Trending'
 import {TrendingVideos as TrendingVideosInterstitial} from '#/components/interstitials/TrendingVideos'
-import {PauseFeedCTA} from '#/constants/pause-feed-cta'
+import {DEBUG_FEED_PAUSE, PauseFeedCTA} from '#/constants/pause-feed-cta'
 import {DiscoverFallbackHeader} from './DiscoverFallbackHeader'
 import {FeedShutdownMsg} from './FeedShutdownMsg'
 import {MediaGrid} from './MediaGrid'
@@ -367,6 +367,8 @@ let PostFeed = ({
   }, [pauseSectionCount])
 
   const feedItems: FeedRow[] = React.useMemo(() => {
+    const effectivePostsPerInterrupt =
+      __DEV__ && DEBUG_FEED_PAUSE ? 7 : postsPerInterrupt
     let pauseSections = 0
 
     let feedKind: 'following' | 'discover' | 'profile' | 'thevids' | undefined
@@ -516,7 +518,7 @@ let PostFeed = ({
                 // Add end of feed marker every PAUSE_AFTER_VIEWING posts
                 if (
                   sliceIndex > 0 &&
-                  (sliceIndex + 1) % postsPerInterrupt === 0
+                  (sliceIndex + 1) % effectivePostsPerInterrupt === 0
                 ) {
                   arr.push({
                     type: 'pauseFeed',
