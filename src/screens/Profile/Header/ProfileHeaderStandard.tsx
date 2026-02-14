@@ -10,7 +10,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {logger} from '#/logger'
-import {isIOS, isWeb} from '#/platform/detection'
+import {isIOS} from '#/platform/detection'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {Shadow} from '#/state/cache/types'
 import {useModalControls} from '#/state/modals'
@@ -24,7 +24,6 @@ import {TrustButton} from '#/view/com/profile/TrustButton'
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
-import {useDialogControl} from '#/components/Dialog'
 import {FirstTimeFollowDialog} from '#/components/dialogs/FirstTimeFollowDialog'
 import {MessageProfileButton} from '#/components/dms/MessageProfileButton'
 import {
@@ -41,7 +40,6 @@ import * as Prompt from '#/components/Prompt'
 import {Pronouns} from '#/components/Pronouns'
 import {RichText} from '#/components/RichText'
 import {ProfileHeaderDisplayName} from './DisplayName'
-import {EditProfileDialog} from './EditProfileDialog'
 import {ProfileHeaderHandle} from './Handle'
 import {ProfileHeaderMetrics} from './Metrics'
 import {ProfileHeaderShell} from './Shell'
@@ -77,18 +75,12 @@ let ProfileHeaderStandard = ({
     profile.viewer?.blockingByList
 
   const {openModal} = useModalControls()
-  const editProfileControl = useDialogControl()
   const onPressEditProfile = React.useCallback(() => {
-    if (isWeb) {
-      // temp, while we figure out the nested dialog bug
-      openModal({
-        name: 'edit-profile',
-        profile,
-      })
-    } else {
-      editProfileControl.open()
-    }
-  }, [editProfileControl, openModal, profile])
+    openModal({
+      name: 'edit-profile',
+      profile,
+    })
+  }, [openModal, profile])
 
   const {follow, unfollow: onPressUnfollow} = useFollowWithTrustMethods({
     profile,
@@ -159,10 +151,6 @@ let ProfileHeaderStandard = ({
                   <Trans>Edit Profile</Trans>
                 </ButtonText>
               </Button>
-              <EditProfileDialog
-                profile={profile}
-                control={editProfileControl}
-              />
             </>
           ) : profile.viewer?.blocking ? (
             profile.viewer?.blockingByList ? null : (
