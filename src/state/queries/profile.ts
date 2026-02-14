@@ -17,6 +17,17 @@ import {
 } from '@tanstack/react-query'
 
 import {uploadBlob} from '#/lib/api'
+import {
+  anonymizeAtProtoProfile,
+  decryptProfileIfAccessible,
+  deletePrivateProfile,
+  getPrivateProfile,
+  getPrivateProfiles,
+  mergePrivateProfileData,
+  migrateMediaToAtProto,
+  savePrivateProfile,
+} from '#/lib/api/private-profiles'
+import {callSpeakeasyApiWithAgent, getErrorCode} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
@@ -53,6 +64,25 @@ export const profileBasicQueryKey = (didOrHandle: string) => [
   didOrHandle,
 ]
 
+/**
+ * Metadata about the private profile state.
+ * Attached to profile query results as _privateProfile.
+ */
+export type PrivateProfileMetadata = {
+  isPrivate: boolean
+  avatarUri?: string // Speakeasy media key for migration
+  bannerUri?: string // Speakeasy media key for migration
+  loadError?: boolean // true if non-404 error occurred loading private profile
+}
+
+/**
+ * Extended profile type that includes private profile metadata.
+ */
+export type ProfileViewDetailedWithPrivate =
+  AppBskyActorDefs.ProfileViewDetailed & {
+    _privateProfile?: PrivateProfileMetadata
+  }
+
 export function useProfileQuery({
   did,
   staleTime = STALE.SECONDS.FIFTEEN,
@@ -62,7 +92,9 @@ export function useProfileQuery({
 }) {
   const queryClient = useQueryClient()
   const agent = useAgent()
-  return useQuery<AppBskyActorDefs.ProfileViewDetailed>({
+  const {currentAccount} = useSession()
+
+  return useQuery<ProfileViewDetailedWithPrivate>({
     // WARNING
     // this staleTime is load-bearing
     // if you remove it, the UI infinite-loops
@@ -71,8 +103,43 @@ export function useProfileQuery({
     refetchOnWindowFocus: true,
     queryKey: RQKEY(did ?? ''),
     queryFn: async () => {
-      const res = await agent.getProfile({actor: did ?? ''})
-      return res.data
+      // Create call function for Speakeasy API
+      const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+        callSpeakeasyApiWithAgent(agent, options)
+
+      // Fetch ATProto and Speakeasy profiles in parallel
+      const [atprotoRes, privateResult] = await Promise.all([
+        agent.getProfile({actor: did ?? ''}),
+        getPrivateProfile(did ?? '', call).catch(err => {
+          if (getErrorCode(err) === 'NotFound') return null
+          return {_error: err} // Non-404 error
+        }),
+      ])
+
+      let result: ProfileViewDetailedWithPrivate = atprotoRes.data
+
+      if (privateResult && '_error' in privateResult) {
+        // Load error - flag it so Edit button can be disabled
+        result._privateProfile = {isPrivate: false, loadError: true}
+      } else if (privateResult) {
+        // Private profile found - decrypt and merge
+        const decrypted = await decryptProfileIfAccessible(
+          privateResult,
+          currentAccount?.did ?? '',
+          call,
+        )
+        if (decrypted) {
+          result = mergePrivateProfileData(result, decrypted)
+          result._privateProfile = {
+            isPrivate: true,
+            avatarUri: decrypted.avatarUri,
+            bannerUri: decrypted.bannerUri,
+          }
+        }
+      }
+      // If no private profile, _privateProfile remains undefined (public mode)
+
+      return result
     },
     placeholderData: () => {
       if (!did) return
@@ -87,12 +154,55 @@ export function useProfileQuery({
 
 export function useProfilesQuery({handles}: {handles: string[]}) {
   const agent = useAgent()
+  const {currentAccount} = useSession()
+
   return useQuery({
     staleTime: STALE.MINUTES.FIVE,
     queryKey: profilesQueryKey(handles),
     queryFn: async () => {
+      // Create call function for Speakeasy API
+      const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+        callSpeakeasyApiWithAgent(agent, options)
+
       const res = await agent.getProfiles({actors: handles})
-      return res.data
+
+      // Extract DIDs from the returned profiles
+      const dids = res.data.profiles.map(p => p.did)
+
+      // Fetch private profiles in batch (silent failure)
+      let privateProfiles: Awaited<ReturnType<typeof getPrivateProfiles>> = []
+      try {
+        privateProfiles = await getPrivateProfiles(dids, call)
+      } catch {
+        // Silent fallback - show ATProto data only
+      }
+
+      // Create a map of DID -> decrypted private data
+      const privateDataMap = new Map<
+        string,
+        Awaited<ReturnType<typeof decryptProfileIfAccessible>>
+      >()
+      for (const encrypted of privateProfiles) {
+        const decrypted = await decryptProfileIfAccessible(
+          encrypted,
+          currentAccount?.did ?? '',
+          call,
+        )
+        if (decrypted) {
+          privateDataMap.set(encrypted.did, decrypted)
+        }
+      }
+
+      // Merge private data into profiles
+      const mergedProfiles = res.data.profiles.map(profile => {
+        const privateData = privateDataMap.get(profile.did)
+        return mergePrivateProfileData(profile, privateData)
+      })
+
+      return {
+        ...res.data,
+        profiles: mergedProfiles,
+      }
     },
   })
 }
@@ -124,6 +234,10 @@ interface ProfileUpdateParams {
   newUserAvatar?: RNImage | undefined | null
   newUserBanner?: RNImage | undefined | null
   checkCommitted?: (res: AppBskyActorGetProfile.Response) => boolean
+  // Private profile fields
+  isPrivate?: boolean
+  existingPrivateAvatarUri?: string // Speakeasy media key for migration
+  existingPrivateBannerUri?: string // Speakeasy media key for migration
 }
 export function useProfileUpdateMutation() {
   const queryClient = useQueryClient()
@@ -135,84 +249,176 @@ export function useProfileUpdateMutation() {
       newUserAvatar,
       newUserBanner,
       checkCommitted,
+      isPrivate,
+      existingPrivateAvatarUri,
+      existingPrivateBannerUri,
     }) => {
-      let newUserAvatarPromise:
-        | Promise<ComAtprotoRepoUploadBlob.Response>
-        | undefined
-      if (newUserAvatar) {
-        newUserAvatarPromise = uploadBlob(
-          agent,
-          newUserAvatar.path,
-          newUserAvatar.mime,
-        )
-      }
-      let newUserBannerPromise:
-        | Promise<ComAtprotoRepoUploadBlob.Response>
-        | undefined
-      if (newUserBanner) {
-        newUserBannerPromise = uploadBlob(
-          agent,
-          newUserBanner.path,
-          newUserBanner.mime,
-        )
-      }
-      await agent.upsertProfile(async existing => {
-        existing = existing || {}
-        if (typeof updates === 'function') {
-          existing = updates(existing)
-        } else {
-          existing.displayName = updates.displayName
-          existing.description = updates.description
-          if ('pinnedPost' in updates) {
-            existing.pinnedPost = updates.pinnedPost
+      // Create call function for Speakeasy API
+      const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+        callSpeakeasyApiWithAgent(agent, options)
+
+      if (isPrivate) {
+        // Becoming private or staying private:
+        // 1. Save to Speakeasy first (handles media upload internally)
+        // 2. Then anonymize ATProto profile
+
+        await savePrivateProfile(agent, call, queryClient, {
+          displayName:
+            typeof updates === 'function' ? '' : updates.displayName || '',
+          description:
+            typeof updates === 'function' ? '' : updates.description || '',
+          isPublic: false,
+          newAvatar: newUserAvatar
+            ? {path: newUserAvatar.path, mime: newUserAvatar.mime}
+            : newUserAvatar, // null or undefined
+          newBanner: newUserBanner
+            ? {path: newUserBanner.path, mime: newUserBanner.mime}
+            : newUserBanner,
+          // If no new avatar, pass the existing ATProto avatar for migration
+          existingAvatarUri:
+            newUserAvatar === undefined
+              ? (profile.avatar as string | undefined)
+              : undefined,
+          existingBannerUri:
+            newUserBanner === undefined
+              ? (profile.banner as string | undefined)
+              : undefined,
+        })
+
+        // Anonymize ATProto profile
+        const anonymized = anonymizeAtProtoProfile()
+        await agent.upsertProfile(() => ({
+          displayName: anonymized.displayName,
+          description: anonymized.description,
+          avatar: undefined,
+          banner: undefined,
+        }))
+
+        await whenAppViewReady(agent, profile.did, res => {
+          return (
+            res.data.displayName === anonymized.displayName &&
+            res.data.description === anonymized.description
+          )
+        })
+      } else {
+        // Becoming public or staying public:
+        // 1. Migrate media from Speakeasy if needed
+        // 2. Delete private profile from Speakeasy (ignore NotFound)
+        // 3. Save to ATProto normally
+
+        let newUserAvatarPromise:
+          | Promise<ComAtprotoRepoUploadBlob.Response>
+          | undefined
+        let newUserBannerPromise:
+          | Promise<ComAtprotoRepoUploadBlob.Response>
+          | undefined
+
+        if (newUserAvatar) {
+          // User selected a new avatar
+          newUserAvatarPromise = uploadBlob(
+            agent,
+            newUserAvatar.path,
+            newUserAvatar.mime,
+          )
+        } else if (
+          newUserAvatar === undefined &&
+          existingPrivateAvatarUri &&
+          !profile.avatar
+        ) {
+          // No new avatar, but we have a private avatar to migrate
+          // (profile.avatar is empty because user was private)
+          newUserAvatarPromise = migrateMediaToAtProto(
+            existingPrivateAvatarUri,
+            agent,
+          )
+        }
+
+        if (newUserBanner) {
+          // User selected a new banner
+          newUserBannerPromise = uploadBlob(
+            agent,
+            newUserBanner.path,
+            newUserBanner.mime,
+          )
+        } else if (
+          newUserBanner === undefined &&
+          existingPrivateBannerUri &&
+          !profile.banner
+        ) {
+          // No new banner, but we have a private banner to migrate
+          newUserBannerPromise = migrateMediaToAtProto(
+            existingPrivateBannerUri,
+            agent,
+          )
+        }
+
+        // Delete private profile from Speakeasy (ignore NotFound)
+        try {
+          await deletePrivateProfile(call)
+        } catch (error) {
+          if (getErrorCode(error) !== 'NotFound') {
+            throw error
           }
         }
-        if (newUserAvatarPromise) {
-          const res = await newUserAvatarPromise
-          existing.avatar = res.data.blob
-        } else if (newUserAvatar === null) {
-          existing.avatar = undefined
-        }
-        if (newUserBannerPromise) {
-          const res = await newUserBannerPromise
-          existing.banner = res.data.blob
-        } else if (newUserBanner === null) {
-          existing.banner = undefined
-        }
-        return existing
-      })
-      await whenAppViewReady(
-        agent,
-        profile.did,
-        checkCommitted ||
-          (res => {
-            if (typeof newUserAvatar !== 'undefined') {
-              if (newUserAvatar === null && res.data.avatar) {
-                // url hasnt cleared yet
-                return false
-              } else if (res.data.avatar === profile.avatar) {
-                // url hasnt changed yet
-                return false
+
+        await agent.upsertProfile(async existing => {
+          existing = existing || {}
+          if (typeof updates === 'function') {
+            existing = updates(existing)
+          } else {
+            existing.displayName = updates.displayName
+            existing.description = updates.description
+            if ('pinnedPost' in updates) {
+              existing.pinnedPost = updates.pinnedPost
+            }
+          }
+          if (newUserAvatarPromise) {
+            const res = await newUserAvatarPromise
+            existing.avatar = res.data.blob
+          } else if (newUserAvatar === null) {
+            existing.avatar = undefined
+          }
+          if (newUserBannerPromise) {
+            const res = await newUserBannerPromise
+            existing.banner = res.data.blob
+          } else if (newUserBanner === null) {
+            existing.banner = undefined
+          }
+          return existing
+        })
+        await whenAppViewReady(
+          agent,
+          profile.did,
+          checkCommitted ||
+            (res => {
+              if (typeof newUserAvatar !== 'undefined') {
+                if (newUserAvatar === null && res.data.avatar) {
+                  // url hasnt cleared yet
+                  return false
+                } else if (res.data.avatar === profile.avatar) {
+                  // url hasnt changed yet
+                  return false
+                }
               }
-            }
-            if (typeof newUserBanner !== 'undefined') {
-              if (newUserBanner === null && res.data.banner) {
-                // url hasnt cleared yet
-                return false
-              } else if (res.data.banner === profile.banner) {
-                // url hasnt changed yet
-                return false
+              if (typeof newUserBanner !== 'undefined') {
+                if (newUserBanner === null && res.data.banner) {
+                  // url hasnt cleared yet
+                  return false
+                } else if (res.data.banner === profile.banner) {
+                  // url hasnt changed yet
+                  return false
+                }
               }
-            }
-            if (typeof updates === 'function') {
-              return true
-            }
-            return (
-              res.data.displayName === updates.displayName &&
-              res.data.description === updates.description
-            )
-          }),
-      )
+              if (typeof updates === 'function') {
+                return true
+              }
+              return (
+                res.data.displayName === updates.displayName &&
+                res.data.description === updates.description
+              )
+            }),
+        )
+      }
     },
     onSuccess(data, variables) {
       // invalidate cache

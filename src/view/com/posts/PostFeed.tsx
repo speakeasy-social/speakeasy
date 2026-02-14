@@ -48,6 +48,7 @@ import {
 } from '#/state/preferences/pause-feed-cta-stats'
 import {useTrendingSettings} from '#/state/preferences/trending'
 import {STALE} from '#/state/queries'
+import {useFeedPrivateProfiles} from '#/state/queries/feed-private-profiles'
 import {
   FeedDescriptor,
   FeedParams,
@@ -270,6 +271,12 @@ let PostFeed = ({
     isFetchingNextPage,
     fetchNextPage,
   } = usePostFeedQuery(feed, feedParams, opts)
+
+  // Enhance author profiles with private profile data
+  useFeedPrivateProfiles(RQKEY(feed, feedParams), {
+    enabled: !!currentAccount,
+  })
+
   const lastFetchedAt = data?.pages[0].fetchedAt
   if (lastFetchedAt) {
     lastFetchRef.current = lastFetchedAt
