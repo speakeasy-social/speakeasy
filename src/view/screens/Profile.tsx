@@ -17,6 +17,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import {ensureSpkeasyMention} from '#/lib/api/private-profiles'
 import {useSetTitle} from '#/lib/hooks/useSetTitle'
 import {ComposeIcon2} from '#/lib/icons'
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
@@ -518,6 +519,7 @@ function useRichText(text: string): [RichTextAPI, boolean] {
       // new each time
       const resolvedRT = new RichTextAPI({text})
       await resolvedRT.detectFacets(agent)
+      ensureSpkeasyMention(resolvedRT)
       if (!ignore) {
         setResolvedRT(resolvedRT)
       }
