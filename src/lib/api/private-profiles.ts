@@ -1,7 +1,9 @@
 import {
   AppBskyActorProfile,
+  AppBskyRichtextFacet,
   BskyAgent,
   ComAtprotoRepoUploadBlob,
+  RichText as RichTextAPI,
 } from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
@@ -20,6 +22,61 @@ import {
   getPrivateKey,
   getPrivateKeyOrWarn,
 } from './user-keys'
+
+/**
+ * Constants for the @spkeasy.social mention in anonymized profiles
+ */
+export const SPKEASY_MENTION = '@spkeasy.social'
+export const SPKEASY_DID = 'did:plc:spkeasy.social'
+export const DEFAULT_PRIVATE_DESCRIPTION = `This is a private profile only visible to trusted followers on ${SPKEASY_MENTION}`
+
+/**
+ * Ensures @spkeasy.social in a RichText resolves to the correct DID.
+ * Should be called after detectFacets() to fix up the mention DID.
+ *
+ * Follows the same pattern as createDefaultHiddenMessage() in src/lib/api/index.ts
+ */
+export function ensureSpkeasyMention(rt: RichTextAPI): void {
+  const text = rt.text
+  const mentionIndex = text.indexOf(SPKEASY_MENTION)
+  if (mentionIndex === -1) return
+
+  const encoder = new TextEncoder()
+  const byteStart = encoder.encode(text.slice(0, mentionIndex)).byteLength
+  const byteEnd = byteStart + encoder.encode(SPKEASY_MENTION).byteLength
+
+  // Check if detectFacets already found this mention
+  if (rt.facets) {
+    for (const facet of rt.facets) {
+      if (
+        facet.index.byteStart === byteStart &&
+        facet.index.byteEnd === byteEnd
+      ) {
+        // Fix up the DID on the existing mention facet
+        for (const feature of facet.features) {
+          if (AppBskyRichtextFacet.isMention(feature)) {
+            feature.did = SPKEASY_DID
+            return
+          }
+        }
+      }
+    }
+  }
+
+  // No existing facet found — add one
+  if (!rt.facets) {
+    rt.facets = []
+  }
+  rt.facets.push({
+    index: {byteStart, byteEnd},
+    features: [
+      {
+        $type: 'app.bsky.richtext.facet#mention',
+        did: SPKEASY_DID,
+      },
+    ],
+  })
+}
 
 /**
  * Private profile types for encrypted profile data
@@ -371,11 +428,12 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
  * Creates an anonymized ATProto profile record for private profile mode.
  * Removes avatar/banner and sets placeholder display name and bio.
  */
-export function anonymizeAtProtoProfile(): AppBskyActorProfile.Record {
+export function anonymizeAtProtoProfile(
+  publicDescription?: string,
+): AppBskyActorProfile.Record {
   return {
     displayName: PRIVATE_PROFILE_DISPLAY_NAME,
-    description:
-      'This is a private profile only visible to trusted followers on @spkeasy.social',
+    description: publicDescription || DEFAULT_PRIVATE_DESCRIPTION,
   }
 }
 

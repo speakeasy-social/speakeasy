@@ -410,7 +410,7 @@ export function useProfileUpdateMutation() {
         })
 
         // Anonymize ATProto profile (clears native pronouns field)
-        const anonymized = anonymizeAtProtoProfile()
+        const anonymized = anonymizeAtProtoProfile(publicDescription)
         await agent.upsertProfile(existing => ({
           ...existing,
           displayName: anonymized.displayName,
