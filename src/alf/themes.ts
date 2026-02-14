@@ -182,6 +182,8 @@ export function createThemes({
     negative_900: color.red_900,
     negative_950: color.red_950,
     negative_975: color.red_975,
+
+    gray: '#F1F3F5',
   } as const
 
   const darkPalette: Palette = {
@@ -244,6 +246,8 @@ export function createThemes({
     negative_900: color.red_100,
     negative_950: color.red_50,
     negative_975: color.red_25,
+
+    gray: '#2F3336',
   } as const
 
   const dimPalette: Palette = {
@@ -370,6 +374,9 @@ export function createThemes({
       bg_contrast_975: {
         backgroundColor: lightPalette.contrast_975,
       },
+      bg_gray: {
+        backgroundColor: lightPalette.gray,
+      },
       border_contrast_low: {
         borderColor: lightPalette.contrast_100,
       },
@@ -455,6 +462,9 @@ export function createThemes({
       },
       bg_contrast_975: {
         backgroundColor: darkPalette.contrast_975,
+      },
+      bg_gray: {
+        backgroundColor: darkPalette.gray,
       },
       border_contrast_low: {
         borderColor: darkPalette.contrast_100,
@@ -546,6 +556,9 @@ export function createThemes({
       },
       bg_contrast_975: {
         backgroundColor: dimPalette.contrast_975,
+      },
+      bg_gray: {
+        backgroundColor: dimPalette.gray,
       },
       border_contrast_low: {
         borderColor: dimPalette.contrast_100,

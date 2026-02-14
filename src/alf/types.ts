@@ -69,6 +69,8 @@ export type Palette = {
   negative_900: string
   negative_950: string
   negative_975: string
+
+  gray: string
 }
 export type ThemedAtoms = {
   text: {
@@ -126,6 +128,9 @@ export type ThemedAtoms = {
     backgroundColor: string
   }
   bg_contrast_975: {
+    backgroundColor: string
+  }
+  bg_gray: {
     backgroundColor: string
   }
   border_contrast_low: {
