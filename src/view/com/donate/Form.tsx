@@ -43,6 +43,16 @@ export function Form({
     // Convert the string value to Stripe's smallest unit here
     const amount = convertAmount(value, currency)
 
+    // Store donation info for the thank you page
+    localStorage.setItem(
+      'pendingDonation',
+      JSON.stringify({
+        amount: value,
+        currency,
+        monthly: mode === 'subscription',
+      }),
+    )
+
     return await call({
       api: 'social.spkeasy.actor.donate',
       method: 'POST',

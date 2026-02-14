@@ -84,7 +84,7 @@ export function BottomBarWeb() {
   const isIntentScreen = currentRouteInfo.name === 'Intent'
   const isDonationScreen =
     currentRouteInfo.name === 'Donate' ||
-    currentRouteInfo.name === 'DonateThanks'
+    currentRouteInfo.name === 'SupportersAdd'
 
   if (isDonationScreen) {
     return null

@@ -6,11 +6,11 @@ import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {atoms as a, useBreakpoints, useTheme, web} from '#/alf'
 import * as Layout from '#/components/Layout'
-import {Thanks} from '../com/donate/Thanks'
+import {SupportersAddForm} from '../com/supporters/SupportersAddForm'
 import {Logo} from '../icons/Logo'
 
-type Props = NativeStackScreenProps<CommonNavigatorParams, 'DonateThanks'>
-export function DonateThanksScreen({}: Props) {
+type Props = NativeStackScreenProps<CommonNavigatorParams, 'SupportersAdd'>
+export function SupportersAddScreen({}: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
   const {onPress: onPressLogo} = useLinkProps({to: '/'})
   const {gtMobile} = useBreakpoints()
@@ -25,7 +25,7 @@ export function DonateThanksScreen({}: Props) {
   )
 
   return (
-    <Layout.Screen testID="donateThanksScreen">
+    <Layout.Screen testID="supportersAddScreen">
       <View
         style={[
           a.w_full,
@@ -62,7 +62,7 @@ export function DonateThanksScreen({}: Props) {
       </View>
       <Layout.Content
         contentContainerStyle={[needsPadding && {paddingTop: 100}]}>
-        <Thanks />
+        <SupportersAddForm />
       </Layout.Content>
     </Layout.Screen>
   )

@@ -9,7 +9,7 @@ export type CommonNavigatorParams = {
   NotFound: undefined
   Lists: undefined
   Donate: undefined
-  DonateThanks: undefined
+  SupportersAdd: undefined
   Moderation: undefined
   ModerationModlists: undefined
   ModerationMutedAccounts: undefined
@@ -42,6 +42,7 @@ export type CommonNavigatorParams = {
   SharedPreferencesTester: undefined
   Log: undefined
   Support: undefined
+  Supporters: undefined
   PrivacyPolicy: undefined
   TermsOfService: undefined
   CommunityGuidelines: undefined
