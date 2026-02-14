@@ -32,6 +32,7 @@ import {InlineLinkText, Link} from '#/components/Link'
 import {Loader} from '#/components/Loader'
 import * as Pills from '#/components/Pills'
 import {Portal} from '#/components/Portal'
+import {Pronouns} from '#/components/Pronouns'
 import {RichText} from '#/components/RichText'
 import {Text} from '#/components/Typography'
 import {ProfileHoverCardProps} from './types'
@@ -478,6 +479,7 @@ function Inner({
           </Text>
 
           <ProfileHeaderHandle profile={profileShadow} disableTaps />
+          <Pronouns did={profile.did} profile={profile} size="sm" />
         </View>
       </Link>
 

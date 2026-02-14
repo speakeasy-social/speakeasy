@@ -28,6 +28,7 @@ import {Check_Stroke2_Corner0_Rounded as Check} from '#/components/icons/Check'
 import {PlusLarge_Stroke2_Corner0_Rounded as Plus} from '#/components/icons/Plus'
 import {Link as InternalLink, LinkProps} from '#/components/Link'
 import * as Prompt from '#/components/Prompt'
+import {Pronouns} from '#/components/Pronouns'
 import {RichText} from '#/components/RichText'
 import {Text} from '#/components/Typography'
 
@@ -190,6 +191,7 @@ export function NameAndHandle({
         style={[a.leading_snug, t.atoms.text_contrast_medium]}
         numberOfLines={1}>
         {handle}
+        <Pronouns did={profile.did} profile={profile} size="sm" prefix=" · " />
       </Text>
     </View>
   )

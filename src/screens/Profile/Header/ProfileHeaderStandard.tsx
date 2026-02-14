@@ -35,6 +35,7 @@ import {
   shouldShowKnownFollowers,
 } from '#/components/KnownFollowers'
 import * as Prompt from '#/components/Prompt'
+import {Pronouns} from '#/components/Pronouns'
 import {RichText} from '#/components/RichText'
 import {ProfileHeaderDisplayName} from './DisplayName'
 import {EditProfileDialog} from './EditProfileDialog'
@@ -217,6 +218,7 @@ let ProfileHeaderStandard = ({
         <View style={[a.flex_col, a.gap_2xs, a.pt_2xs, a.pb_sm]}>
           <ProfileHeaderDisplayName profile={profile} moderation={moderation} />
           <ProfileHeaderHandle profile={profile} />
+          <Pronouns did={profile.did} profile={profile} />
         </View>
         {!isPlaceholderProfile && !isBlockedUser && (
           <View style={a.gap_md}>
