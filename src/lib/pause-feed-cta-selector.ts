@@ -1,5 +1,9 @@
 import {CTADisplayStats} from '#/state/preferences/pause-feed-cta-stats'
-import {FEED_PAUSE_CTAS, PauseFeedCTA} from '#/constants/pause-feed-cta'
+import {
+  DEBUG_FEED_PAUSE,
+  FEED_PAUSE_CTAS,
+  PauseFeedCTA,
+} from '#/constants/pause-feed-cta'
 
 const ROLLING_WINDOW_SIZE = 30
 
@@ -12,6 +16,11 @@ export function selectCTA(
   stats: CTADisplayStats,
   hasSeenOnboarding: boolean,
 ): PauseFeedCTA | 'onboarding' | 'default' {
+  if (__DEV__ && DEBUG_FEED_PAUSE) {
+    const debugCTA = FEED_PAUSE_CTAS.find(cta => cta.id === DEBUG_FEED_PAUSE)
+    if (debugCTA) return debugCTA
+  }
+
   // First pause: show onboarding if not seen
   if (stats.totalPausesDisplayed === 0 && !hasSeenOnboarding) {
     return 'onboarding'
