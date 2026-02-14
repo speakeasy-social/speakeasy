@@ -1,0 +1,35 @@
+export type SupporterTier =
+  | 'founder'
+  | 'supporter'
+  | 'contributor'
+  | 'engineering'
+  | 'qa'
+  | 'design'
+
+export type RelationshipPriority =
+  | 'self'
+  | 'trusts-me'
+  | 'i-trust'
+  | 'i-follow'
+  | 'follows-me'
+  | 'other'
+
+export interface TestimonialContribution {
+  contribution: string
+  public?: {recognition?: string; isRegularGift?: boolean} | null
+}
+
+export interface TestimonialAuthor {
+  did: string
+  handle: string
+  displayName?: string
+  avatar?: string
+}
+
+export interface Testimonial {
+  id: string
+  author: TestimonialAuthor
+  message: string
+  contributions: TestimonialContribution[]
+  relationship: RelationshipPriority
+}

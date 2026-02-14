@@ -11,6 +11,7 @@ export const router = new Router({
   Lists: '/lists',
   Donate: '/donate',
   DonateThanks: '/donate/thanks',
+  Supporters: '/supporters',
   // moderation
   Moderation: '/moderation',
   ModerationModlists: '/moderation/modlists',
