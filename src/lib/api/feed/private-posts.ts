@@ -12,11 +12,7 @@ import {
 
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {
-  getCachedPrivateKey,
-  getPrivateKeyOrWarn,
-  SpeakeasyPrivateKey,
-} from '#/lib/api/user-keys'
+import {getCachedPrivateKey, SpeakeasyPrivateKey} from '#/lib/api/user-keys'
 import {decryptBatch} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
@@ -558,16 +554,11 @@ export async function decryptPostsAndFetchAuthorProfiles(
   posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
-  const privateKey = await getPrivateKeyOrWarn(agent.session!.did, options =>
-    callSpeakeasyApiWithAgent(agent, options),
+  const privateKey = await getCachedPrivateKey(
+    agent.session!.did,
+    options => callSpeakeasyApiWithAgent(agent, options),
+    false,
   )
-
-  if (!privateKey) {
-    return {
-      posts: [],
-      authorProfileMap: authorProfileMap ?? new Map(),
-    }
-  }
 
   /** Decrypt the posts and fetch author profiles */
   let authorDids = [...new Set(encryptedPosts.map(post => post.authorDid))]
@@ -579,7 +570,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 
   const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey),
+    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey!),
   ])
 
   const mergedAuthorProfileMap = authorProfileMap
