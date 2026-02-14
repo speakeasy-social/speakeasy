@@ -143,10 +143,19 @@ export function PrivacyAndSecuritySettingsScreen({}: Props) {
                   <Admonition.Text>
                     <Trans>
                       Note: Bluesky is an open and public network. This setting
-                      only limits the visibility of your content on the Bluesky
-                      app and website, and other apps may not respect this
-                      setting. Your content may still be shown to logged-out
-                      users by other apps and websites.
+                      only limits the visibility of your content on Speakeasy
+                      and Bluesky, and other apps may not respect this setting.
+                      Your content may still be shown to logged-out users by
+                      other apps and websites.
+                    </Trans>
+                  </Admonition.Text>
+                  <Admonition.Text>
+                    <Trans>
+                      On Speakeasy, when you post to your trusted audience, your
+                      posts are encrypted and only visible to those you trust.
+                      If you set your profile to trusted, then your avatar,
+                      display name and description are also encrypted and only
+                      visible to those you trust.
                     </Trans>
                   </Admonition.Text>
                   <Admonition.Text>
