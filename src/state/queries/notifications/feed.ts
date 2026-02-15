@@ -136,8 +136,6 @@ export function useNotificationFeedQuery(opts: {
     enabled,
     select: useCallback(
       (data: InfiniteData<FeedPage>) => {
-        const {moderationOpts, hiddenReplyUris} = selectArgs
-
         // Keep track of the last run and whether we can reuse
         // some already selected pages from there.
         let reusedPages = []
@@ -192,7 +190,7 @@ export function useNotificationFeedQuery(opts: {
                     const isHiddenReply =
                       item.type === 'reply' &&
                       item.subjectUri &&
-                      hiddenReplyUris.has(item.subjectUri)
+                      selectArgs.hiddenReplyUris.has(item.subjectUri)
                     return !isHiddenReply
                   })
                   .filter(item => {
@@ -207,7 +205,10 @@ export function useNotificationFeedQuery(opts: {
                        * `record` is a post, we know it's a post view.
                        */
                       if (AppBskyFeedPost.isRecord(item.subject?.record)) {
-                        const mod = moderatePost(item.subject, moderationOpts!)
+                        const mod = moderatePost(
+                          item.subject,
+                          selectArgs.moderationOpts!,
+                        )
                         if (mod.ui('contentList').filter) {
                           return false
                         }
