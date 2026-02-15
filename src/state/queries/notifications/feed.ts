@@ -32,6 +32,10 @@ import {
 } from '@tanstack/react-query'
 
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
+import {
+  getCachedPrivateProfile,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {useAgent} from '#/state/session'
 import {useThreadgateHiddenReplyUris} from '#/state/threadgate-hidden-replies'
 import {useModerationOpts} from '../../preferences/moderation-opts'
@@ -41,6 +45,7 @@ import {
   embedViewRecordToPostView,
   getEmbeddedPost,
 } from '../util'
+import {mergeNotificationItemWithPrivateProfiles} from './private-profiles'
 import {FeedPage} from './types'
 import {useUnreadNotificationsApi} from './unread'
 import {fetchPage} from './util'
@@ -67,13 +72,15 @@ export function useNotificationFeedQuery(opts: {
   const enabled = opts.enabled !== false
   const filter = opts.filter
   const {uris: hiddenReplyUris} = useThreadgateHiddenReplyUris()
+  const privateProfileVersion = usePrivateProfileCacheVersion()
 
   const selectArgs = useMemo(() => {
     return {
       moderationOpts,
       hiddenReplyUris,
+      privateProfileVersion,
     }
-  }, [moderationOpts, hiddenReplyUris])
+  }, [moderationOpts, hiddenReplyUris, privateProfileVersion])
   const lastRun = useRef<{
     data: InfiniteData<FeedPage>
     args: typeof selectArgs
@@ -207,7 +214,13 @@ export function useNotificationFeedQuery(opts: {
                       }
                     }
                     return true
-                  }),
+                  })
+                  .map(item =>
+                    mergeNotificationItemWithPrivateProfiles(
+                      item,
+                      getCachedPrivateProfile,
+                    ),
+                  ),
               }
             }),
           ],

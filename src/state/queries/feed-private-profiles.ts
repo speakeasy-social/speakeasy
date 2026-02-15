@@ -1,12 +1,12 @@
 import {AppBskyFeedDefs} from '@atproto/api'
-import {InfiniteData, QueryKey, useQueryClient} from '@tanstack/react-query'
+import {QueryKey} from '@tanstack/react-query'
 
 import {
   mergePrivateProfileData,
   PrivateProfileData,
 } from '#/lib/api/private-profiles'
 import {FeedPageUnselected, RQKEY_ROOT} from './post-feed'
-import {usePrivateProfileEnhancer} from './use-private-profile-enhancer'
+import {usePrivateProfileFetcher} from './use-private-profile-fetcher'
 
 /**
  * Extracts unique author DIDs from feed pages.
@@ -41,97 +41,103 @@ export function extractDidsFromFeed(pages: FeedPageUnselected[]): Set<string> {
 }
 
 /**
- * Updates the feed cache with private profile data.
- * Mutates FeedPageUnselected to trigger select callback re-run.
+ * Pure function to merge private profile data into a single feed item.
+ * Returns a new item with private profiles merged into:
+ * post author, reply parent/root authors, repost author.
  */
-export function updateFeedCacheWithPrivateProfiles(
-  queryClient: ReturnType<typeof useQueryClient>,
-  feedQueryKey: QueryKey,
-  privateProfiles: Map<string, PrivateProfileData>,
-): boolean {
-  const queryData =
-    queryClient.getQueryData<InfiniteData<FeedPageUnselected>>(feedQueryKey)
-
-  if (!queryData?.pages) return false
-
+export function mergeFeedItemWithPrivateProfiles(
+  item: AppBskyFeedDefs.FeedViewPost,
+  getProfile: (did: string) => PrivateProfileData | undefined,
+): AppBskyFeedDefs.FeedViewPost {
   let modified = false
+  let newPost = item.post
+  let newReply = item.reply
+  let newReason = item.reason
 
-  for (const page of queryData.pages) {
-    for (const item of page.feed) {
-      // Enhance post author
-      const authorPrivate = privateProfiles.get(item.post.author.did)
-      if (authorPrivate) {
-        item.post.author = mergePrivateProfileData(
-          item.post.author,
-          authorPrivate,
-        )
-        modified = true
-      }
+  // Enhance post author
+  const authorPrivate = getProfile(item.post.author.did)
+  if (authorPrivate) {
+    newPost = {
+      ...item.post,
+      author: mergePrivateProfileData(item.post.author, authorPrivate),
+    }
+    modified = true
+  }
 
-      // Enhance reply parent author
-      if (item.reply?.parent && AppBskyFeedDefs.isPostView(item.reply.parent)) {
-        const parentPrivate = privateProfiles.get(item.reply.parent.author.did)
-        if (parentPrivate) {
-          item.reply.parent.author = mergePrivateProfileData(
+  // Enhance reply parent author
+  if (item.reply?.parent && AppBskyFeedDefs.isPostView(item.reply.parent)) {
+    const parentPrivate = getProfile(item.reply.parent.author.did)
+    if (parentPrivate) {
+      newReply = {
+        ...item.reply,
+        parent: {
+          ...item.reply.parent,
+          author: mergePrivateProfileData(
             item.reply.parent.author,
             parentPrivate,
-          )
-          modified = true
-        }
+          ),
+        },
       }
+      modified = true
+    }
+  }
 
-      // Enhance reply root author
-      if (item.reply?.root && AppBskyFeedDefs.isPostView(item.reply.root)) {
-        const rootPrivate = privateProfiles.get(item.reply.root.author.did)
-        if (rootPrivate) {
-          item.reply.root.author = mergePrivateProfileData(
-            item.reply.root.author,
-            rootPrivate,
-          )
-          modified = true
-        }
+  // Enhance reply root author
+  if (item.reply?.root && AppBskyFeedDefs.isPostView(item.reply.root)) {
+    const rootPrivate = getProfile(item.reply.root.author.did)
+    if (rootPrivate) {
+      const baseReply = newReply ?? item.reply
+      newReply = {
+        ...baseReply,
+        root: {
+          ...item.reply.root,
+          author: mergePrivateProfileData(item.reply.root.author, rootPrivate),
+        },
       }
+      modified = true
+    }
+  }
 
-      // Enhance repost author
-      if (AppBskyFeedDefs.isReasonRepost(item.reason)) {
-        const repostPrivate = privateProfiles.get(item.reason.by.did)
-        if (repostPrivate) {
-          item.reason.by = mergePrivateProfileData(
-            item.reason.by,
-            repostPrivate,
-          )
-          modified = true
-        }
+  // Enhance repost author
+  if (AppBskyFeedDefs.isReasonRepost(item.reason)) {
+    const repostPrivate = getProfile(item.reason.by.did)
+    if (repostPrivate) {
+      newReason = {
+        ...item.reason,
+        by: mergePrivateProfileData(item.reason.by, repostPrivate),
       }
+      modified = true
     }
   }
 
   if (modified) {
-    // Trigger re-render by setting data with new reference
-    queryClient.setQueryData(feedQueryKey, {...queryData})
+    return {
+      ...item,
+      post: newPost,
+      reply: newReply,
+      reason: newReason,
+    }
   }
-
-  return modified
+  return item
 }
 
 /**
- * Hook to enhance feed author profiles with private profile data.
+ * Hook to fetch private profiles for feed authors.
  *
  * Watches the feed cache for changes, extracts unique author DIDs,
- * batch fetches their private profiles, and updates the cache.
+ * and batch fetches their private profiles into the module-level cache.
  *
- * @param feedQueryKey - The React Query key for the feed (from RQKEY)
- * @param options - Optional configuration
+ * Does NOT mutate the feed query cache — merging happens
+ * in the post-feed.ts select callback via mergeFeedItemWithPrivateProfiles.
  */
 export function useFeedPrivateProfiles(
   feedQueryKey: QueryKey,
   options?: {enabled?: boolean},
 ) {
-  usePrivateProfileEnhancer<FeedPageUnselected>({
+  usePrivateProfileFetcher<FeedPageUnselected>({
     queryKey: feedQueryKey,
     rqKeyRoot: RQKEY_ROOT,
     extractDids: extractDidsFromFeed,
-    updateCache: updateFeedCacheWithPrivateProfiles,
     enabled: options?.enabled,
     logPrefix: 'useFeedPrivateProfiles',
   })
