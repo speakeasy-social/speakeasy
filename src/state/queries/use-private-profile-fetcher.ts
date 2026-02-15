@@ -1,80 +1,67 @@
 import {useCallback, useEffect, useRef} from 'react'
 import {InfiniteData, QueryKey, useQueryClient} from '@tanstack/react-query'
 
-import {
-  fetchPrivateProfiles,
-  PrivateProfileData,
-} from '#/lib/api/private-profiles'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
+import {fetchPrivateProfiles} from '#/lib/api/private-profiles'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {isServiceError, showServiceErrorToast} from '#/lib/api/speakeasy-health'
 import {logger} from '#/logger'
+import {
+  claimDids,
+  isDidChecked,
+  markDidsChecked,
+  releaseDids,
+  upsertCachedPrivateProfiles,
+} from '#/state/cache/private-profile-cache'
 import {useAgent, useSession} from '#/state/session'
 
 export type ExtractDidsFn<TPage> = (pages: TPage[]) => Set<string>
 
-export type UpdateCacheFn = (
-  queryClient: ReturnType<typeof useQueryClient>,
-  queryKey: QueryKey,
-  privateProfiles: Map<string, PrivateProfileData>,
-) => boolean
-
-export interface UsePrivateProfileEnhancerOptions<TPage> {
+export interface UsePrivateProfileFetcherOptions<TPage> {
   queryKey: QueryKey
   rqKeyRoot: string
   extractDids: ExtractDidsFn<TPage>
-  updateCache: UpdateCacheFn
   enabled?: boolean
   logPrefix?: string
 }
 
 /**
- * Generic hook to enhance cached data with private profile information.
+ * Pure fetcher hook — watches a query cache for new DIDs, batch fetches
+ * their private profiles, and stores results in the module-level cache.
  *
- * Watches a query cache for changes, extracts unique author DIDs using the
- * provided extractor, batch fetches their private profiles, and updates
- * the cache using the provided updater.
- *
- * @param options - Configuration for the enhancer
+ * Does NOT mutate query caches. Consumers use `select` callbacks with
+ * `usePrivateProfileCacheVersion` to merge at read time.
  */
-export function usePrivateProfileEnhancer<TPage>({
+export function usePrivateProfileFetcher<TPage>({
   queryKey,
   rqKeyRoot,
   extractDids,
-  updateCache,
   enabled = true,
-  logPrefix = 'usePrivateProfileEnhancer',
-}: UsePrivateProfileEnhancerOptions<TPage>) {
+  logPrefix = 'usePrivateProfileFetcher',
+}: UsePrivateProfileFetcherOptions<TPage>) {
   const queryClient = useQueryClient()
   const agent = useAgent()
   const {currentAccount} = useSession()
 
-  // Track which DIDs we've already fetched to avoid refetching
-  const fetchedDidsRef = useRef<Set<string>>(new Set())
   const isFetchingRef = useRef(false)
 
-  // Reset fetched DIDs when query key descriptor changes
-  const keyDescriptor = queryKey[1]
-  useEffect(() => {
-    fetchedDidsRef.current.clear()
-  }, [keyDescriptor])
-
-  const enhanceProfiles = useCallback(async () => {
+  const fetchProfiles = useCallback(async () => {
     if (!enabled) return
     if (!currentAccount?.did) return
     if (isFetchingRef.current) return
 
-    // Get current data
     const queryData = queryClient.getQueryData<InfiniteData<TPage>>(queryKey)
-
     if (!queryData?.pages?.length) return
 
-    // Extract DIDs that haven't been fetched yet
+    // Extract DIDs that haven't been checked yet
     const allDids = extractDids(queryData.pages)
-    const newDids = Array.from(allDids).filter(
-      did => !fetchedDidsRef.current.has(did),
-    )
+    const newDids = Array.from(allDids).filter(did => !isDidChecked(did))
 
     if (newDids.length === 0) return
+
+    // Claim DIDs for inflight dedup — skip any already being fetched
+    const claimedDids = claimDids(newDids)
+    if (claimedDids.length === 0) return
 
     isFetchingRef.current = true
 
@@ -83,30 +70,28 @@ export function usePrivateProfileEnhancer<TPage>({
         callSpeakeasyApiWithAgent(agent, opts)
 
       const privateProfiles = await fetchPrivateProfiles(
-        newDids,
+        claimedDids,
         currentAccount.did,
         call,
+        getBaseCdnUrl(agent),
       )
 
-      // Mark all DIDs as fetched (even if no private profile found)
-      for (const did of newDids) {
-        fetchedDidsRef.current.add(did)
+      // Store results in the module-level cache
+      if (privateProfiles.size > 0) {
+        upsertCachedPrivateProfiles(privateProfiles)
       }
 
-      // Update cache if we got any private profiles
-      if (privateProfiles.size > 0) {
-        updateCache(queryClient, queryKey, privateProfiles)
-      }
+      // Mark all claimed DIDs as checked (null sentinel for those without data)
+      markDidsChecked(claimedDids)
     } catch (error) {
       logger.error(`${logPrefix}: failed to fetch`, {error})
       if (isServiceError(error)) {
         showServiceErrorToast()
       }
-      // Mark as fetched to avoid retry loops
-      for (const did of newDids) {
-        fetchedDidsRef.current.add(did)
-      }
+      // Mark as checked to avoid retry loops
+      markDidsChecked(claimedDids)
     } finally {
+      releaseDids(claimedDids)
       isFetchingRef.current = false
     }
   }, [
@@ -117,13 +102,12 @@ export function usePrivateProfileEnhancer<TPage>({
     logPrefix,
     queryClient,
     queryKey,
-    updateCache,
   ])
 
   // Watch for data changes and handle refetch clearing
   useEffect(() => {
-    // Initial enhancement
-    enhanceProfiles()
+    // Initial fetch
+    fetchProfiles()
 
     const queryKeyStr = JSON.stringify(queryKey)
 
@@ -133,14 +117,10 @@ export function usePrivateProfileEnhancer<TPage>({
       if (event.query.queryKey[0] !== rqKeyRoot) return
       if (JSON.stringify(event.query.queryKey) !== queryKeyStr) return
 
-      // Clear tracked DIDs on refetch (pull-to-refresh)
-      if (event.action?.type === 'fetch') {
-        fetchedDidsRef.current.clear()
-      }
-
-      enhanceProfiles()
+      // On success: check for new DIDs and fetch
+      fetchProfiles()
     })
 
     return unsubscribe
-  }, [enhanceProfiles, queryClient, queryKey, rqKeyRoot])
+  }, [fetchProfiles, queryClient, queryKey, rqKeyRoot])
 }

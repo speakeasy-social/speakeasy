@@ -515,7 +515,12 @@ describe('fetchPrivateProfiles', () => {
   it('returns empty Map for empty dids array', async () => {
     mockCall.mockResolvedValue({profiles: []})
 
-    const result = await fetchPrivateProfiles([], mockUserDid, mockCall)
+    const result = await fetchPrivateProfiles(
+      [],
+      mockUserDid,
+      mockCall,
+      'https://cdn.test',
+    )
 
     expect(result.size).toBe(0)
     // Should not call the API for empty input
@@ -541,17 +546,22 @@ describe('fetchPrivateProfiles', () => {
       ['did:plc:alice', 'did:plc:bob'],
       mockUserDid,
       mockCall,
+      'https://cdn.test',
     )
 
     expect(result.size).toBe(2)
     expect(result.get('did:plc:alice')).toEqual({
       displayName: 'Alice',
       description: 'Hello from Alice',
-      avatarUri: 'alice-avatar-key',
+      avatarUri: 'https://cdn.test/alice-avatar-key',
+      rawAvatarUri: 'alice-avatar-key',
+      rawBannerUri: undefined,
     })
     expect(result.get('did:plc:bob')).toEqual({
       displayName: 'Bob',
       description: 'Hello from Bob',
+      rawAvatarUri: undefined,
+      rawBannerUri: undefined,
     })
   })
 
@@ -583,6 +593,7 @@ describe('fetchPrivateProfiles', () => {
       ['did:plc:alice', 'did:plc:bob'],
       mockUserDid,
       mockCall,
+      'https://cdn.test',
     )
 
     expect(result.size).toBe(1)
@@ -595,7 +606,12 @@ describe('fetchPrivateProfiles', () => {
     mockCall.mockRejectedValue(apiError)
 
     await expect(
-      fetchPrivateProfiles(['did:plc:alice'], mockUserDid, mockCall),
+      fetchPrivateProfiles(
+        ['did:plc:alice'],
+        mockUserDid,
+        mockCall,
+        'https://cdn.test',
+      ),
     ).rejects.toThrow('Service unavailable')
   })
 
@@ -615,6 +631,7 @@ describe('fetchPrivateProfiles', () => {
       ['did:plc:alice'],
       mockUserDid,
       mockCall,
+      'https://cdn.test',
     )
 
     expect(result.size).toBe(0)

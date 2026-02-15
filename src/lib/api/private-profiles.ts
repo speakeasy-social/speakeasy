@@ -30,8 +30,10 @@ import {
 export type PrivateProfileData = {
   displayName: string // max 64 graphemes
   description: string // max 256 graphemes
-  avatarUri?: string // speakeasy media service URI
-  bannerUri?: string // speakeasy media service URI
+  avatarUri?: string // resolved CDN URL (for display)
+  bannerUri?: string // resolved CDN URL (for display)
+  rawAvatarUri?: string // original Speakeasy media key (for _privateProfile metadata)
+  rawBannerUri?: string // original Speakeasy media key (for _privateProfile metadata)
 }
 
 /**
@@ -252,10 +254,29 @@ export async function getPrivateProfiles(
  * @param call - The API call function
  * @returns Map of DID to decrypted private profile data
  */
+/**
+ * Resolves avatarUri/bannerUri storage keys to full CDN URLs.
+ * Keys are stored as relative paths (e.g. "media/abc123") and need
+ * the base CDN URL prepended to form valid image URLs.
+ */
+export function resolvePrivateProfileUrls(
+  data: PrivateProfileData,
+  baseUrl: string,
+): PrivateProfileData {
+  return {
+    ...data,
+    rawAvatarUri: data.avatarUri,
+    rawBannerUri: data.bannerUri,
+    avatarUri: data.avatarUri ? `${baseUrl}/${data.avatarUri}` : undefined,
+    bannerUri: data.bannerUri ? `${baseUrl}/${data.bannerUri}` : undefined,
+  }
+}
+
 export async function fetchPrivateProfiles(
   dids: string[],
   userDid: string,
   call: SpeakeasyApiCall,
+  baseUrl: string,
 ): Promise<Map<string, PrivateProfileData>> {
   const encrypted = await getPrivateProfiles(dids, call)
   if (encrypted.length === 0) return new Map()
@@ -282,7 +303,8 @@ export async function fetchPrivateProfiles(
 
   const result = new Map<string, PrivateProfileData>()
   for (const [did, content] of decryptedMap) {
-    result.set(did, JSON.parse(content) as PrivateProfileData)
+    const data = JSON.parse(content) as PrivateProfileData
+    result.set(did, resolvePrivateProfileUrls(data, baseUrl))
   }
   return result
 }
