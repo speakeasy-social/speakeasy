@@ -46,6 +46,7 @@ export function getHost(agent: BskyAgent, endpoint: string): string {
       host: 'http://localhost:3006',
     },
     {prefix: 'social.spkeasy.actor', host: 'http://localhost:3005'},
+    {prefix: 'social.spkeasy.media', host: 'http://localhost:3003'},
     // Catch all
     {prefix: 'social.spkeasy', host: 'http://localhost:3002'},
   ]
