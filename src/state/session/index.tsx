@@ -3,6 +3,7 @@ import {AtpSessionEvent, BskyAgent} from '@atproto/api'
 
 import {logEvent} from '#/lib/statsig/statsig'
 import {isWeb} from '#/platform/detection'
+import {clearAll as clearPrivateProfileCache} from '#/state/cache/private-profile-cache'
 import * as persisted from '#/state/persisted'
 import {useCloseAllActiveElements} from '#/state/util'
 import {useGlobalDialogsControlContext} from '#/components/dialogs/Context'
@@ -100,6 +101,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       if (signal.aborted) {
         return
       }
+      clearPrivateProfileCache()
       dispatch({
         type: 'switched-to-account',
         newAgent: agent,
@@ -117,6 +119,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
     logContext => {
       addSessionDebugLog({type: 'method:start', method: 'logout'})
       cancelPendingTask()
+      clearPrivateProfileCache()
       dispatch({
         type: 'logged-out-current-account',
       })
@@ -132,6 +135,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
     logContext => {
       addSessionDebugLog({type: 'method:start', method: 'logout'})
       cancelPendingTask()
+      clearPrivateProfileCache()
       dispatch({
         type: 'logged-out-every-account',
       })
@@ -157,6 +161,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       if (signal.aborted) {
         return
       }
+      clearPrivateProfileCache()
       dispatch({
         type: 'switched-to-account',
         newAgent: agent,
