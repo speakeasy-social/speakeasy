@@ -4,6 +4,7 @@ import {QueryKey} from '@tanstack/react-query'
 import {
   mergePrivateProfileData,
   PrivateProfileData,
+  shouldCheckPrivateProfile,
 } from '#/lib/api/private-profiles'
 import {usePrivateProfileFetcher} from '../use-private-profile-fetcher'
 import {getEmbeddedPost} from '../util'
@@ -20,12 +21,16 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
   for (const page of pages) {
     for (const item of page.items) {
       // Notification author (who triggered the notification)
-      dids.add(item.notification.author.did)
+      if (shouldCheckPrivateProfile(item.notification.author.displayName)) {
+        dids.add(item.notification.author.did)
+      }
 
       // Additional notification authors (grouped notifications)
       if (item.additional) {
         for (const additional of item.additional) {
-          dids.add(additional.author.did)
+          if (shouldCheckPrivateProfile(additional.author.displayName)) {
+            dids.add(additional.author.did)
+          }
         }
       }
 
@@ -33,13 +38,17 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
       if (item.type !== 'starterpack-joined' && item.subject) {
         const postView = item.subject as AppBskyFeedDefs.PostView
         if (postView.author) {
-          dids.add(postView.author.did)
+          if (shouldCheckPrivateProfile(postView.author.displayName)) {
+            dids.add(postView.author.did)
+          }
         }
 
         // Quoted post author
         const quotedPost = getEmbeddedPost(postView.embed)
         if (quotedPost?.author) {
-          dids.add(quotedPost.author.did)
+          if (shouldCheckPrivateProfile(quotedPost.author.displayName)) {
+            dids.add(quotedPost.author.did)
+          }
         }
       }
     }

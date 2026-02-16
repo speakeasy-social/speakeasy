@@ -1,11 +1,12 @@
 import {AppBskyFeedDefs} from '@atproto/api'
 import {describe, expect, it} from '@jest/globals'
 
+import {PRIVATE_PROFILE_DISPLAY_NAME} from '#/lib/api/private-profiles'
 import {extractDidsFromFeed} from '../feed-private-profiles'
 import {FeedPageUnselected} from '../post-feed'
 
 // Helper to create a mock ProfileViewBasic
-function mockProfile(did: string, displayName = 'Test User') {
+function mockProfile(did: string, displayName = PRIVATE_PROFILE_DISPLAY_NAME) {
   return {
     did,
     handle: `${did.split(':').pop()}.test`,
@@ -154,6 +155,27 @@ describe('extractDidsFromFeed', () => {
 
     expect(result.size).toBe(1)
     expect(result.has('did:plc:user1')).toBe(true)
+  })
+
+  it('skips authors without the private profile displayName', () => {
+    const pages = [
+      mockFeedPage([
+        mockFeedViewPost('did:plc:private'),
+        // Create a post with a non-private displayName
+        {
+          post: {
+            ...mockPostView('did:plc:public'),
+            author: mockProfile('did:plc:public', 'Regular User'),
+          },
+        } as AppBskyFeedDefs.FeedViewPost,
+      ]),
+    ]
+
+    const result = extractDidsFromFeed(pages)
+
+    expect(result.has('did:plc:private')).toBe(true)
+    expect(result.has('did:plc:public')).toBe(false)
+    expect(result.size).toBe(1)
   })
 
   it('handles multiple pages with different authors', () => {

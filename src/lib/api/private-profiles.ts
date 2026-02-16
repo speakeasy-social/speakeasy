@@ -55,6 +55,13 @@ export type EncryptedProfilesResponse = {
   profiles: EncryptedProfileResponse[]
 }
 
+export const PRIVATE_PROFILE_DISPLAY_NAME = 'Private Profile'
+const CHECK_ALL_PROFILES = false
+
+export function shouldCheckPrivateProfile(displayName?: string): boolean {
+  return CHECK_ALL_PROFILES || displayName === PRIVATE_PROFILE_DISPLAY_NAME
+}
+
 /**
  * Creates a new profile session with encrypted DEKs for recipients.
  */
@@ -353,7 +360,7 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
  */
 export function anonymizeAtProtoProfile(): AppBskyActorProfile.Record {
   return {
-    displayName: 'Private User',
+    displayName: PRIVATE_PROFILE_DISPLAY_NAME,
     description:
       'This is a private profile only visible to trusted followers on @spkeasy.social',
   }

@@ -4,6 +4,7 @@ import {QueryKey} from '@tanstack/react-query'
 import {
   mergePrivateProfileData,
   PrivateProfileData,
+  shouldCheckPrivateProfile,
 } from '#/lib/api/private-profiles'
 import {FeedPageUnselected, RQKEY_ROOT} from './post-feed'
 import {usePrivateProfileFetcher} from './use-private-profile-fetcher'
@@ -18,21 +19,29 @@ export function extractDidsFromFeed(pages: FeedPageUnselected[]): Set<string> {
   for (const page of pages) {
     for (const item of page.feed) {
       // Post author
-      dids.add(item.post.author.did)
+      if (shouldCheckPrivateProfile(item.post.author.displayName)) {
+        dids.add(item.post.author.did)
+      }
 
       // Reply parent author
       if (item.reply?.parent && AppBskyFeedDefs.isPostView(item.reply.parent)) {
-        dids.add(item.reply.parent.author.did)
+        if (shouldCheckPrivateProfile(item.reply.parent.author.displayName)) {
+          dids.add(item.reply.parent.author.did)
+        }
       }
 
       // Reply root author (if different from parent)
       if (item.reply?.root && AppBskyFeedDefs.isPostView(item.reply.root)) {
-        dids.add(item.reply.root.author.did)
+        if (shouldCheckPrivateProfile(item.reply.root.author.displayName)) {
+          dids.add(item.reply.root.author.did)
+        }
       }
 
       // Repost author
       if (AppBskyFeedDefs.isReasonRepost(item.reason)) {
-        dids.add(item.reason.by.did)
+        if (shouldCheckPrivateProfile(item.reason.by.displayName)) {
+          dids.add(item.reason.by.did)
+        }
       }
     }
   }

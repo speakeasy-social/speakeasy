@@ -29,6 +29,7 @@ import {
   type PrivateProfileData,
   resolvePrivateProfileUrls,
   savePrivateProfile,
+  shouldCheckPrivateProfile,
 } from '#/lib/api/private-profiles'
 import {callSpeakeasyApiWithAgent, getErrorCode} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
@@ -136,6 +137,12 @@ export function useProfileQuery({
         return result
       }
 
+      // Skip Speakeasy lookup if displayName doesn't match the sentinel
+      if (!shouldCheckPrivateProfile(result.displayName)) {
+        result._privateProfile = {isPrivate: false}
+        return result
+      }
+
       // Not checked yet — call Speakeasy API
       try {
         const privateResult = await getPrivateProfile(did ?? '', call)
@@ -204,8 +211,12 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
       // Extract DIDs from the returned profiles
       const dids = res.data.profiles.map(p => p.did)
 
-      // Only fetch unchecked DIDs from Speakeasy
-      const uncheckedDids = dids.filter(d => !isDidChecked(d))
+      // Only fetch unchecked DIDs that look like private profiles
+      const profileByDid = new Map(res.data.profiles.map(p => [p.did, p]))
+      const uncheckedDids = dids.filter(d => {
+        if (isDidChecked(d)) return false
+        return shouldCheckPrivateProfile(profileByDid.get(d)?.displayName)
+      })
 
       const freshDataMap = new Map<string, PrivateProfileData>()
 
