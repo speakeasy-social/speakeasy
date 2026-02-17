@@ -11,6 +11,12 @@ import {useWarnMaxGraphemeCount} from '#/lib/strings/helpers'
 import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
 import {useProfileUpdateMutation} from '#/state/queries/profile'
+import {
+  PRONOUNS_MAX_GRAPHEMES,
+  setProfilePronouns,
+  useEditablePronouns,
+  useSavePronounsMutation,
+} from '#/state/queries/pronouns'
 import {ErrorMessage} from '#/view/com/util/error/ErrorMessage'
 import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
@@ -108,6 +114,7 @@ function DialogInner({
     isError: isUpdateProfileError,
     isPending: isUpdatingProfile,
   } = useProfileUpdateMutation()
+  const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState('')
   const initialDisplayName = profile.displayName || ''
   const [displayName, setDisplayName] = useState(initialDisplayName)
@@ -126,11 +133,22 @@ function DialogInner({
     RNImage | undefined | null
   >()
 
+  // Pronouns state
+  const {
+    pronouns,
+    setPronouns,
+    initialPronouns,
+    parsedSets,
+    nativePronounsValue,
+    pronounsTooLong,
+  } = useEditablePronouns(profile)
+
   const dirty =
     displayName !== initialDisplayName ||
     description !== initialDescription ||
     userAvatar !== profile.avatar ||
-    userBanner !== profile.banner
+    userBanner !== profile.banner ||
+    pronouns !== initialPronouns
 
   useEffect(() => {
     setDirty(dirty)
@@ -179,12 +197,19 @@ function DialogInner({
     try {
       await updateProfileMutation({
         profile,
-        updates: {
-          displayName: displayName.trimEnd(),
-          description: description.trimEnd(),
+        updates: existing => {
+          existing = existing || {}
+          existing.displayName = displayName.trimEnd()
+          existing.description = description.trimEnd()
+          setProfilePronouns(existing, nativePronounsValue)
+          return existing
         },
         newUserAvatar,
         newUserBanner,
+      })
+      await savePronounsMutation.mutateAsync({
+        did: profile.did,
+        sets: parsedSets,
       })
       onUpdate?.()
       control.close()
@@ -194,11 +219,14 @@ function DialogInner({
     }
   }, [
     updateProfileMutation,
+    savePronounsMutation,
     profile,
     onUpdate,
     control,
     displayName,
     description,
+    nativePronounsValue,
+    parsedSets,
     newUserAvatar,
     newUserBanner,
     setImageError,
@@ -213,7 +241,6 @@ function DialogInner({
     text: description,
     maxCount: DESCRIPTION_MAX_GRAPHEMES,
   })
-
   const cancelButton = useCallback(
     () => (
       <Button
@@ -241,7 +268,8 @@ function DialogInner({
           !dirty ||
           isUpdatingProfile ||
           displayNameTooLong ||
-          descriptionTooLong
+          descriptionTooLong ||
+          pronounsTooLong
         }
         size="small"
         color="primary"
@@ -261,6 +289,7 @@ function DialogInner({
       isUpdatingProfile,
       displayNameTooLong,
       descriptionTooLong,
+      pronounsTooLong,
     ],
   )
 
@@ -365,6 +394,36 @@ function DialogInner({
               <Trans>
                 Description is too long. The maximum number of characters is{' '}
                 {DESCRIPTION_MAX_GRAPHEMES}.
+              </Trans>
+            </TextField.SuffixText>
+          )}
+        </View>
+
+        <View>
+          <TextField.LabelText>
+            <Trans>Pronouns</Trans>
+          </TextField.LabelText>
+          <TextField.Root isInvalid={pronounsTooLong}>
+            <Dialog.Input
+              value={pronouns}
+              onChangeText={setPronouns}
+              label={_(msg`Pronouns`)}
+              placeholder={_(msg`e.g. she/her, they/them`)}
+              testID="editProfilePronounsInput"
+            />
+          </TextField.Root>
+          {pronounsTooLong && (
+            <TextField.SuffixText
+              style={[
+                a.text_sm,
+                a.mt_xs,
+                a.font_bold,
+                {color: t.palette.negative_400},
+              ]}
+              label={_(msg`Pronouns are too long`)}>
+              <Trans>
+                Pronouns are too long. The maximum number of characters is{' '}
+                {PRONOUNS_MAX_GRAPHEMES}.
               </Trans>
             </TextField.SuffixText>
           )}

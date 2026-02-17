@@ -26,6 +26,11 @@ import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
 import {useModalControls} from '#/state/modals'
 import {useProfileUpdateMutation} from '#/state/queries/profile'
+import {
+  setProfilePronouns,
+  useEditablePronouns,
+  useSavePronounsMutation,
+} from '#/state/queries/pronouns'
 import {Text} from '#/view/com/util/text/Text'
 import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
@@ -49,6 +54,7 @@ export function Component({
   const {_} = useLingui()
   const {closeModal} = useModalControls()
   const updateMutation = useProfileUpdateMutation()
+  const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState<string>('')
   const [displayName, setDisplayName] = useState<string>(
     profile.displayName || '',
@@ -68,6 +74,16 @@ export function Component({
   const [newUserAvatar, setNewUserAvatar] = useState<
     RNImage | undefined | null
   >()
+
+  // Pronouns state
+  const {
+    pronouns,
+    setPronouns,
+    parsedSets,
+    nativePronounsValue,
+    pronounsTooLong,
+  } = useEditablePronouns(profile)
+
   const onPressCancel = () => {
     closeModal()
   }
@@ -110,16 +126,24 @@ export function Component({
   )
 
   const onPressSave = useCallback(async () => {
+    if (pronounsTooLong) return
     setImageError('')
     try {
       await updateMutation.mutateAsync({
         profile,
-        updates: {
-          displayName,
-          description,
+        updates: existing => {
+          existing = existing || {}
+          existing.displayName = displayName
+          existing.description = description
+          setProfilePronouns(existing, nativePronounsValue)
+          return existing
         },
         newUserAvatar,
         newUserBanner,
+      })
+      await savePronounsMutation.mutateAsync({
+        did: profile.did,
+        sets: parsedSets,
       })
       Toast.show(_(msg`Profile updated`))
       onUpdate?.()
@@ -129,11 +153,15 @@ export function Component({
     }
   }, [
     updateMutation,
+    savePronounsMutation,
     profile,
     onUpdate,
     closeModal,
     displayName,
     description,
+    nativePronounsValue,
+    parsedSets,
+    pronounsTooLong,
     newUserAvatar,
     newUserBanner,
     setImageError,
@@ -204,6 +232,22 @@ export function Component({
               accessible={true}
               accessibilityLabel={_(msg`Description`)}
               accessibilityHint={_(msg`Edit your profile description`)}
+            />
+          </View>
+          <View style={s.pb10}>
+            <Text style={[styles.label, pal.text]}>
+              <Trans>Pronouns</Trans>
+            </Text>
+            <TextInput
+              testID="editProfilePronounsInput"
+              style={[styles.textInput, pal.border, pal.text]}
+              placeholder={_(msg`e.g. she/her, they/them`)}
+              placeholderTextColor={colors.gray4}
+              value={pronouns}
+              onChangeText={setPronouns}
+              accessible={true}
+              accessibilityLabel={_(msg`Pronouns`)}
+              accessibilityHint={_(msg`Edit your pronouns`)}
             />
           </View>
           {updateMutation.isPending ? (
