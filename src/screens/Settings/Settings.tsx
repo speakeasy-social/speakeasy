@@ -47,6 +47,7 @@ import {
   PersonX_Stroke2_Corner0_Rounded as PersonXIcon,
 } from '#/components/icons/Person'
 import {RaisingHand4Finger_Stroke2_Corner2_Rounded as HandIcon} from '#/components/icons/RaisingHand'
+import {Ticket_Stroke2_Corner0_Rounded as TicketIcon} from '#/components/icons/Ticket'
 import {Window_Stroke2_Corner2_Rounded as WindowIcon} from '#/components/icons/Window'
 import * as Layout from '#/components/Layout'
 import {Loader} from '#/components/Loader'
@@ -200,6 +201,12 @@ export function SettingsScreen({}: Props) {
             <SettingsList.ItemIcon icon={EarthIcon} />
             <SettingsList.ItemText>
               <Trans>Languages</Trans>
+            </SettingsList.ItemText>
+          </SettingsList.LinkItem>
+          <SettingsList.LinkItem to="/settings/invites" label={_(msg`Invites`)}>
+            <SettingsList.ItemIcon icon={TicketIcon} />
+            <SettingsList.ItemText>
+              <Trans>Invites</Trans>
             </SettingsList.ItemText>
           </SettingsList.LinkItem>
           <SettingsList.PressableItem

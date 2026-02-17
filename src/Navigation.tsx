@@ -99,6 +99,7 @@ import {AppPasswordsScreen} from './screens/Settings/AppPasswords'
 import {ContentAndMediaSettingsScreen} from './screens/Settings/ContentAndMediaSettings'
 import {ExternalMediaPreferencesScreen} from './screens/Settings/ExternalMediaPreferences'
 import {FollowingFeedPreferencesScreen} from './screens/Settings/FollowingFeedPreferences'
+import {InvitesSettingsScreen} from './screens/Settings/InvitesSettings'
 import {LanguageSettingsScreen} from './screens/Settings/LanguageSettings'
 import {PrivacyAndSecuritySettingsScreen} from './screens/Settings/PrivacyAndSecuritySettings'
 import {SettingsScreen} from './screens/Settings/Settings'
@@ -412,6 +413,14 @@ function commonScreens(Stack: typeof HomeTab, unreadCountLabel?: string) {
         getComponent={() => AboutSettingsScreen}
         options={{
           title: title(msg`About`),
+          requireAuth: true,
+        }}
+      />
+      <Stack.Screen
+        name="InvitesSettings"
+        getComponent={() => InvitesSettingsScreen}
+        options={{
+          title: title(msg`Invites`),
           requireAuth: true,
         }}
       />
