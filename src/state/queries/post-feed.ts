@@ -32,6 +32,10 @@ import {DISCOVER_FEED_URI} from '#/lib/constants'
 import {BSKY_FEED_OWNER_DIDS} from '#/lib/constants'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {logger} from '#/logger'
+import {
+  getCachedPrivateProfile,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {STALE} from '#/state/queries'
 import {DEFAULT_LOGGED_OUT_PREFERENCES} from '#/state/queries/preferences/const'
 import {useAgent, useSession} from '#/state/session'
@@ -39,6 +43,7 @@ import * as userActionHistory from '#/state/userActionHistory'
 import {KnownError} from '#/view/com/posts/PostFeedErrorMessage'
 import {useFeedTuners} from '../preferences/feed-tuners'
 import {useModerationOpts} from '../preferences/moderation-opts'
+import {mergeFeedItemWithPrivateProfiles} from './feed-private-profiles'
 import {usePreferencesQuery} from './preferences'
 import {
   didOrHandleUriMatches,
@@ -147,6 +152,7 @@ export function usePostFeedQuery(
   } | null>(null)
   const isDiscover = feedDesc.includes(DISCOVER_FEED_URI)
   const baseUrl = getBaseCdnUrl(agent)
+  const privateProfileVersion = usePrivateProfileCacheVersion()
 
   /**
    * The number of posts to fetch in a single request. Because we filter
@@ -163,8 +169,16 @@ export function usePostFeedQuery(
       ignoreFilterFor: opts?.ignoreFilterFor,
       isDiscover,
       baseUrl,
+      privateProfileVersion,
     }),
-    [feedTuners, moderationOpts, opts?.ignoreFilterFor, isDiscover, baseUrl],
+    [
+      feedTuners,
+      moderationOpts,
+      opts?.ignoreFilterFor,
+      isDiscover,
+      baseUrl,
+      privateProfileVersion,
+    ],
   )
 
   const query = useInfiniteQuery<
@@ -305,7 +319,14 @@ export function usePostFeedQuery(
               cursor: page.cursor,
               fetchedAt: page.fetchedAt,
               slices: tuner
-                .tune(page.feed)
+                .tune(
+                  page.feed.map(item =>
+                    mergeFeedItemWithPrivateProfiles(
+                      item,
+                      getCachedPrivateProfile,
+                    ),
+                  ),
+                )
                 .map(slice => {
                   const moderations = slice.items.map(item =>
                     moderatePost(item.post, moderationOptsInSelect!),

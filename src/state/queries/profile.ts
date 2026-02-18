@@ -17,6 +17,7 @@ import {
 } from '@tanstack/react-query'
 
 import {uploadBlob} from '#/lib/api'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {
   anonymizeAtProtoProfile,
   decryptProfileIfAccessible,
@@ -25,12 +26,22 @@ import {
   getPrivateProfiles,
   mergePrivateProfileData,
   migrateMediaToAtProto,
+  type PrivateProfileData,
+  resolvePrivateProfileUrls,
   savePrivateProfile,
+  shouldCheckPrivateProfile,
 } from '#/lib/api/private-profiles'
 import {callSpeakeasyApiWithAgent, getErrorCode} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
+import {
+  evictDid,
+  getCachedPrivateProfile,
+  isDidChecked,
+  markDidsChecked,
+  upsertCachedPrivateProfiles,
+} from '#/state/cache/private-profile-cache'
 import {Shadow} from '#/state/cache/types'
 import {
   addCachedFollowerDid,
@@ -100,44 +111,75 @@ export function useProfileQuery({
     // if you remove it, the UI infinite-loops
     // -prf
     staleTime,
-    refetchOnWindowFocus: true,
     queryKey: RQKEY(did ?? ''),
     queryFn: async () => {
       // Create call function for Speakeasy API
       const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
         callSpeakeasyApiWithAgent(agent, options)
 
-      // Fetch ATProto and Speakeasy profiles in parallel
-      const [atprotoRes, privateResult] = await Promise.all([
-        agent.getProfile({actor: did ?? ''}),
-        getPrivateProfile(did ?? '', call).catch(err => {
-          if (getErrorCode(err) === 'NotFound') return null
-          return {_error: err} // Non-404 error
-        }),
-      ])
-
+      // ATProto fetch is always unconditional
+      const atprotoRes = await agent.getProfile({actor: did ?? ''})
       let result: ProfileViewDetailedWithPrivate = atprotoRes.data
 
-      if (privateResult && '_error' in privateResult) {
-        // Load error - flag it so Edit button can be disabled
-        result._privateProfile = {isPrivate: false, loadError: true}
-      } else if (privateResult) {
-        // Private profile found - decrypt and merge
-        const decrypted = await decryptProfileIfAccessible(
-          privateResult,
-          currentAccount?.did ?? '',
-          call,
-        )
-        if (decrypted) {
-          result = mergePrivateProfileData(result, decrypted)
+      // Check cache before calling Speakeasy API
+      if (isDidChecked(did ?? '')) {
+        const cached = getCachedPrivateProfile(did ?? '')
+        if (cached) {
+          result = mergePrivateProfileData(result, cached)
           result._privateProfile = {
             isPrivate: true,
-            avatarUri: decrypted.avatarUri,
-            bannerUri: decrypted.bannerUri,
+            avatarUri: cached.rawAvatarUri,
+            bannerUri: cached.rawBannerUri,
           }
+        } else {
+          result._privateProfile = {isPrivate: false}
         }
+        return result
       }
-      // If no private profile, _privateProfile remains undefined (public mode)
+
+      // Skip Speakeasy lookup if displayName doesn't match the sentinel
+      if (!shouldCheckPrivateProfile(result.displayName)) {
+        result._privateProfile = {isPrivate: false}
+        return result
+      }
+
+      // Not checked yet — call Speakeasy API
+      try {
+        const privateResult = await getPrivateProfile(did ?? '', call)
+
+        if (privateResult) {
+          const decryptedRaw = await decryptProfileIfAccessible(
+            privateResult,
+            currentAccount?.did ?? '',
+            call,
+          )
+          if (decryptedRaw) {
+            const baseUrl = getBaseCdnUrl(agent)
+            const decrypted = resolvePrivateProfileUrls(decryptedRaw, baseUrl)
+            result = mergePrivateProfileData(result, decrypted)
+            result._privateProfile = {
+              isPrivate: true,
+              avatarUri: decrypted.rawAvatarUri,
+              bannerUri: decrypted.rawBannerUri,
+            }
+            upsertCachedPrivateProfiles(new Map([[did ?? '', decrypted]]))
+            markDidsChecked([did ?? ''])
+          } else {
+            // Decryption returned null
+            markDidsChecked([did ?? ''])
+            result._privateProfile = {isPrivate: false}
+          }
+        } else {
+          // NotFound (getPrivateProfile returns null for 404)
+          evictDid(did ?? '')
+          markDidsChecked([did ?? ''])
+          result._privateProfile = {isPrivate: false}
+        }
+      } catch {
+        // Non-404 error
+        markDidsChecked([did ?? ''])
+        result._privateProfile = {isPrivate: false, loadError: true}
+      }
 
       return result
     },
@@ -169,33 +211,48 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
       // Extract DIDs from the returned profiles
       const dids = res.data.profiles.map(p => p.did)
 
-      // Fetch private profiles in batch (silent failure)
-      let privateProfiles: Awaited<ReturnType<typeof getPrivateProfiles>> = []
-      try {
-        privateProfiles = await getPrivateProfiles(dids, call)
-      } catch {
-        // Silent fallback - show ATProto data only
-      }
+      // Only fetch unchecked DIDs that look like private profiles
+      const profileByDid = new Map(res.data.profiles.map(p => [p.did, p]))
+      const uncheckedDids = dids.filter(d => {
+        if (isDidChecked(d)) return false
+        return shouldCheckPrivateProfile(profileByDid.get(d)?.displayName)
+      })
 
-      // Create a map of DID -> decrypted private data
-      const privateDataMap = new Map<
-        string,
-        Awaited<ReturnType<typeof decryptProfileIfAccessible>>
-      >()
-      for (const encrypted of privateProfiles) {
-        const decrypted = await decryptProfileIfAccessible(
-          encrypted,
-          currentAccount?.did ?? '',
-          call,
-        )
-        if (decrypted) {
-          privateDataMap.set(encrypted.did, decrypted)
+      const freshDataMap = new Map<string, PrivateProfileData>()
+
+      if (uncheckedDids.length > 0) {
+        try {
+          const privateProfiles = await getPrivateProfiles(uncheckedDids, call)
+          const baseUrl = getBaseCdnUrl(agent)
+
+          for (const encrypted of privateProfiles) {
+            const decryptedRaw = await decryptProfileIfAccessible(
+              encrypted,
+              currentAccount?.did ?? '',
+              call,
+            )
+            if (decryptedRaw) {
+              freshDataMap.set(
+                encrypted.did,
+                resolvePrivateProfileUrls(decryptedRaw, baseUrl),
+              )
+            }
+          }
+
+          if (freshDataMap.size > 0) {
+            upsertCachedPrivateProfiles(freshDataMap)
+          }
+        } catch {
+          // Silent fallback - show ATProto data only
         }
+        markDidsChecked(uncheckedDids)
       }
 
-      // Merge private data into profiles
+      // Merge private data into profiles — use fresh data if available,
+      // otherwise fall back to existing cache
       const mergedProfiles = res.data.profiles.map(profile => {
-        const privateData = privateDataMap.get(profile.did)
+        const privateData =
+          freshDataMap.get(profile.did) ?? getCachedPrivateProfile(profile.did)
         return mergePrivateProfileData(profile, privateData)
       })
 
@@ -217,7 +274,20 @@ export function usePrefetchProfileQuery() {
         queryKey: RQKEY(did),
         queryFn: async () => {
           const res = await agent.getProfile({actor: did || ''})
-          return res.data
+          let result: ProfileViewDetailedWithPrivate = res.data
+
+          // Merge cached private profile if available (no API call for prefetch)
+          const cached = getCachedPrivateProfile(did)
+          if (cached) {
+            result = mergePrivateProfileData(result, cached)
+            result._privateProfile = {
+              isPrivate: true,
+              avatarUri: cached.rawAvatarUri,
+              bannerUri: cached.rawBannerUri,
+            }
+          }
+
+          return result
         },
       })
     },
@@ -421,6 +491,8 @@ export function useProfileUpdateMutation() {
       }
     },
     onSuccess(data, variables) {
+      // Evict from private profile cache so next query re-fetches from API
+      evictDid(variables.profile.did)
       // invalidate cache
       queryClient.invalidateQueries({
         queryKey: RQKEY(variables.profile.did),

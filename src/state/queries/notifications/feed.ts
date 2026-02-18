@@ -32,6 +32,10 @@ import {
 } from '@tanstack/react-query'
 
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
+import {
+  getCachedPrivateProfile,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {useAgent} from '#/state/session'
 import {useThreadgateHiddenReplyUris} from '#/state/threadgate-hidden-replies'
 import {useModerationOpts} from '../../preferences/moderation-opts'
@@ -41,6 +45,7 @@ import {
   embedViewRecordToPostView,
   getEmbeddedPost,
 } from '../util'
+import {mergeNotificationItemWithPrivateProfiles} from './private-profiles'
 import {FeedPage} from './types'
 import {useUnreadNotificationsApi} from './unread'
 import {fetchPage} from './util'
@@ -51,7 +56,7 @@ const PAGE_SIZE = 30
 
 type RQPageParam = string | undefined
 
-const RQKEY_ROOT = 'notification-feed'
+export const RQKEY_ROOT = 'notification-feed'
 export function RQKEY(filter: 'all' | 'mentions') {
   return [RQKEY_ROOT, filter]
 }
@@ -67,13 +72,15 @@ export function useNotificationFeedQuery(opts: {
   const enabled = opts.enabled !== false
   const filter = opts.filter
   const {uris: hiddenReplyUris} = useThreadgateHiddenReplyUris()
+  const privateProfileVersion = usePrivateProfileCacheVersion()
 
   const selectArgs = useMemo(() => {
     return {
       moderationOpts,
       hiddenReplyUris,
+      privateProfileVersion,
     }
-  }, [moderationOpts, hiddenReplyUris])
+  }, [moderationOpts, hiddenReplyUris, privateProfileVersion])
   const lastRun = useRef<{
     data: InfiniteData<FeedPage>
     args: typeof selectArgs
@@ -129,8 +136,6 @@ export function useNotificationFeedQuery(opts: {
     enabled,
     select: useCallback(
       (data: InfiniteData<FeedPage>) => {
-        const {moderationOpts, hiddenReplyUris} = selectArgs
-
         // Keep track of the last run and whether we can reuse
         // some already selected pages from there.
         let reusedPages = []
@@ -185,7 +190,7 @@ export function useNotificationFeedQuery(opts: {
                     const isHiddenReply =
                       item.type === 'reply' &&
                       item.subjectUri &&
-                      hiddenReplyUris.has(item.subjectUri)
+                      selectArgs.hiddenReplyUris.has(item.subjectUri)
                     return !isHiddenReply
                   })
                   .filter(item => {
@@ -200,14 +205,23 @@ export function useNotificationFeedQuery(opts: {
                        * `record` is a post, we know it's a post view.
                        */
                       if (AppBskyFeedPost.isRecord(item.subject?.record)) {
-                        const mod = moderatePost(item.subject, moderationOpts!)
+                        const mod = moderatePost(
+                          item.subject,
+                          selectArgs.moderationOpts!,
+                        )
                         if (mod.ui('contentList').filter) {
                           return false
                         }
                       }
                     }
                     return true
-                  }),
+                  })
+                  .map(item =>
+                    mergeNotificationItemWithPrivateProfiles(
+                      item,
+                      getCachedPrivateProfile,
+                    ),
+                  ),
               }
             }),
           ],
