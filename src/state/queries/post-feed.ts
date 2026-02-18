@@ -34,7 +34,7 @@ import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {logger} from '#/logger'
 import {STALE} from '#/state/queries'
 import {DEFAULT_LOGGED_OUT_PREFERENCES} from '#/state/queries/preferences/const'
-import {useAgent} from '#/state/session'
+import {useAgent, useSession} from '#/state/session'
 import * as userActionHistory from '#/state/userActionHistory'
 import {KnownError} from '#/view/com/posts/PostFeedErrorMessage'
 import {useFeedTuners} from '../preferences/feed-tuners'
@@ -139,6 +139,7 @@ export function usePostFeedQuery(
     ) ?? -1
   const enableFollowingToDiscoverFallback = followingPinnedIndex === 0
   const agent = useAgent()
+  const {hasSession} = useSession()
   const lastRun = useRef<{
     data: InfiniteData<FeedPageUnselected>
     args: typeof selectArgs
@@ -195,6 +196,7 @@ export function usePostFeedQuery(
               feedParams: params || {},
               feedTuners,
               agent,
+              hasSession,
               // Not in the query key because they don't change:
               userInterests,
               // Not in the query key. Reacting to it switching isn't important:
@@ -212,7 +214,7 @@ export function usePostFeedQuery(
          * moderations happen later, which results in some posts being shown and
          * some not.
          */
-        if (!agent.session) {
+        if (!hasSession) {
           assertSomePostsPassModeration(res.feed)
         }
 
@@ -466,6 +468,7 @@ function createApi({
   feedTuners,
   userInterests,
   agent,
+  hasSession,
   enableFollowingToDiscoverFallback,
 }: {
   feedDesc: FeedDescriptor
@@ -473,6 +476,7 @@ function createApi({
   feedTuners: FeedTunerFn[]
   userInterests?: string
   agent: BskyAgent
+  hasSession: boolean
   enableFollowingToDiscoverFallback: boolean
 }) {
   let api: FeedAPI
@@ -512,12 +516,14 @@ function createApi({
     api = new AuthorFeedAPI({agent, feedParams: {actor, filter}})
 
     // Wrap author feeds with PrivatePostsWrapper to merge private posts
-    api = new PrivatePostsWrapper({
-      wrappedFeed: api,
-      agent,
-      mergeMethod: 'followers',
-      author: actor,
-    })
+    if (hasSession) {
+      api = new PrivatePostsWrapper({
+        wrappedFeed: api,
+        agent,
+        mergeMethod: 'followers',
+        author: actor,
+      })
+    }
   } else if (feedDesc.startsWith('likes')) {
     const [_, actor] = feedDesc.split('|')
     api = new LikesFeedAPI({agent, feedParams: {actor}})
@@ -541,7 +547,7 @@ function createApi({
   )
 
   // Wrap the API with private posts if enabled for this feed type
-  if (privatePostConfig) {
+  if (privatePostConfig && hasSession) {
     api = new PrivatePostsWrapper({
       wrappedFeed: api,
       agent,
