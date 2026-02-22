@@ -1,4 +1,8 @@
-import {AppBskyFeedDefs} from '@atproto/api'
+import {
+  AppBskyEmbedRecord,
+  AppBskyEmbedRecordWithMedia,
+  AppBskyFeedDefs,
+} from '@atproto/api'
 import {QueryKey} from '@tanstack/react-query'
 
 import {
@@ -21,14 +25,14 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
   for (const page of pages) {
     for (const item of page.items) {
       // Notification author (who triggered the notification)
-      if (shouldCheckPrivateProfile(item.notification.author.displayName)) {
+      if (shouldCheckPrivateProfile(item.notification.author)) {
         dids.add(item.notification.author.did)
       }
 
       // Additional notification authors (grouped notifications)
       if (item.additional) {
         for (const additional of item.additional) {
-          if (shouldCheckPrivateProfile(additional.author.displayName)) {
+          if (shouldCheckPrivateProfile(additional.author)) {
             dids.add(additional.author.did)
           }
         }
@@ -38,7 +42,7 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
       if (item.type !== 'starterpack-joined' && item.subject) {
         const postView = item.subject as AppBskyFeedDefs.PostView
         if (postView.author) {
-          if (shouldCheckPrivateProfile(postView.author.displayName)) {
+          if (shouldCheckPrivateProfile(postView.author)) {
             dids.add(postView.author.did)
           }
         }
@@ -46,7 +50,7 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
         // Quoted post author
         const quotedPost = getEmbeddedPost(postView.embed)
         if (quotedPost?.author) {
-          if (shouldCheckPrivateProfile(quotedPost.author.displayName)) {
+          if (shouldCheckPrivateProfile(quotedPost.author)) {
             dids.add(quotedPost.author.did)
           }
         }
@@ -83,10 +87,11 @@ export function mergeNotificationItemWithPrivateProfiles(
 
   // Enhance additional notification authors
   if (item.additional) {
+    let additionalModified = false
     const mappedAdditional = item.additional.map(additional => {
       const additionalPrivate = getProfile(additional.author.did)
       if (additionalPrivate) {
-        itemModified = true
+        additionalModified = true
         return {
           ...additional,
           author: mergePrivateProfileData(additional.author, additionalPrivate),
@@ -94,8 +99,9 @@ export function mergeNotificationItemWithPrivateProfiles(
       }
       return additional
     })
-    if (itemModified) {
+    if (additionalModified) {
       newAdditional = mappedAdditional
+      itemModified = true
     }
   }
 
@@ -113,28 +119,34 @@ export function mergeNotificationItemWithPrivateProfiles(
       }
     }
 
-    // Enhance quoted post author
+    // Enhance quoted post author (clone embed to avoid mutating shared cache)
     const quotedPost = getEmbeddedPost(postView.embed)
     if (quotedPost?.author) {
       const quotedPrivate = getProfile(quotedPost.author.did)
       if (quotedPrivate) {
-        // Create new subject with a new embed containing the merged quoted author
-        // We need to clone since getEmbeddedPost returns a reference
         const mergedAuthor = mergePrivateProfileData(
           quotedPost.author,
           quotedPrivate,
         )
-        // Only update subject if we haven't already
-        if (!newSubject || newSubject === item.subject) {
-          newSubject = {...postView}
+        const baseSubject = newSubject ?? postView
+        let newEmbed: typeof postView.embed
+        if (AppBskyEmbedRecord.isView(postView.embed)) {
+          newEmbed = {
+            ...postView.embed,
+            record: {...postView.embed.record, author: mergedAuthor},
+          }
+        } else if (AppBskyEmbedRecordWithMedia.isView(postView.embed)) {
+          newEmbed = {
+            ...postView.embed,
+            record: {
+              ...postView.embed.record,
+              record: {...postView.embed.record.record, author: mergedAuthor},
+            },
+          }
+        } else {
+          newEmbed = postView.embed
         }
-        // Mutate the quoted post author within the new subject's embed
-        const newQuotedPost = getEmbeddedPost(
-          (newSubject as AppBskyFeedDefs.PostView).embed,
-        )
-        if (newQuotedPost) {
-          newQuotedPost.author = mergedAuthor
-        }
+        newSubject = {...baseSubject, embed: newEmbed}
         itemModified = true
       }
     }

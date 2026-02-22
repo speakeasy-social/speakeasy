@@ -36,6 +36,7 @@ export function getHost(agent: BskyAgent, endpoint: string): string {
   const devHosts = [
     {prefix: 'social.spkeasy.graph', host: 'http://localhost:3001'},
     {prefix: 'social.spkeasy.key', host: 'http://localhost:3004'},
+    {prefix: 'social.spkeasy.media', host: 'http://localhost:3003'},
     {prefix: 'social.spkeasy.profileSession', host: 'http://localhost:3006'},
     {prefix: 'social.spkeasy.actor.getProfile', host: 'http://localhost:3006'},
     {prefix: 'social.spkeasy.actor.getProfiles', host: 'http://localhost:3006'},
@@ -45,6 +46,7 @@ export function getHost(agent: BskyAgent, endpoint: string): string {
       host: 'http://localhost:3006',
     },
     {prefix: 'social.spkeasy.actor', host: 'http://localhost:3005'},
+    {prefix: 'social.spkeasy.media', host: 'http://localhost:3003'},
     // Catch all
     {prefix: 'social.spkeasy', host: 'http://localhost:3002'},
   ]

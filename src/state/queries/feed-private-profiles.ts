@@ -19,27 +19,27 @@ export function extractDidsFromFeed(pages: FeedPageUnselected[]): Set<string> {
   for (const page of pages) {
     for (const item of page.feed) {
       // Post author
-      if (shouldCheckPrivateProfile(item.post.author.displayName)) {
+      if (shouldCheckPrivateProfile(item.post.author)) {
         dids.add(item.post.author.did)
       }
 
       // Reply parent author
       if (item.reply?.parent && AppBskyFeedDefs.isPostView(item.reply.parent)) {
-        if (shouldCheckPrivateProfile(item.reply.parent.author.displayName)) {
+        if (shouldCheckPrivateProfile(item.reply.parent.author)) {
           dids.add(item.reply.parent.author.did)
         }
       }
 
       // Reply root author (if different from parent)
       if (item.reply?.root && AppBskyFeedDefs.isPostView(item.reply.root)) {
-        if (shouldCheckPrivateProfile(item.reply.root.author.displayName)) {
+        if (shouldCheckPrivateProfile(item.reply.root.author)) {
           dids.add(item.reply.root.author.did)
         }
       }
 
       // Repost author
       if (AppBskyFeedDefs.isReasonRepost(item.reason)) {
-        if (shouldCheckPrivateProfile(item.reason.by.displayName)) {
+        if (shouldCheckPrivateProfile(item.reason.by)) {
           dids.add(item.reason.by.did)
         }
       }
