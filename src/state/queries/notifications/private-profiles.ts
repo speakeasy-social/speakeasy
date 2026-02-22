@@ -21,14 +21,14 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
   for (const page of pages) {
     for (const item of page.items) {
       // Notification author (who triggered the notification)
-      if (shouldCheckPrivateProfile(item.notification.author.displayName)) {
+      if (shouldCheckPrivateProfile(item.notification.author)) {
         dids.add(item.notification.author.did)
       }
 
       // Additional notification authors (grouped notifications)
       if (item.additional) {
         for (const additional of item.additional) {
-          if (shouldCheckPrivateProfile(additional.author.displayName)) {
+          if (shouldCheckPrivateProfile(additional.author)) {
             dids.add(additional.author.did)
           }
         }
@@ -38,7 +38,7 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
       if (item.type !== 'starterpack-joined' && item.subject) {
         const postView = item.subject as AppBskyFeedDefs.PostView
         if (postView.author) {
-          if (shouldCheckPrivateProfile(postView.author.displayName)) {
+          if (shouldCheckPrivateProfile(postView.author)) {
             dids.add(postView.author.did)
           }
         }
@@ -46,7 +46,7 @@ export function extractDidsFromNotifications(pages: FeedPage[]): Set<string> {
         // Quoted post author
         const quotedPost = getEmbeddedPost(postView.embed)
         if (quotedPost?.author) {
-          if (shouldCheckPrivateProfile(quotedPost.author.displayName)) {
+          if (shouldCheckPrivateProfile(quotedPost.author)) {
             dids.add(quotedPost.author.did)
           }
         }

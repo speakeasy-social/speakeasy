@@ -142,7 +142,7 @@ export function useProfileQuery({
       }
 
       // Skip Speakeasy lookup if displayName doesn't match the sentinel
-      if (!shouldCheckPrivateProfile(result.displayName)) {
+      if (!shouldCheckPrivateProfile(result)) {
         result._privateProfile = {isPrivate: false}
         return result
       }
@@ -260,7 +260,7 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
       const profileByDid = new Map(res.data.profiles.map(p => [p.did, p]))
       const uncheckedDids = dids.filter(d => {
         if (isDidChecked(d)) return false
-        return shouldCheckPrivateProfile(profileByDid.get(d)?.displayName)
+        return shouldCheckPrivateProfile(profileByDid.get(d))
       })
 
       let freshDataMap = new Map<string, PrivateProfileData>()

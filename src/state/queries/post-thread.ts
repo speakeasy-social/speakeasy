@@ -161,9 +161,7 @@ export function usePostThreadQuery(uri: string | undefined) {
 
         // Merge private profiles from cache first (instant when coming from feed)
         const privateProfileDids = Array.from(authorProfileMap.entries())
-          .filter(([, profile]) =>
-            shouldCheckPrivateProfile(profile?.displayName),
-          )
+          .filter(([, profile]) => shouldCheckPrivateProfile(profile))
           .map(([did]) => did)
         for (const did of privateProfileDids) {
           const cached = getCachedPrivateProfile(did)
@@ -896,7 +894,7 @@ function collectPrivateProfileDidsFromThread(thread: ThreadNode): string[] {
   for (const node of traverseThread(thread)) {
     if (node.type === 'post' && node.post.author) {
       const author = node.post.author
-      if (shouldCheckPrivateProfile(author.displayName)) {
+      if (shouldCheckPrivateProfile(author)) {
         dids.add(author.did)
       }
     }
@@ -916,7 +914,7 @@ function mergePrivateProfilesIntoThreadFromCache(
     if (
       node.type === 'post' &&
       node.post.author &&
-      shouldCheckPrivateProfile(node.post.author.displayName)
+      shouldCheckPrivateProfile(node.post.author)
     ) {
       const cached = getCachedPrivateProfile(node.post.author.did)
       if (cached) {

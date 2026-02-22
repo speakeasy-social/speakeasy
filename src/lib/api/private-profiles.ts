@@ -1,4 +1,5 @@
 import {
+  AppBskyActorDefs,
   AppBskyActorProfile,
   AppBskyRichtextFacet,
   BskyAgent,
@@ -117,8 +118,17 @@ export type EncryptedProfilesResponse = {
 export const PRIVATE_PROFILE_DISPLAY_NAME = 'Private Profile'
 const CHECK_ALL_PROFILES = false
 
-export function shouldCheckPrivateProfile(displayName?: string): boolean {
-  return CHECK_ALL_PROFILES || displayName === PRIVATE_PROFILE_DISPLAY_NAME
+/**
+ * Returns whether we should attempt to load private profile data for this
+ * profile. Detection is opaque and may change (e.g. sentinel displayName today,
+ * server hint or other signal later).
+ */
+export function shouldCheckPrivateProfile(
+  profile: AppBskyActorDefs.ProfileViewBasic | null | undefined,
+): boolean {
+  return (
+    CHECK_ALL_PROFILES || profile?.displayName === PRIVATE_PROFILE_DISPLAY_NAME
+  )
 }
 
 /**
