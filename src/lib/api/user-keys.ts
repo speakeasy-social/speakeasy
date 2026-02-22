@@ -5,8 +5,9 @@ import {generateKeyPair} from '#/lib/encryption'
 import {logger} from '#/logger'
 import * as Toast from '#/view/com/util/Toast'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
+import {isServiceError} from './speakeasy-health'
 
-// Throttled toast for private key errors - only show once per 30 seconds
+// Throttled toast for non-service private key errors (e.g. 4xx) - only show once per 30 seconds
 const showPrivateKeyErrorToast = throttle(() => {
   Toast.show('Unable to load private data', 'xmark')
 }, 30_000)
@@ -127,7 +128,10 @@ export async function getPrivateKeyOrWarn(
     return privateKey ?? null
   } catch (error) {
     logger.error('getPrivateKeyOrWarn: failed to get private key', {error})
-    showPrivateKeyErrorToast()
+    // Service errors (network/5xx): central layer shows opt-in-gated toast; do not show here.
+    if (!isServiceError(error)) {
+      showPrivateKeyErrorToast()
+    }
     return null
   }
 }
