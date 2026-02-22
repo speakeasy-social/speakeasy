@@ -120,7 +120,7 @@ async function getPrivateProfilesForDids(
     const cached = getCachedPrivateProfile(did)
     if (cached) result.set(did, cached)
   }
-  const uncachedDids = dids.filter(did => !getCachedPrivateProfile(did))
+  const uncachedDids = dids.filter(did => !result.has(did))
   if (uncachedDids.length === 0 || !userDid) return result
   try {
     const privateProfiles = await fetchPrivateProfiles(
