@@ -448,7 +448,10 @@ export function anonymizeAtProtoProfile(
   }
 }
 
-/** In-flight promise so concurrent callers share one session creation. */
+/**
+ * In-flight promise so concurrent callers share one session creation.
+ * Cleared in finally so the next caller gets a fresh creation; do not leave set across retries.
+ */
 let sessionCreationPromise: Promise<{
   sessionId: string
   sessionKey: string
