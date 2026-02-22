@@ -311,16 +311,6 @@ export async function getPrivateProfiles(
 }
 
 /**
- * Fetches and decrypts private profiles for multiple users in a batch.
- * Returns a Map of DID -> decrypted profile data for all accessible profiles.
- * Fetches the private key once and decrypts all profiles in parallel.
- *
- * @param dids - Array of DIDs to fetch profiles for
- * @param userDid - The viewer's DID (needed for decryption)
- * @param call - The API call function
- * @returns Map of DID to decrypted private profile data
- */
-/**
  * Resolves avatarUri/bannerUri storage keys to full CDN URLs.
  * Keys are stored as relative paths (e.g. "media/abc123") and need
  * the base CDN URL prepended to form valid image URLs.
@@ -338,6 +328,17 @@ export function resolvePrivateProfileUrls(
   }
 }
 
+/**
+ * Fetches and decrypts private profiles for multiple users in a batch.
+ * Returns a Map of DID -> decrypted profile data for all accessible profiles.
+ * Fetches the private key once and decrypts all profiles in parallel.
+ *
+ * @param dids - Array of DIDs to fetch profiles for
+ * @param userDid - The viewer's DID (needed for decryption)
+ * @param call - The API call function
+ * @param baseUrl - Base CDN URL for resolving media keys
+ * @returns Map of DID to decrypted private profile data
+ */
 export async function fetchPrivateProfiles(
   dids: string[],
   userDid: string,
@@ -437,8 +438,16 @@ export function anonymizeAtProtoProfile(
   }
 }
 
+/** In-flight promise so concurrent callers share one session creation. */
+let sessionCreationPromise: Promise<{
+  sessionId: string
+  sessionKey: string
+}> | null = null
+
 /**
  * Retrieves or creates a profile session for the current user.
+ * Concurrent callers that get NotFound share a single creation so only one
+ * create runs.
  * @param agent - The BskyAgent containing user information
  * @param call - The API call function
  * @param queryClient - The React Query client instance
@@ -449,45 +458,37 @@ export async function getOrCreateProfileSession(
   call: SpeakeasyApiCall,
   queryClient: QueryClient,
 ): Promise<{sessionId: string; sessionKey: string}> {
-  let privateKey
-  let publicKey
-  let encryptedDek
-  let sessionId
-  let userKeyPairId
-
-  // Try to get existing session
   try {
-    ;({sessionId, encryptedDek} = await getProfileSession(call))
+    const {sessionId, encryptedDek} = await getProfileSession(call)
+    const {privateKey} = await getPrivateKey(call)
+    const sessionKey = await decryptDEK(encryptedDek, privateKey)
+    return {sessionId, sessionKey}
   } catch (error) {
-    if (getErrorCode(error) === 'NotFound') {
-      // No session exists, create a new one
-      ;({publicKey, privateKey, userKeyPairId} = await getOrCreatePublicKey(
-        agent,
-        call,
-      ))
-      ;({sessionId, encryptedDek} = await createNewProfileSession(
-        publicKey,
-        userKeyPairId,
-        agent,
-        call,
-        queryClient,
-      ))
-    } else {
+    if (getErrorCode(error) !== 'NotFound') {
       throw error
     }
   }
 
-  // Get private key if we don't have it yet
-  if (!privateKey) {
-    ;({privateKey} = await getPrivateKey(call))
+  if (!sessionCreationPromise) {
+    sessionCreationPromise = (async () => {
+      try {
+        const {publicKey, privateKey, userKeyPairId} =
+          await getOrCreatePublicKey(agent, call)
+        const {sessionId, encryptedDek} = await createNewProfileSession(
+          publicKey,
+          userKeyPairId,
+          agent,
+          call,
+          queryClient,
+        )
+        const sessionKey = await decryptDEK(encryptedDek, privateKey)
+        return {sessionId, sessionKey}
+      } finally {
+        sessionCreationPromise = null
+      }
+    })()
   }
-
-  const sessionKey = await decryptDEK(encryptedDek, privateKey)
-
-  return {
-    sessionId,
-    sessionKey,
-  }
+  return sessionCreationPromise
 }
 
 /**
@@ -627,59 +628,46 @@ export async function savePrivateProfile(
     pronouns,
   } = profileData
 
-  // Resolve avatar URI
-  let avatarUri: string | undefined
-  if (newAvatar === null) {
-    // Explicit deletion
-    avatarUri = undefined
-  } else if (newAvatar) {
-    // Upload new avatar to speakeasy
-    const blob = await pathToBlob(newAvatar.path)
-    const result = await uploadMediaToSpeakeasy(
-      agent,
-      blob,
-      newAvatar.mime,
-      sessionId,
-    )
-    avatarUri = result.data.blob.key
-  } else if (existingAvatarUri?.startsWith('http')) {
-    // Migration from ATProto: fetch and upload to Speakeasy
-    avatarUri = await migrateMediaToSpeakeasy(
-      existingAvatarUri,
-      agent,
-      sessionId,
-    )
-  } else {
-    // No change - keep existing Speakeasy key
-    avatarUri = existingAvatarUri
+  const resolveAvatar = async (): Promise<string | undefined> => {
+    if (newAvatar === null) return undefined
+    if (newAvatar) {
+      const blob = await pathToBlob(newAvatar.path)
+      const result = await uploadMediaToSpeakeasy(
+        agent,
+        blob,
+        newAvatar.mime,
+        sessionId,
+      )
+      return result.data.blob.key
+    }
+    if (existingAvatarUri?.startsWith('http')) {
+      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
+    }
+    return existingAvatarUri
   }
 
-  // Resolve banner URI
-  let bannerUri: string | undefined
-  if (newBanner === null) {
-    // Explicit deletion
-    bannerUri = undefined
-  } else if (newBanner) {
-    // Upload new banner to speakeasy
-    const blob = await pathToBlob(newBanner.path)
-    const result = await uploadMediaToSpeakeasy(
-      agent,
-      blob,
-      newBanner.mime,
-      sessionId,
-    )
-    bannerUri = result.data.blob.key
-  } else if (existingBannerUri?.startsWith('http')) {
-    // Migration from ATProto: fetch and upload to Speakeasy
-    bannerUri = await migrateMediaToSpeakeasy(
-      existingBannerUri,
-      agent,
-      sessionId,
-    )
-  } else {
-    // No change - keep existing Speakeasy key
-    bannerUri = existingBannerUri
+  const resolveBanner = async (): Promise<string | undefined> => {
+    if (newBanner === null) return undefined
+    if (newBanner) {
+      const blob = await pathToBlob(newBanner.path)
+      const result = await uploadMediaToSpeakeasy(
+        agent,
+        blob,
+        newBanner.mime,
+        sessionId,
+      )
+      return result.data.blob.key
+    }
+    if (existingBannerUri?.startsWith('http')) {
+      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
+    }
+    return existingBannerUri
   }
+
+  const [avatarUri, bannerUri] = await Promise.all([
+    resolveAvatar(),
+    resolveBanner(),
+  ])
 
   // Build and encrypt profile data
   const privateData: PrivateProfileData = {
