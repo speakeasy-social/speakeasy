@@ -26,6 +26,7 @@ import {
   getPrivateProfile,
   mergePrivateProfileData,
   migrateMediaToAtProto,
+  PRIVATE_PROFILE_DISPLAY_NAME,
   type PrivateProfileData,
   resolvePrivateProfileUrls,
   savePrivateProfile,
@@ -99,6 +100,25 @@ export type ProfileViewDetailedWithPrivate =
     _privateProfile?: PrivateProfileMetadata
   }
 
+/**
+ * Returns a profile with _privateProfile set from cached private data or isPrivate: false.
+ */
+function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
+  profile: T,
+  cached: PrivateProfileData | null | undefined,
+): T & {_privateProfile: PrivateProfileMetadata} {
+  return {
+    ...profile,
+    _privateProfile: cached
+      ? {
+          isPrivate: true,
+          avatarUri: cached.rawAvatarUri,
+          bannerUri: cached.rawBannerUri,
+        }
+      : {isPrivate: false},
+  }
+}
+
 export function useProfileQuery({
   did,
   staleTime = STALE.SECONDS.FIFTEEN,
@@ -130,17 +150,10 @@ export function useProfileQuery({
       // Check cache before calling Speakeasy API (avoid re-fetching when we already know the answer)
       if (isDidChecked(did ?? '')) {
         const cached = getCachedPrivateProfile(did ?? '')
-        if (cached) {
-          result = mergePrivateProfileData(result, cached)
-          result._privateProfile = {
-            isPrivate: true,
-            avatarUri: cached.rawAvatarUri,
-            bannerUri: cached.rawBannerUri,
-          }
-          return result
-        }
-        result._privateProfile = {isPrivate: false}
-        return result
+        return withPrivateProfileMeta(
+          cached ? mergePrivateProfileData(result, cached) : result,
+          cached ?? null,
+        )
       }
 
       // Skip Speakeasy lookup if displayName doesn't match the sentinel
@@ -155,17 +168,10 @@ export function useProfileQuery({
         // DID already being fetched by batch fetcher; return atproto result and
         // merge from cache if already present; useMemo will re-merge when cache updates
         const cached = getCachedPrivateProfile(safeDid)
-        if (cached) {
-          const merged = mergePrivateProfileData(result, cached)
-          merged._privateProfile = {
-            isPrivate: true,
-            avatarUri: cached.rawAvatarUri,
-            bannerUri: cached.rawBannerUri,
-          }
-          return merged
-        }
-        result._privateProfile = {isPrivate: false}
-        return result
+        return withPrivateProfileMeta(
+          cached ? mergePrivateProfileData(result, cached) : result,
+          cached ?? null,
+        )
       }
 
       try {
@@ -180,24 +186,22 @@ export function useProfileQuery({
           if (decryptedRaw) {
             const baseUrl = getBaseCdnUrl(agent)
             const decrypted = resolvePrivateProfileUrls(decryptedRaw, baseUrl)
-            result = mergePrivateProfileData(result, decrypted)
-            result._privateProfile = {
-              isPrivate: true,
-              avatarUri: decrypted.rawAvatarUri,
-              bannerUri: decrypted.rawBannerUri,
-            }
+            result = withPrivateProfileMeta(
+              mergePrivateProfileData(result, decrypted),
+              decrypted,
+            )
             upsertCachedPrivateProfiles(new Map([[safeDid, decrypted]]))
             markDidsChecked([safeDid])
           } else {
             markDidsChecked([safeDid])
-            result._privateProfile = {isPrivate: false}
+            result = withPrivateProfileMeta(result, null)
           }
         } else {
-          if (result.displayName !== 'Private Profile') {
+          if (result.displayName !== PRIVATE_PROFILE_DISPLAY_NAME) {
             evictDid(safeDid)
             markDidsChecked([safeDid])
           }
-          result._privateProfile = {isPrivate: false}
+          result = withPrivateProfileMeta(result, null)
         }
       } catch {
         markDidsChecked([safeDid])
@@ -225,16 +229,7 @@ export function useProfileQuery({
     if (!base || !did) return base
     const cached = getCachedPrivateProfile(did)
     if (!cached) return base
-    const merged = mergePrivateProfileData(base, cached)
-    const withMeta: ProfileViewDetailedWithPrivate = {
-      ...merged,
-      _privateProfile: {
-        isPrivate: true,
-        avatarUri: cached.rawAvatarUri,
-        bannerUri: cached.rawBannerUri,
-      },
-    }
-    return withMeta
+    return withPrivateProfileMeta(mergePrivateProfileData(base, cached), cached)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- privateProfileCacheVersion forces re-merge when cache updates
   }, [query.data, privateProfileCacheVersion, did])
 
@@ -425,6 +420,16 @@ function defaultCheckCommittedForPublicProfile(
 }
 
 /**
+ * Resolves pronouns for private profile storage: 2+ sets → array, else native string.
+ */
+function resolvePrivatePronouns(pronouns: {
+  native: string
+  sets: PronounSet[]
+}): string | PronounSet[] {
+  return pronouns.sets.length >= 2 ? pronouns.sets : pronouns.native
+}
+
+/**
  * Builds the optimistic private profile payload for cache upsert after save.
  * Must match the shape we just saved to Speakeasy so the refetch uses cache
  * instead of calling getPrivateProfile (avoids race where Speakeasy isn't ready yet).
@@ -449,13 +454,9 @@ function buildOptimisticPrivateProfileFromUpdateParams(variables: {
     (typeof variables.updates === 'function'
       ? ''
       : variables.updates.description || '')
-  let pronouns: string | PronounSet[] | undefined
-  if (variables.pronouns) {
-    pronouns =
-      variables.pronouns.sets.length >= 2
-        ? variables.pronouns.sets
-        : variables.pronouns.native
-  }
+  const pronouns = variables.pronouns
+    ? resolvePrivatePronouns(variables.pronouns)
+    : undefined
   return {
     displayName,
     description,
@@ -513,12 +514,9 @@ export function useProfileUpdateMutation() {
         // 1. Save to Speakeasy first (handles media upload internally)
         // 2. Then anonymize ATProto profile
 
-        // Determine pronouns value for private storage
-        let privatePronouns: string | PronounSet[] | undefined
-        if (pronouns) {
-          privatePronouns =
-            pronouns.sets.length >= 2 ? pronouns.sets : pronouns.native
-        }
+        const privatePronouns = pronouns
+          ? resolvePrivatePronouns(pronouns)
+          : undefined
 
         await savePrivateProfile(agent, call, queryClient, {
           displayName:
