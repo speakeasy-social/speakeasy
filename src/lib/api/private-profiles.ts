@@ -9,11 +9,13 @@ import {
 import {QueryClient} from '@tanstack/react-query'
 
 import {decryptBatch, decryptDEK, encryptContent} from '#/lib/encryption'
+import {isWeb} from '#/platform/detection'
 import {type PronounSet} from '#/state/queries/pronouns'
 import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
 import {
   getErrorCode,
+  getHost,
   SpeakeasyApiCall,
   uploadMediaToSpeakeasy,
 } from './speakeasy'
@@ -542,8 +544,34 @@ export function getSpeakeasyMediaUrl(key: string, agent: BskyAgent): string {
 }
 
 /**
+ * Fetches Speakeasy media as a Blob via the API with auth (avoids CORS on web).
+ */
+async function fetchSpeakeasyMediaBlob(
+  agent: BskyAgent,
+  speakeasyKey: string,
+): Promise<Blob> {
+  const serverUrl = getHost(agent, 'social.spkeasy.media.upload')
+  const url = `${serverUrl}/xrpc/social.spkeasy.media.get?key=${encodeURIComponent(
+    speakeasyKey,
+  )}`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${agent.session?.accessJwt}`,
+    },
+  })
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch Speakeasy media: ${response.status} ${response.statusText}`,
+    )
+  }
+  return response.blob()
+}
+
+/**
  * Migrates media from Speakeasy storage to ATProto blob storage.
  * Used when switching from private to public profile.
+ * On web, fetches via authenticated API to avoid CORS (direct CDN fetch fails).
  * @param speakeasyKey - The media key from the private profile
  * @param agent - The BskyAgent for uploading
  * @returns ATProto blob upload response
@@ -552,8 +580,13 @@ export async function migrateMediaToAtProto(
   speakeasyKey: string,
   agent: BskyAgent,
 ): Promise<ComAtprotoRepoUploadBlob.Response> {
-  const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
-  const blob = await pathToBlob(url)
+  let blob: Blob
+  if (isWeb) {
+    blob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
+  } else {
+    const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
+    blob = await pathToBlob(url)
+  }
   return uploadBlob(agent, blob, blob.type || 'image/jpeg')
 }
 
