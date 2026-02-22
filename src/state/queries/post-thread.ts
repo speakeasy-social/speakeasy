@@ -20,14 +20,26 @@ import {
   profileToAuthorView,
 } from '#/lib/api/feed/private-posts'
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
+import {
+  fetchPrivateProfiles,
+  mergePrivateProfileData,
+  type PrivateProfileData,
+  shouldCheckPrivateProfile,
+} from '#/lib/api/private-profiles'
+import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
+import {
+  getCachedPrivateProfile,
+  markDidsChecked,
+  upsertCachedPrivateProfiles,
+} from '#/state/cache/private-profile-cache'
 import {findAllPostsInQueryData as findAllPostsInQuoteQueryData} from '#/state/queries/post-quotes'
 import {UsePreferencesQueryResponse} from '#/state/queries/preferences/types'
 import {
   findAllPostsInQueryData as findAllPostsInSearchQueryData,
   findAllProfilesInQueryData as findAllProfilesInSearchQueryData,
 } from '#/state/queries/search-posts'
-import {useAgent} from '#/state/session'
+import {useAgent, useSession} from '#/state/session'
 import {
   findAllPostsInQueryData as findAllPostsInNotifsQueryData,
   findAllProfilesInQueryData as findAllProfilesInNotifsQueryData,
@@ -105,6 +117,7 @@ export type PostThreadQueryData = {
 export function usePostThreadQuery(uri: string | undefined) {
   const queryClient = useQueryClient()
   const agent = useAgent()
+  const {currentAccount} = useSession()
   const baseUrl = getBaseCdnUrl(agent)
   return useQuery<PostThreadQueryData, Error>({
     gcTime: 0,
@@ -113,6 +126,9 @@ export function usePostThreadQuery(uri: string | undefined) {
       if (!uri) {
         return {thread: {type: 'unknown', uri: ''} as ThreadUnknown}
       }
+
+      const call = (opts: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+        callSpeakeasyApiWithAgent(agent, opts)
 
       // Check if this is a private post
       const isPrivatePost = uri.includes('/social.spkeasy.private-post/')
@@ -142,6 +158,55 @@ export function usePostThreadQuery(uri: string | undefined) {
             allEncryptedPosts,
             encryptedSessionKeys,
           )
+
+        // Merge private profiles from cache first (instant when coming from feed)
+        const privateProfileDids = Array.from(authorProfileMap.entries())
+          .filter(([, profile]) =>
+            shouldCheckPrivateProfile(profile?.displayName),
+          )
+          .map(([did]) => did)
+        for (const did of privateProfileDids) {
+          const cached = getCachedPrivateProfile(did)
+          if (cached) {
+            const existing = authorProfileMap.get(did)
+            if (existing) {
+              authorProfileMap.set(
+                did,
+                mergePrivateProfileData(existing, cached),
+              )
+            }
+          }
+        }
+        // Only fetch from Speakeasy for DIDs not in cache
+        const uncachedDids = privateProfileDids.filter(
+          did => !getCachedPrivateProfile(did),
+        )
+        if (uncachedDids.length > 0 && currentAccount?.did) {
+          try {
+            const privateProfiles = await fetchPrivateProfiles(
+              uncachedDids,
+              currentAccount.did,
+              call,
+              baseUrl,
+            )
+            for (const [did, data] of privateProfiles) {
+              const existing = authorProfileMap.get(did)
+              if (existing) {
+                authorProfileMap.set(
+                  did,
+                  mergePrivateProfileData(existing, data),
+                )
+              }
+            }
+            if (privateProfiles.size > 0) {
+              upsertCachedPrivateProfiles(privateProfiles)
+            }
+          } catch {
+            // Leave authors unchanged
+          } finally {
+            markDidsChecked(uncachedDids)
+          }
+        }
 
         // Fetch quoted posts
         const quotedPostUris = allPosts
@@ -187,13 +252,44 @@ export function usePostThreadQuery(uri: string | undefined) {
       })
       // TODO get private replies
       if (res.success) {
-        const thread = responseToThreadNodes(
-          res.data.thread,
-          0,
-          'start',
-          baseUrl,
-        )
+        let thread = responseToThreadNodes(res.data.thread, 0, 'start', baseUrl)
         annotateSelfThread(thread)
+
+        // Merge private profiles from cache first (instant when coming from feed)
+        const privateProfileDids = collectPrivateProfileDidsFromThread(thread)
+        const cachedPrivateMap = new Map<string, PrivateProfileData>()
+        for (const did of privateProfileDids) {
+          const cached = getCachedPrivateProfile(did)
+          if (cached) {
+            cachedPrivateMap.set(did, cached)
+          }
+        }
+        if (cachedPrivateMap.size > 0) {
+          thread = mergePrivateProfilesIntoThread(thread, cachedPrivateMap)
+        }
+        // Only fetch from Speakeasy for DIDs not in cache
+        const uncachedDids = privateProfileDids.filter(
+          did => !getCachedPrivateProfile(did),
+        )
+        if (uncachedDids.length > 0 && currentAccount?.did) {
+          try {
+            const privateProfiles = await fetchPrivateProfiles(
+              uncachedDids,
+              currentAccount.did,
+              call,
+              baseUrl,
+            )
+            if (privateProfiles.size > 0) {
+              thread = mergePrivateProfilesIntoThread(thread, privateProfiles)
+              upsertCachedPrivateProfiles(privateProfiles)
+            }
+          } catch {
+            // Leave authors unchanged
+          } finally {
+            markDidsChecked(uncachedDids)
+          }
+        }
+
         return {
           thread,
           threadgate: res.data.threadgate as
@@ -206,11 +302,12 @@ export function usePostThreadQuery(uri: string | undefined) {
     enabled: !!uri,
     placeholderData: () => {
       if (!uri) return
-      const post = findPostInQueryData(queryClient, uri)
-      if (post) {
-        return {thread: post}
-      }
-      return undefined
+      const threadNode = findPostInQueryData(queryClient, uri)
+      if (!threadNode) return undefined
+      // Placeholder comes from raw feed/thread cache (unmerged); merge from
+      // private profile cache so we don't flash sentinel when cache is warm.
+      const merged = mergePrivateProfilesIntoThreadFromCache(threadNode)
+      return {thread: merged}
     },
   })
 }
@@ -788,6 +885,80 @@ export function* findAllProfilesInQueryData(
   for (let profile of findAllProfilesInSearchQueryData(queryClient, did)) {
     yield profile
   }
+}
+
+/**
+ * Collects unique author DIDs from the thread that have the private profile
+ * sentinel and should be checked for private profile data.
+ */
+function collectPrivateProfileDidsFromThread(thread: ThreadNode): string[] {
+  const dids = new Set<string>()
+  for (const node of traverseThread(thread)) {
+    if (node.type === 'post' && node.post.author) {
+      const author = node.post.author
+      if (shouldCheckPrivateProfile(author.displayName)) {
+        dids.add(author.did)
+      }
+    }
+  }
+  return Array.from(dids)
+}
+
+/**
+ * Merges private profile data from the module-level cache into a thread
+ * (e.g. placeholder from feed). Use so placeholder doesn't flash sentinel.
+ */
+function mergePrivateProfilesIntoThreadFromCache(
+  thread: ThreadNode,
+): ThreadNode {
+  const cachedPrivateMap = new Map<string, PrivateProfileData>()
+  for (const node of traverseThread(thread)) {
+    if (
+      node.type === 'post' &&
+      node.post.author &&
+      shouldCheckPrivateProfile(node.post.author.displayName)
+    ) {
+      const cached = getCachedPrivateProfile(node.post.author.did)
+      if (cached) {
+        cachedPrivateMap.set(node.post.author.did, cached)
+      }
+    }
+  }
+  if (cachedPrivateMap.size === 0) return thread
+  return mergePrivateProfilesIntoThread(thread, cachedPrivateMap)
+}
+
+/**
+ * Returns a new thread tree with private profile data merged into each
+ * post author where we have private data for that DID.
+ */
+function mergePrivateProfilesIntoThread(
+  node: ThreadNode,
+  privateMap: Map<string, PrivateProfileData>,
+): ThreadNode {
+  if (node.type !== 'post') {
+    return node
+  }
+  const privateData = node.post.author
+    ? privateMap.get(node.post.author.did)
+    : undefined
+  const mergedPost = privateData
+    ? {
+        ...node.post,
+        author: mergePrivateProfileData(node.post.author, privateData),
+      }
+    : node.post
+  const mergedNode: ThreadPost = {
+    ...node,
+    post: mergedPost,
+    parent: node.parent
+      ? mergePrivateProfilesIntoThread(node.parent, privateMap)
+      : undefined,
+    replies: node.replies?.map(reply =>
+      mergePrivateProfilesIntoThread(reply, privateMap),
+    ),
+  }
+  return mergedNode
 }
 
 function* traverseThread(node: ThreadNode): Generator<ThreadNode, void> {
