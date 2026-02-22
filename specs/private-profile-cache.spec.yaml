@@ -1,0 +1,867 @@
+spec:
+  version: "1.0"
+  name: private-profile-cache-consolidation
+  description: >
+    Consolidate three independent private profile fetching systems into
+    a single module-level cache that prevents redundant Speakeasy API calls.
+    React Query handles staleness/expiry for query-level refetching.
+    The module cache handles deduplication across query boundaries.
+
+# ─── Types ───────────────────────────────────────────────────────────
+
+types:
+  PrivateProfileData:
+    file: src/lib/api/private-profiles.ts
+    fields:
+      displayName: string
+      description: string
+      avatarUri: string | undefined       # resolved CDN URL (for display)
+      bannerUri: string | undefined       # resolved CDN URL (for display)
+      rawAvatarUri: string | undefined    # raw media key (for _privateProfile metadata)
+      rawBannerUri: string | undefined    # raw media key (for _privateProfile metadata)
+    status: CHANGED
+    added_fields: [rawAvatarUri, rawBannerUri]
+    note: >
+      avatarUri/bannerUri contain resolved CDN URLs (e.g. https://cdn.example.com/media-key)
+      used by mergePrivateProfileData for display. rawAvatarUri/rawBannerUri contain the
+      original Speakeasy media keys (e.g. "media-key") needed by the profile editor to
+      reference media assets in save mutations and copy to ATProto on private→public toggle.
+
+  PrivateProfileMetadata:
+    file: src/state/queries/profile.ts
+    fields:
+      isPrivate: boolean
+      avatarUri: string | undefined       # raw Speakeasy media key (NOT resolved URL)
+      bannerUri: string | undefined       # raw Speakeasy media key (NOT resolved URL)
+      loadError: boolean | undefined
+    description: >
+      Attached to profile query results as _privateProfile. Consumed by the
+      profile editor (feature/private-profile-editor) to determine if profile
+      is private, access raw media keys for ATProto migration on toggle, and
+      detect load errors.
+
+  EncryptedProfileResponse:
+    fields:
+      did: string
+      encryptedContent: string
+      encryptedDek: string
+      userKeyPairId: string
+
+# ─── Speakeasy API surface (external, not modified) ─────────────────
+
+api:
+  social.spkeasy.actor.getProfile:
+    type: GET
+    params: { did: string }
+    returns: EncryptedProfileResponse | null
+    note: Single profile fetch. Called by useProfileQuery only.
+
+  social.spkeasy.actor.getProfiles:
+    type: GET
+    params: { dids: string[] }
+    returns: EncryptedProfileResponse[]
+    note: Batch profile fetch. Called by useProfilesQuery and usePrivateProfileFetcher.
+
+# ─── Modules ─────────────────────────────────────────────────────────
+
+modules:
+
+  # ── Module: private-profile-cache ──────────────────────────────────
+  private_profile_cache:
+    file: src/state/cache/private-profile-cache.ts
+    description: >
+      Module-level singleton cache for decrypted private profile data.
+      Single source of truth for "has this DID been checked for a private profile?"
+
+    state:
+      cache:
+        type: Map<string, PrivateProfileData | null>
+        description: >
+          Single data structure serving both as cache and fetch-tracker.
+          Three possible states per DID:
+            - !cache.has(did)        → never checked → API call needed
+            - cache.get(did) === null → checked, no private profile → skip
+            - cache.get(did) === data → has private profile → use it
+        scope: module-level singleton
+        lifetime: persists until clearAll() or page reload
+
+      inflightDids:
+        type: Set<string>
+        description: >
+          DIDs currently being fetched by any fetcher instance.
+          Prevents duplicate concurrent API calls when multiple
+          fetcher instances (feed + notifications) see the same
+          unchecked DID simultaneously.
+        scope: module-level singleton
+        lifetime: transient — DIDs added before API call, removed in finally block
+        status: NEW
+
+      emitter:
+        type: EventEmitter
+        events: ["change"]
+        description: Fires "change" when cache contents are modified
+
+    removed_state:
+      fetchedDids:
+        was: Set<string>
+        reason: >
+          Separate tracking structure that could diverge from cache state.
+          Replaced by using null sentinel values in the cache Map itself.
+          cache.has(did) now serves the same purpose as fetchedDids.has(did).
+
+    exports:
+      getCachedPrivateProfile:
+        signature: "(did: string) => PrivateProfileData | undefined"
+        reads: [cache]
+        writes: []
+        side_effects: none
+        behavior: >
+          Returns the cached data if present and non-null.
+          Returns undefined if DID is not in cache OR if value is null.
+          Callers do not need to distinguish "never checked" from "no profile".
+
+      isDidChecked:
+        signature: "(did: string) => boolean"
+        current_name: isDidFetched
+        rename_to: isDidChecked
+        reads: [cache]
+        writes: []
+        side_effects: none
+        behavior: "return cache.has(did)"
+        note: >
+          Returns true if this DID has been checked (whether it has a
+          private profile or not). Replaces the old isDidFetched which
+          read from the separate fetchedDids Set.
+
+      upsertCachedPrivateProfiles:
+        signature: "(profiles: Map<string, PrivateProfileData>) => void"
+        current_name: setCachedPrivateProfiles
+        rename_to: upsertCachedPrivateProfiles
+        reads: [cache]
+        writes: [cache]
+        behavior: >
+          Merges input entries into the existing cache. Existing entries
+          not present in the input map are left untouched. Only entries
+          whose values differ from the current cache are written.
+        side_effects:
+          - emits "change" ONLY if any value actually differs from existing cache entry
+        idempotent: true
+
+      markDidsChecked:
+        signature: "(dids: string[]) => void"
+        current_name: markDidsFetched
+        rename_to: markDidsChecked
+        reads: [cache]
+        writes: [cache]
+        side_effects:
+          - emits "change" ONLY if any new null entries are added
+        behavior: >
+          For each DID: if NOT already in cache, sets cache.set(did, null).
+          If already in cache (with data or null), leaves it untouched.
+          This marks DIDs as "checked, no private profile" without
+          overwriting existing profile data.
+        note: >
+          Called even when no private profile is found, to prevent
+          re-checking. Safe to call for DIDs that already have cached data.
+
+      evictDid:
+        signature: "(did: string) => void"
+        reads: []
+        writes: [cache]
+        side_effects:
+          - emits "change" if DID was in cache
+        status: NEW
+        description: >
+          Removes a DID from cache entirely (both data and checked-status).
+          Next consumer will re-fetch from API.
+          Used after profile edit mutations.
+
+      claimDids:
+        signature: "(dids: string[]) => string[]"
+        reads: [inflightDids]
+        writes: [inflightDids]
+        side_effects: none
+        status: NEW
+        behavior: >
+          Filters input DIDs to exclude any already in inflightDids.
+          Adds the remaining DIDs to inflightDids.
+          Returns only the claimed (non-inflight) DIDs.
+        description: >
+          Called by fetcher instances before making API calls.
+          Prevents two concurrent fetcher instances from requesting
+          the same DID simultaneously.
+
+      releaseDids:
+        signature: "(dids: string[]) => void"
+        reads: []
+        writes: [inflightDids]
+        side_effects: none
+        status: NEW
+        behavior: >
+          Removes the given DIDs from inflightDids.
+        description: >
+          Called in the finally block of fetchProfiles after API call completes
+          (success or error). Releases the claim so subsequent fetcher runs
+          can pick up these DIDs if needed.
+
+      clearAll:
+        signature: "() => void"
+        reads: []
+        writes: [cache, inflightDids]
+        side_effects:
+          - emits "change"
+        when_called: account switch / logout
+
+      usePrivateProfileCacheVersion:
+        signature: "() => number"
+        type: react-hook
+        reads: []
+        writes: []
+        subscribes_to: emitter "change" event
+        returns: monotonically incrementing counter
+        description: >
+          Components include this in selectArgs/useMemo deps to trigger
+          re-computation when cache contents change.
+
+    removed_exports:
+      clearFetchedDids:
+        reason: >
+          Root cause of excessive re-fetching. Was called on every query
+          refetch event and every fetcher mount, wiping tracking for ALL DIDs
+          globally. Removed entirely.
+
+      removeCachedPrivateProfile:
+        reason: >
+          Replaced by markDidsChecked which sets null, or evictDid which
+          removes entirely. The old function removed from cache but left
+          the DID in fetchedDids — with the unified cache this split no
+          longer makes sense.
+
+      markDidsFetched:
+        reason: Renamed to markDidsChecked and reimplemented against the unified cache.
+
+      isDidFetched:
+        reason: Renamed to isDidChecked and reimplemented as cache.has(did).
+
+  # ── Module: use-private-profile-fetcher ────────────────────────────
+  use_private_profile_fetcher:
+    file: src/state/queries/use-private-profile-fetcher.ts
+    description: >
+      Generic hook that watches a React Query infinite query cache,
+      extracts DIDs from pages, and batch-fetches their private profiles
+      into the module cache. Does NOT mutate query caches.
+
+    parameters:
+      queryKey: QueryKey
+      rqKeyRoot: string
+      extractDids: "(pages: TPage[]) => Set<string>"
+      enabled: boolean
+      logPrefix: string
+
+    behavior:
+      on_mount:
+        - calls fetchProfiles() once
+        - subscribes to queryClient.getQueryCache()
+
+      cache_subscription:
+        filter:
+          - event.type === "updated"
+          - event.query.queryKey[0] === rqKeyRoot
+          - JSON.stringify(event.query.queryKey) === JSON.stringify(queryKey)
+        on_match:
+          - calls fetchProfiles()
+
+      fetchProfiles:
+        preconditions:
+          - enabled === true
+          - currentAccount.did exists
+          - isFetchingRef.current === false
+          - queryData.pages.length > 0
+        steps:
+          - extract allDids from pages via extractDids()
+          - filter: "newDids = allDids.filter(did => !isDidChecked(did))"
+          - if newDids is empty: return (no API call)
+          - "claimedDids = claimDids(newDids)"
+            note: >
+              Filters out DIDs already being fetched by another instance.
+              Only the claimed DIDs are sent to the API.
+          - if claimedDids is empty: return (another instance is fetching them)
+          - set isFetchingRef.current = true
+          - call fetchPrivateProfiles(claimedDids, ...) → social.spkeasy.actor.getProfiles
+          - call upsertCachedPrivateProfiles(results) for DIDs that have profiles
+          - call markDidsChecked(claimedDids) for ALL claimed DIDs
+            note: >
+              markDidsChecked sets null for DIDs not already in cache.
+              DIDs that got data via upsertCachedPrivateProfiles above
+              are already in cache with data, so markDidsChecked is a no-op for them.
+              DIDs with no profile get null (checked, no profile).
+          - call releaseDids(claimedDids) in finally block
+          - set isFetchingRef.current = false
+        on_error:
+          - call markDidsChecked(claimedDids) to prevent retry loops
+          - call releaseDids(claimedDids) in finally block
+          - set isFetchingRef.current = false
+
+    removed_behavior:
+      keyDescriptor_effect:
+        was: "useEffect(() => clearFetchedDids(), [keyDescriptor])"
+        reason: >
+          Cleared ALL tracked DIDs whenever the query key descriptor changed.
+          Not needed — new DIDs from new pages will be unfetched naturally.
+
+      fetch_event_clearing:
+        was: "if (event.action?.type === 'fetch') { clearFetchedDids(); return }"
+        reason: >
+          Cleared ALL tracked DIDs on every query refetch start.
+          This caused a cascade: refetch → clear → success → re-fetch all profiles.
+
+  # ── Module: profile queries ────────────────────────────────────────
+  profile_queries:
+    file: src/state/queries/profile.ts
+
+    useProfileQuery:
+      description: >
+        Fetches a single detailed profile. Used by Profile screen,
+        ProfileHoverCard (on hover), Drawer (mobile).
+        NOT used for feed/notification item authors.
+      query_key: "['profile', did]"
+      staleTime: STALE.SECONDS.FIFTEEN  # 15000ms
+
+      react_query_options:
+        refetchOnWindowFocus:
+          value: false
+          status: CHANGED
+          was: true
+          reason: >
+            Global default is already false. The override to true caused
+            every mounted useProfileQuery to fire both ATProto AND Speakeasy
+            API calls on every window focus event.
+
+      queryFn:
+        steps:
+          - fetch ATProto profile: "agent.getProfile({actor: did})"
+            note: Always fetched. React Query handles its own caching at the query level.
+
+          - check module cache: "isDidChecked(did)"
+            status: NEW
+            if_checked:
+              - read from getCachedPrivateProfile(did)
+              - if data exists:
+                  - merge into result via mergePrivateProfileData()
+                  - reconstruct _privateProfile metadata from cached data:
+                      isPrivate: true
+                      avatarUri: cached.rawAvatarUri
+                      bannerUri: cached.rawBannerUri
+                    note: >
+                      rawAvatarUri/rawBannerUri contain the original Speakeasy
+                      media keys (not resolved CDN URLs). These are needed by the
+                      profile editor to reference media assets in save mutations
+                      and copy to ATProto when toggling private→public.
+              - if data is undefined (was null in cache):
+                  - no merge
+                  - set _privateProfile: { isPrivate: false }
+              - skip Speakeasy API call
+              - return result
+            if_not_checked:
+              - call getPrivateProfile(did) → social.spkeasy.actor.getProfile
+              - on success with data:
+                  - decrypt → decryptedRaw (contains raw media keys)
+                  - resolve URLs: "decrypted = resolvePrivateProfileUrls(decryptedRaw, baseUrl)"
+                  - build cache entry with both raw and resolved:
+                      displayName: decrypted.displayName
+                      description: decrypted.description
+                      avatarUri: decrypted.avatarUri       # resolved CDN URL
+                      bannerUri: decrypted.bannerUri       # resolved CDN URL
+                      rawAvatarUri: decryptedRaw.avatarUri # raw media key
+                      rawBannerUri: decryptedRaw.bannerUri # raw media key
+                  - merge into result via mergePrivateProfileData()
+                  - set _privateProfile metadata:
+                      isPrivate: true
+                      avatarUri: decryptedRaw.avatarUri
+                      bannerUri: decryptedRaw.bannerUri
+                  - call upsertCachedPrivateProfiles(Map{did → cacheEntry})
+              - on NotFound:
+                  - call evictDid(did) then markDidsChecked([did])
+                  - set _privateProfile: { isPrivate: false }
+                  - postcondition: "cache.get(did) === null"
+                  - note: >
+                      evictDid removes any existing entry (including stale data
+                      from when user previously had a private profile).
+                      markDidsChecked then sets null to mark as "checked, no profile".
+                      This prevents re-checking AND clears stale data.
+              - on other error:
+                  - set _privateProfile: { isPrivate: false, loadError: true }
+                  - call markDidsChecked([did])
+
+    useProfilesQuery:
+      description: >
+        Batch profile fetch. Used by LeftNav (all account DIDs),
+        AccountList, AvatarStack.
+      query_key: "['profiles', handles]"
+      staleTime: STALE.MINUTES.FIVE  # 300000ms
+
+      queryFn:
+        steps:
+          - fetch ATProto profiles: "agent.getProfiles({actors: handles})"
+
+          - extract DIDs from response
+
+          - filter unchecked DIDs:
+            status: NEW
+            logic: "uncheckedDids = allDids.filter(did => !isDidChecked(did))"
+
+          - if uncheckedDids.length > 0:
+              - call getPrivateProfiles(uncheckedDids) → social.spkeasy.actor.getProfiles
+              - decrypt each result
+              - call upsertCachedPrivateProfiles(results) for DIDs with profiles
+              - call markDidsChecked(uncheckedDids) for ALL requested DIDs
+
+          - merge ALL profiles from response:
+            status: CHANGED
+            was: only used freshly fetched data for merge
+            now: >
+              For each profile in ATProto response:
+                1. If DID was in the freshly fetched batch → merge fresh data
+                2. Else call getCachedPrivateProfile(did) → merge if non-undefined
+              Only unchecked DIDs are sent to the Speakeasy API. Checked DIDs
+              are merged from the module cache. This is correct because:
+                - React Query controls when this queryFn re-runs (staleTime: 5min)
+                - The module cache is populated by feed/notification fetchers
+                - Checked DIDs already have the best-known data in the cache
+                - If a profile changes, evictDid + invalidateQueries forces a fresh fetch
+
+    usePrefetchProfileQuery:
+      description: >
+        Lightweight prefetch triggered on pointer-move over ProfileHoverCard.
+        Warms the ['profile', did] React Query cache before the card opens.
+      status: CHANGED
+      was: >
+        Only fetched ATProto profile. Did not merge private profile data.
+        This meant prefetched profiles showed anonymized public placeholders
+        until useProfileQuery.queryFn re-ran after staleTime expired.
+      now: >
+        After fetching ATProto profile, reads from module cache via
+        getCachedPrivateProfile(did). If cached data exists, merges it
+        into the prefetched result. This ensures hover cards display
+        private profile data immediately for DIDs already in the cache
+        (the common case — DIDs seen in feed/notification pages).
+
+      queryFn:
+        steps:
+          - fetch ATProto profile: "agent.getProfile({actor: did})"
+          - read module cache: "getCachedPrivateProfile(did)"
+          - if cached data exists:
+              - merge into result via mergePrivateProfileData()
+              - set _privateProfile metadata:
+                  isPrivate: true
+                  avatarUri: cached.rawAvatarUri
+                  bannerUri: cached.rawBannerUri
+          - return result
+        note: >
+          Does NOT call the Speakeasy API — this is a prefetch, not a full fetch.
+          For DIDs not yet in the module cache, the result will be ATProto-only.
+          When useProfileQuery.queryFn later runs (after staleTime), it will
+          do the full Speakeasy check and merge.
+
+    useProfileUpdateMutation:
+      description: Mutation for saving profile edits.
+      onSuccess:
+        steps:
+          - call evictDid(variables.profile.did)
+            status: NEW
+            reason: >
+              Removes DID from cache entirely so isDidChecked returns false.
+              The subsequent invalidateQueries triggers queryFn re-run,
+              which will re-fetch from Speakeasy API.
+          - call queryClient.invalidateQueries({queryKey: RQKEY(did)})
+            status: EXISTING
+
+  # ── Module: feed consumers (NOT modified) ──────────────────────────
+  feed_private_profiles:
+    file: src/state/queries/feed-private-profiles.ts
+    status: NOT_MODIFIED
+    mounts_in: src/view/com/posts/PostFeed.tsx
+    calls: usePrivateProfileFetcher with extractDidsFromFeed
+
+  notification_private_profiles:
+    file: src/state/queries/notifications/private-profiles.ts
+    status: NOT_MODIFIED
+    mounts_in: src/view/com/notifications/NotificationFeed.tsx
+    calls: usePrivateProfileFetcher with extractDidsFromNotifications
+
+  # ── Module: select callbacks (NOT modified) ────────────────────────
+  post_feed_select:
+    file: src/state/queries/post-feed.ts
+    status: NOT_MODIFIED
+    reads_from: getCachedPrivateProfile in select callback
+    triggers_on: usePrivateProfileCacheVersion() change
+
+  notification_feed_select:
+    file: src/state/queries/notifications/feed.ts
+    status: NOT_MODIFIED
+    reads_from: getCachedPrivateProfile in select callback
+    triggers_on: usePrivateProfileCacheVersion() change
+
+# ─── Invariants ──────────────────────────────────────────────────────
+
+invariants:
+  no_duplicate_speakeasy_calls:
+    description: >
+      A DID where cache.has(did) is true MUST NOT trigger a
+      social.spkeasy.actor.getProfile or getProfiles API call
+      from any module.
+    enforced_by:
+      - useProfileQuery checks isDidChecked before getPrivateProfile
+      - useProfilesQuery filters uncheckedDids before getPrivateProfiles
+      - usePrivateProfileFetcher filters newDids before fetchPrivateProfiles
+
+  cache_never_bulk_cleared:
+    description: >
+      The cache Map is never cleared except by clearAll() on logout.
+      Individual DIDs can be evicted via evictDid().
+    enforced_by:
+      - clearFetchedDids() removed from codebase
+      - evictDid() only removes a single DID
+
+  single_data_structure:
+    description: >
+      There is exactly one data structure (the cache Map) that tracks
+      both "has been checked" (cache.has) and "has data" (cache.get !== null).
+      No separate fetchedDids Set exists.
+
+  cache_write_convergence:
+    description: >
+      All three systems write to the same cache Map via
+      upsertCachedPrivateProfiles() and markDidsChecked().
+      There is exactly one source of truth.
+
+  no_concurrent_duplicate_requests:
+    description: >
+      Two fetcher instances (e.g. feed + notifications) that see the same
+      unchecked DID at the same time MUST NOT both send it to the API.
+      The inflightDids Set via claimDids/releaseDids ensures only one
+      instance fetches a given DID.
+    enforced_by:
+      - usePrivateProfileFetcher calls claimDids before API call
+      - usePrivateProfileFetcher calls releaseDids in finally block
+
+  no_refetch_on_window_focus:
+    description: >
+      useProfileQuery does not set refetchOnWindowFocus: true.
+      Window focus does not trigger Speakeasy API calls.
+
+  private_profile_metadata_always_set:
+    description: >
+      Every code path in useProfileQuery queryFn MUST set result._privateProfile
+      before returning. The profile editor depends on this field to determine
+      private/public state, access raw media keys, and detect errors.
+    enforced_by:
+      - cache-hit with data: _privateProfile = { isPrivate: true, avatarUri, bannerUri }
+      - cache-hit with null: _privateProfile = { isPrivate: false }
+      - API success with data: _privateProfile = { isPrivate: true, avatarUri, bannerUri }
+      - API NotFound: _privateProfile = { isPrivate: false }
+      - API error: _privateProfile = { isPrivate: false, loadError: true }
+
+  select_callbacks_unchanged:
+    description: >
+      The post-feed and notification-feed select callbacks are not modified.
+      They continue to read from getCachedPrivateProfile() and re-run
+      when usePrivateProfileCacheVersion() increments.
+
+  atproto_profiles_not_redundantly_fetched:
+    description: >
+      ATProto profiles embedded in feed/notification API responses are used
+      as-is. useProfileQuery and useProfilesQuery only fetch ATProto profiles
+      for their specific use cases (profile screen, hover card, LeftNav).
+      The private profile fetcher (usePrivateProfileFetcher) never makes
+      ATProto profile calls — it only fetches Speakeasy private profiles.
+
+# ─── Scenarios ───────────────────────────────────────────────────────
+
+scenarios:
+
+  initial_notification_page_load:
+    description: User navigates to /notifications for the first time in session
+    preconditions:
+      cache: empty
+    steps:
+      - action: notification feed query fetches page 1 (30 items)
+        api_calls:
+          - social.spkeasy.actor.getProfiles: NOT called yet (query still loading)
+
+      - action: notification data arrives, cache subscription fires
+        triggers: usePrivateProfileFetcher.fetchProfiles()
+        api_calls:
+          - social.spkeasy.actor.getProfiles:
+              called: true
+              dids: all unique author DIDs from page 1
+              count: 1
+        postconditions:
+          cache: >
+            DIDs with private profiles → PrivateProfileData entries.
+            DIDs without private profiles → null entries.
+            All DIDs from page 1 have cache.has(did) === true.
+
+      - action: select callback re-runs (triggered by cache version change)
+        api_calls: none
+        result: notification items display with merged private profile data
+
+  auto_pagination:
+    description: >
+      Notification feed auto-paginates to page 2 because page 1
+      had too few items after filtering.
+    preconditions:
+      cache: populated from page 1 (all page 1 DIDs have entries)
+    steps:
+      - action: page 2 fetch starts
+        api_calls:
+          social.spkeasy.actor.getProfiles: NOT called
+
+      - action: page 2 data arrives, subscription fires fetchProfiles()
+        api_calls:
+          - social.spkeasy.actor.getProfiles:
+              called: only if page 2 has DIDs where cache.has(did) === false
+              dids: only new DIDs not already in cache
+        postconditions:
+          cache: contains entries for DIDs from page 1 AND page 2
+
+  navigate_feed_then_notifications:
+    description: User views feed first, then navigates to notifications
+    steps:
+      - action: feed loads, feed fetcher runs
+        api_calls:
+          - social.spkeasy.actor.getProfiles:
+              called: true
+              dids: feed author DIDs
+        postconditions:
+          cache: contains entries for feed author DIDs
+
+      - action: navigate to notifications, notification fetcher mounts
+        api_calls: none yet
+
+      - action: notification data loads, notification fetcher runs
+        api_calls:
+          - social.spkeasy.actor.getProfiles:
+              called: true
+              dids: only notification DIDs where cache.has(did) === false
+              note: >
+                DIDs shared between feed and notifications are NOT re-fetched.
+                They already have entries in cache from the feed fetcher.
+
+  window_focus:
+    description: User switches tabs and returns to the app
+    preconditions:
+      cache: populated
+    steps:
+      - action: window receives focus event
+        api_calls:
+          social.spkeasy.actor.getProfile: NOT called
+          social.spkeasy.actor.getProfiles: NOT called
+        reason: >
+          refetchOnWindowFocus is false on useProfileQuery.
+          usePrivateProfileFetcher does not respond to window focus.
+
+  profile_edit:
+    description: User edits their private profile
+    preconditions:
+      cache: "cache.get(userDid) === PrivateProfileData (old data)"
+    steps:
+      - action: profile update mutation succeeds
+        triggers:
+          - evictDid(userDid) → cache.delete(userDid)
+          - invalidateQueries(['profile', userDid])
+        postconditions:
+          cache: "cache.has(userDid) === false"
+
+      - action: useProfileQuery re-runs queryFn (triggered by invalidation)
+        checks: "isDidChecked(userDid) → false (was evicted)"
+        api_calls:
+          - social.spkeasy.actor.getProfile:
+              called: true
+              did: userDid
+        postconditions:
+          cache: "cache.get(userDid) === PrivateProfileData (new data)"
+
+  profile_goes_public:
+    description: User switches from private to public profile
+    preconditions:
+      cache: "cache.get(userDid) === PrivateProfileData (old private data)"
+    steps:
+      - action: profile update mutation succeeds (public mode)
+        triggers:
+          - evictDid(userDid) → cache.delete(userDid)
+          - invalidateQueries(['profile', userDid])
+
+      - action: useProfileQuery re-runs, getPrivateProfile returns NotFound
+        triggers:
+          - evictDid(userDid) then markDidsChecked([userDid])
+        postconditions:
+          cache: "cache.get(userDid) === null (no stale private data)"
+        result: >
+          Feed/notification select callbacks call getCachedPrivateProfile(userDid)
+          which returns undefined (null in cache). ATProto profile displayed as-is.
+
+  leftnav_profiles_query:
+    description: LeftNav useProfilesQuery loads account profiles
+    preconditions:
+      cache: contains entries for some DIDs from prior feed/notification fetches
+    steps:
+      - action: useProfilesQuery queryFn runs for account DIDs [A, B]
+        checks:
+          - "isDidChecked(A) → true (cache.has(A) from feed)"
+          - "isDidChecked(B) → false (not in cache)"
+        api_calls:
+          - social.spkeasy.actor.getProfiles:
+              called: true
+              dids: [B]
+        merge_behavior:
+          - profile A: merged with getCachedPrivateProfile(A) from cache
+          - profile B: merged with freshly fetched data
+
+  hover_card_profile:
+    description: User hovers over a notification author avatar
+    preconditions:
+      cache: "cache.get(authorDid) === PrivateProfileData (from batch fetch)"
+    steps:
+      - action: pointer moves over avatar, usePrefetchProfileQuery fires
+        api_calls:
+          - app.bsky.actor.getProfile:
+              called: true
+              note: ATProto profile prefetched
+          - social.spkeasy.actor.getProfile:
+              called: false
+              note: prefetch does not call Speakeasy API
+        result: >
+          Prefetched data merged with getCachedPrivateProfile(authorDid).
+          React Query cache now contains ATProto + private profile data.
+
+      - action: hover card opens, useProfileQuery({did: authorDid}) mounts
+        checks: "React Query cache has fresh data (within staleTime)"
+        api_calls:
+          - app.bsky.actor.getProfile: NOT called (data is fresh)
+          - social.spkeasy.actor.getProfile: NOT called (data is fresh)
+        result: >
+          useProfileQuery returns prefetched+merged data.
+          Private profile (displayName, avatar, etc.) displays correctly.
+
+  concurrent_fetchers:
+    description: Feed and notification fetchers both see the same unchecked DID
+    preconditions:
+      cache: empty
+    steps:
+      - action: feed data and notification data arrive near-simultaneously
+        triggers:
+          - feed fetcher calls fetchProfiles(), sees DID-X as unchecked
+          - notification fetcher calls fetchProfiles(), sees DID-X as unchecked
+        resolution:
+          - first fetcher calls claimDids([DID-X, ...]) → claims DID-X
+          - second fetcher calls claimDids([DID-X, ...]) → DID-X filtered out (already inflight)
+          - first fetcher completes, calls releaseDids + markDidsChecked
+          - second fetcher may re-run later but DID-X is now in cache → no API call
+        api_calls:
+          social.spkeasy.actor.getProfiles: "DID-X included in exactly 1 batch call"
+
+  logout:
+    description: User logs out
+    steps:
+      - action: clearAll() called
+        postconditions:
+          cache: empty (Map size 0)
+          inflightDids: empty
+          emitter: "change" event fired
+
+# ─── Files Changed ───────────────────────────────────────────────────
+
+files:
+  modified:
+    - path: src/lib/api/private-profiles.ts
+      changes:
+        - "add rawAvatarUri and rawBannerUri fields to PrivateProfileData type"
+        - "update resolvePrivateProfileUrls to preserve raw keys:"
+        - "  rawAvatarUri: data.avatarUri (original value before resolution)"
+        - "  rawBannerUri: data.bannerUri (original value before resolution)"
+        - "  avatarUri: `${baseUrl}/${data.avatarUri}` (resolved, as before)"
+        - "  bannerUri: `${baseUrl}/${data.bannerUri}` (resolved, as before)"
+      note: >
+        fetchPrivateProfiles already calls resolvePrivateProfileUrls, so
+        batch-fetched results will automatically include raw keys.
+        mergePrivateProfileData is NOT modified — it only reads avatarUri/bannerUri
+        (resolved) and ignores the raw fields.
+
+    - path: src/state/cache/private-profile-cache.ts
+      changes:
+        - "change cache type: Map<string, PrivateProfileData> → Map<string, PrivateProfileData | null>"
+        - remove fetchedDids Set entirely
+        - add inflightDids Set<string>
+        - remove clearFetchedDids() function and export
+        - "rename isDidFetched → isDidChecked, reimplement as cache.has(did)"
+        - "rename setCachedPrivateProfiles → upsertCachedPrivateProfiles"
+        - "rename markDidsFetched → markDidsChecked, reimplement to set null for uncached DIDs"
+        - remove removeCachedPrivateProfile (replaced by evictDid + markDidsChecked)
+        - add evictDid(did) function (cache.delete + emit change)
+        - add claimDids(dids) function (filter + add to inflightDids)
+        - add releaseDids(dids) function (remove from inflightDids)
+        - "update getCachedPrivateProfile to return undefined for null entries"
+        - "update clearAll to clear cache + inflightDids (no more fetchedDids)"
+
+    - path: src/state/queries/profile.ts
+      changes:
+        - "update imports: isDidChecked, getCachedPrivateProfile, evictDid, markDidsChecked, upsertCachedPrivateProfiles"
+        - "useProfileQuery: remove refetchOnWindowFocus line"
+        - "useProfileQuery queryFn: add isDidChecked check before getPrivateProfile call"
+        - "useProfileQuery queryFn: reconstruct _privateProfile in all code paths (cache-hit, API success, NotFound, error)"
+        - "useProfileQuery queryFn: build cache entry with rawAvatarUri/rawBannerUri before upsert"
+        - "useProfileQuery queryFn NotFound branch: evictDid + markDidsChecked to clear stale data"
+        - "useProfilesQuery queryFn: filter uncheckedDids before getPrivateProfiles call"
+        - "useProfilesQuery queryFn: merge using cache fallback for checked DIDs"
+        - "usePrefetchProfileQuery queryFn: merge from getCachedPrivateProfile + set _privateProfile"
+        - "useProfileUpdateMutation onSuccess: add evictDid call before invalidateQueries"
+
+    - path: src/state/queries/use-private-profile-fetcher.ts
+      changes:
+        - "update imports: isDidChecked, markDidsChecked, upsertCachedPrivateProfiles, claimDids, releaseDids (remove clearFetchedDids, removeCachedPrivateProfile)"
+        - remove keyDescriptor useEffect (lines 49-52)
+        - remove clearFetchedDids call in subscription handler (line 131)
+        - simplify subscription to just call fetchProfiles() on all matching events
+        - "update fetchProfiles: use claimDids before API call, releaseDids in finally"
+        - "update fetchProfiles: use isDidChecked, markDidsChecked, upsertCachedPrivateProfiles"
+
+  not_modified:
+    - src/state/queries/feed-private-profiles.ts
+    - src/state/queries/notifications/private-profiles.ts
+    - src/state/queries/post-feed.ts
+    - src/state/queries/notifications/feed.ts
+    - src/view/com/notifications/NotificationFeed.tsx
+    - src/view/com/posts/PostFeed.tsx
+
+# ─── Verification ────────────────────────────────────────────────────
+
+verification:
+  typecheck:
+    command: npx tsc --noEmit
+
+  manual_checks:
+    - name: notification page load
+      steps:
+        - open browser devtools network tab, filter by "spkeasy"
+        - navigate to /notifications
+        - "assert: at most 1 batch getProfiles call"
+        - "assert: 0 individual getProfile calls for notification authors"
+
+    - name: cross-view deduplication
+      steps:
+        - navigate to feed (observe getProfiles call)
+        - navigate to notifications
+        - "assert: getProfiles only includes DIDs not seen in feed"
+
+    - name: window focus
+      steps:
+        - on notifications page, switch to another browser tab
+        - switch back
+        - "assert: no spkeasy API calls fired"
+
+    - name: profile edit round-trip
+      steps:
+        - edit your private profile and save
+        - "assert: getProfile fires for your DID after save"
+        - "assert: updated profile data displays correctly"
