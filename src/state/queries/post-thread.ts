@@ -26,7 +26,10 @@ import {
   type PrivateProfileData,
   shouldCheckPrivateProfile,
 } from '#/lib/api/private-profiles'
-import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {
+  callSpeakeasyApiWithAgent,
+  type SpeakeasyApiCall,
+} from '#/lib/api/speakeasy'
 import {moderatePost_wrapped as moderatePost} from '#/lib/moderatePost_wrapped'
 import {
   getCachedPrivateProfile,
@@ -101,6 +104,41 @@ export type ThreadUnknown = {
   uri: string
 }
 
+/**
+ * Fetches private profile data for DIDs (from cache and Speakeasy), upserts
+ * cache, and marks DIDs checked. Returns a single Map of all available private
+ * data for the requested DIDs.
+ */
+async function getPrivateProfilesForDids(
+  dids: string[],
+  userDid: string | undefined,
+  call: SpeakeasyApiCall,
+  baseUrl: string,
+): Promise<Map<string, PrivateProfileData>> {
+  const result = new Map<string, PrivateProfileData>()
+  for (const did of dids) {
+    const cached = getCachedPrivateProfile(did)
+    if (cached) result.set(did, cached)
+  }
+  const uncachedDids = dids.filter(did => !getCachedPrivateProfile(did))
+  if (uncachedDids.length === 0 || !userDid) return result
+  try {
+    const privateProfiles = await fetchPrivateProfiles(
+      uncachedDids,
+      userDid,
+      call,
+      baseUrl,
+    )
+    for (const [did, data] of privateProfiles) result.set(did, data)
+    if (privateProfiles.size > 0) upsertCachedPrivateProfiles(privateProfiles)
+  } catch {
+    // Leave result with cache-only data
+  } finally {
+    markDidsChecked(uncachedDids)
+  }
+  return result
+}
+
 export type ThreadNode =
   | ThreadPost
   | ThreadNotFound
@@ -159,50 +197,19 @@ export function usePostThreadQuery(uri: string | undefined) {
             encryptedSessionKeys,
           )
 
-        // Merge private profiles from cache first (instant when coming from feed)
         const privateProfileDids = Array.from(authorProfileMap.entries())
           .filter(([, profile]) => shouldCheckPrivateProfile(profile))
           .map(([did]) => did)
-        for (const did of privateProfileDids) {
-          const cached = getCachedPrivateProfile(did)
-          if (cached) {
-            const existing = authorProfileMap.get(did)
-            if (existing) {
-              authorProfileMap.set(
-                did,
-                mergePrivateProfileData(existing, cached),
-              )
-            }
-          }
-        }
-        // Only fetch from Speakeasy for DIDs not in cache
-        const uncachedDids = privateProfileDids.filter(
-          did => !getCachedPrivateProfile(did),
+        const privateMap = await getPrivateProfilesForDids(
+          privateProfileDids,
+          currentAccount?.did,
+          call,
+          baseUrl,
         )
-        if (uncachedDids.length > 0 && currentAccount?.did) {
-          try {
-            const privateProfiles = await fetchPrivateProfiles(
-              uncachedDids,
-              currentAccount.did,
-              call,
-              baseUrl,
-            )
-            for (const [did, data] of privateProfiles) {
-              const existing = authorProfileMap.get(did)
-              if (existing) {
-                authorProfileMap.set(
-                  did,
-                  mergePrivateProfileData(existing, data),
-                )
-              }
-            }
-            if (privateProfiles.size > 0) {
-              upsertCachedPrivateProfiles(privateProfiles)
-            }
-          } catch {
-            // Leave authors unchanged
-          } finally {
-            markDidsChecked(uncachedDids)
+        for (const [did, data] of privateMap) {
+          const existing = authorProfileMap.get(did)
+          if (existing) {
+            authorProfileMap.set(did, mergePrivateProfileData(existing, data))
           }
         }
 
@@ -253,39 +260,15 @@ export function usePostThreadQuery(uri: string | undefined) {
         let thread = responseToThreadNodes(res.data.thread, 0, 'start', baseUrl)
         annotateSelfThread(thread)
 
-        // Merge private profiles from cache first (instant when coming from feed)
         const privateProfileDids = collectPrivateProfileDidsFromThread(thread)
-        const cachedPrivateMap = new Map<string, PrivateProfileData>()
-        for (const did of privateProfileDids) {
-          const cached = getCachedPrivateProfile(did)
-          if (cached) {
-            cachedPrivateMap.set(did, cached)
-          }
-        }
-        if (cachedPrivateMap.size > 0) {
-          thread = mergePrivateProfilesIntoThread(thread, cachedPrivateMap)
-        }
-        // Only fetch from Speakeasy for DIDs not in cache
-        const uncachedDids = privateProfileDids.filter(
-          did => !getCachedPrivateProfile(did),
+        const privateMap = await getPrivateProfilesForDids(
+          privateProfileDids,
+          currentAccount?.did,
+          call,
+          baseUrl,
         )
-        if (uncachedDids.length > 0 && currentAccount?.did) {
-          try {
-            const privateProfiles = await fetchPrivateProfiles(
-              uncachedDids,
-              currentAccount.did,
-              call,
-              baseUrl,
-            )
-            if (privateProfiles.size > 0) {
-              thread = mergePrivateProfilesIntoThread(thread, privateProfiles)
-              upsertCachedPrivateProfiles(privateProfiles)
-            }
-          } catch {
-            // Leave authors unchanged
-          } finally {
-            markDidsChecked(uncachedDids)
-          }
+        if (privateMap.size > 0) {
+          thread = mergePrivateProfilesIntoThread(thread, privateMap)
         }
 
         return {
