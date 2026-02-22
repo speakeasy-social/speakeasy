@@ -27,60 +27,69 @@ export function PrivateProfileInfoDialog({
     <Dialog.Outer control={control}>
       <Dialog.Handle />
       <Dialog.ScrollableInner label={_(msg`Private Profile`)}>
-        <View style={[a.gap_xl]}>
-          <Text style={[a.text_2xl, a.font_bold]}>
-            <Trans>Private Profile</Trans>
+        <View style={[a.gap_lg]}>
+          <Text style={[a.text_2xl, a.font_bold, a.pb_sm, a.leading_snug]}>
+            <Trans>Making your Profile Private</Trans>
           </Text>
 
-          <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-            <Trans>
-              There's only so much we can make private on a Bluesky account.
-              Setting your account to private will hide the following from the
-              public and show it only to people you trust:
-            </Trans>
-          </Text>
-
-          <View style={[a.pl_md]}>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-              <Trans>• Display Name</Trans>
-            </Text>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-              <Trans>• Pronouns</Trans>
-            </Text>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-              <Trans>• Description</Trans>
-            </Text>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-              <Trans>• Profile Picture and Banner</Trans>
-            </Text>
-          </View>
-
-          <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-            <Trans>Things that will still be visible to the public:</Trans>
-          </Text>
-
-          <View style={[a.pl_md]}>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
-              <Trans>• Who you follow / who follows you</Trans>
-            </Text>
-            <Text style={[a.text_md, t.atoms.text_contrast_medium]}>
+          <View style={[a.gap_xs, a.pb_lg]}>
+            <Text
+              style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
               <Trans>
-                • Any public posts you have already made, or any public posts
-                you make in the future
+                There's only so much we can make private on a Bluesky account.
+                Setting your account to private will hide the following from the
+                public and show it only to people you trust:
               </Trans>
             </Text>
+            <View style={[a.pl_md, a.gap_xs]}>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Display Name</Trans>
+              </Text>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Pronouns</Trans>
+              </Text>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Description</Trans>
+              </Text>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Profile Picture and Banner</Trans>
+              </Text>
+            </View>
           </View>
 
-          <Button
-            variant="solid"
-            color="primary"
-            size="large"
-            label={_(msg`Got it`)}
-            onPress={handleGotIt}>
-            <ButtonText>
-              <Trans>Got it</Trans>
-            </ButtonText>
-          </Button>
+          <View style={[a.gap_xs]}>
+            <Text
+              style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+              <Trans>Things that will still be visible to the public:</Trans>
+            </Text>
+            <View style={[a.pl_md, a.gap_xs]}>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Who you follow / who follows you</Trans>
+              </Text>
+              <Text
+                style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
+                <Trans>• Any existing or future public posts</Trans>
+              </Text>
+            </View>
+          </View>
+
+          <View style={[a.pt_xl]}>
+            <Button
+              variant="solid"
+              color="primary"
+              size="large"
+              label={_(msg`Got it`)}
+              onPress={handleGotIt}>
+              <ButtonText>
+                <Trans>Got it</Trans>
+              </ButtonText>
+            </Button>
+          </View>
         </View>
       </Dialog.ScrollableInner>
     </Dialog.Outer>
