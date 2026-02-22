@@ -592,6 +592,7 @@ type NewMedia = {path: string; mime: string}
  * @param call - The API call function
  * @param queryClient - The React Query client instance
  * @param profileData - The profile data to save
+ * @returns Resolved avatar and banner URIs (Speakeasy media keys) for optimistic cache updates
  */
 export async function savePrivateProfile(
   agent: BskyAgent,
@@ -607,7 +608,7 @@ export async function savePrivateProfile(
     existingBannerUri?: string
     pronouns?: string | PronounSet[]
   },
-): Promise<void> {
+): Promise<{avatarUri?: string; bannerUri?: string}> {
   const {isPublic} = profileData
 
   // When switching to public, delete private profile and return early
@@ -621,7 +622,7 @@ export async function savePrivateProfile(
         throw error
       }
     }
-    return
+    return {}
   }
 
   // Private profile: get/create session and save encrypted data
@@ -703,4 +704,6 @@ export async function savePrivateProfile(
     },
     call,
   )
+
+  return {avatarUri, bannerUri}
 }

@@ -434,16 +434,19 @@ function resolvePrivatePronouns(pronouns: {
  * Must match the shape we just saved to Speakeasy so the refetch uses cache
  * instead of calling getPrivateProfile (avoids race where Speakeasy isn't ready yet).
  */
-function buildOptimisticPrivateProfileFromUpdateParams(variables: {
-  updates:
-    | AppBskyActorProfile.Record
-    | ((existing: AppBskyActorProfile.Record) => AppBskyActorProfile.Record)
-  privateDisplayName?: string
-  privateDescription?: string
-  existingPrivateAvatarUri?: string
-  existingPrivateBannerUri?: string
-  pronouns?: {native: string; sets: PronounSet[]}
-}): PrivateProfileData {
+function buildOptimisticPrivateProfileFromUpdateParams(
+  variables: {
+    updates:
+      | AppBskyActorProfile.Record
+      | ((existing: AppBskyActorProfile.Record) => AppBskyActorProfile.Record)
+    privateDisplayName?: string
+    privateDescription?: string
+    existingPrivateAvatarUri?: string
+    existingPrivateBannerUri?: string
+    pronouns?: {native: string; sets: PronounSet[]}
+  },
+  saved?: {avatarUri?: string; bannerUri?: string},
+): PrivateProfileData {
   const displayName =
     variables.privateDisplayName ??
     (typeof variables.updates === 'function'
@@ -460,8 +463,8 @@ function buildOptimisticPrivateProfileFromUpdateParams(variables: {
   return {
     displayName,
     description,
-    avatarUri: variables.existingPrivateAvatarUri,
-    bannerUri: variables.existingPrivateBannerUri,
+    avatarUri: saved?.avatarUri ?? variables.existingPrivateAvatarUri,
+    bannerUri: saved?.bannerUri ?? variables.existingPrivateBannerUri,
     pronouns,
   }
 }
@@ -490,7 +493,11 @@ interface ProfileUpdateParams {
 export function useProfileUpdateMutation() {
   const queryClient = useQueryClient()
   const agent = useAgent()
-  return useMutation<void, Error, ProfileUpdateParams>({
+  return useMutation<
+    {avatarUri?: string; bannerUri?: string} | void,
+    Error,
+    ProfileUpdateParams
+  >({
     mutationFn: async ({
       profile,
       updates,
@@ -518,7 +525,7 @@ export function useProfileUpdateMutation() {
           ? resolvePrivatePronouns(pronouns)
           : undefined
 
-        await savePrivateProfile(agent, call, queryClient, {
+        const saved = await savePrivateProfile(agent, call, queryClient, {
           displayName:
             privateDisplayName ??
             (typeof updates === 'function' ? '' : updates.displayName || ''),
@@ -577,6 +584,8 @@ export function useProfileUpdateMutation() {
             res.data.description === anonymized.description
           )
         })
+
+        return saved
       } else {
         // Becoming public or staying public:
         // 1. Build avatar/banner promises (upload or migrate from Speakeasy)
@@ -642,7 +651,10 @@ export function useProfileUpdateMutation() {
     onSuccess(data, variables) {
       const did = variables.profile.did
       if (variables.isPrivate) {
-        const raw = buildOptimisticPrivateProfileFromUpdateParams(variables)
+        const raw = buildOptimisticPrivateProfileFromUpdateParams(
+          variables,
+          typeof data === 'object' && data !== null ? data : undefined,
+        )
         const baseUrl = getBaseCdnUrl(agent)
         const resolved = resolvePrivateProfileUrls(raw, baseUrl)
         upsertCachedPrivateProfiles(new Map([[did, resolved]]))
