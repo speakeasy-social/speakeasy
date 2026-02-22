@@ -355,11 +355,7 @@ function buildAvatarBannerPromisesForPublicProfile(
       newUserAvatar.path,
       newUserAvatar.mime,
     )
-  } else if (
-    newUserAvatar === undefined &&
-    existingPrivateAvatarUri &&
-    !profile.avatar
-  ) {
+  } else if (newUserAvatar === undefined && existingPrivateAvatarUri) {
     newUserAvatarPromise = migrateMediaToAtProto(
       existingPrivateAvatarUri,
       agent,
@@ -374,11 +370,7 @@ function buildAvatarBannerPromisesForPublicProfile(
       newUserBanner.path,
       newUserBanner.mime,
     )
-  } else if (
-    newUserBanner === undefined &&
-    existingPrivateBannerUri &&
-    !profile.banner
-  ) {
+  } else if (newUserBanner === undefined && existingPrivateBannerUri) {
     newUserBannerPromise = migrateMediaToAtProto(
       existingPrivateBannerUri,
       agent,
