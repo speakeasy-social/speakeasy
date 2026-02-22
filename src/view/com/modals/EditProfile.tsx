@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react'
+import {Fragment, useCallback, useState} from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -40,6 +40,8 @@ import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
 import {UserBanner} from '#/view/com/util/UserBanner'
 import {Admonition} from '#/components/Admonition'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
+import * as Dialog from '#/components/Dialog'
+import {PrivateProfileInfoDialog} from '#/components/dialogs/PrivateProfileInfoDialog'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {ErrorMessage} from '../util/error/ErrorMessage'
@@ -60,6 +62,7 @@ export function Component({
   const theme = useTheme()
   const {_} = useLingui()
   const {closeModal} = useModalControls()
+  const privateProfileInfoControl = Dialog.useDialogControl()
   const updateMutation = useProfileUpdateMutation()
   const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState<string>('')
@@ -80,8 +83,6 @@ export function Component({
     if (!stored || stored === DEFAULT_PRIVATE_DESCRIPTION) return ''
     return stored
   })
-  const [privateAvatarUri] = useState(profile._privateProfile?.avatarUri)
-  const [privateBannerUri] = useState(profile._privateProfile?.bannerUri)
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -177,8 +178,13 @@ export function Component({
         })
       }
       Toast.show(_(msg`Profile updated`))
-      onUpdate?.()
-      closeModal()
+      const transitioningToPrivate = !privateProfileMeta?.isPrivate && isPrivate
+      if (transitioningToPrivate) {
+        privateProfileInfoControl.open()
+      } else {
+        onUpdate?.()
+        closeModal()
+      }
     } catch (e: any) {
       logger.error('Failed to update user profile', {message: String(e)})
     }
@@ -195,196 +201,212 @@ export function Component({
     pronounsTooLong,
     isPrivate,
     publicDescription,
-    privateAvatarUri,
-    privateBannerUri,
+    privateProfileMeta?.isPrivate,
+    privateProfileMeta?.avatarUri,
+    privateProfileMeta?.bannerUri,
+    privateProfileInfoControl,
     newUserAvatar,
     newUserBanner,
     setImageError,
     _,
   ])
 
-  return (
-    <KeyboardAvoidingView style={s.flex1} behavior="height">
-      <ScrollView style={[pal.view]} testID="editProfileModal">
-        <Text style={[styles.title, pal.text]}>
-          <Trans>Edit my profile</Trans>
-        </Text>
-        <View style={styles.photos}>
-          <UserBanner
-            banner={userBanner}
-            onSelectNewBanner={onSelectNewBanner}
-          />
-          <View style={[styles.avi, {borderColor: pal.colors.background}]}>
-            <EditableUserAvatar
-              size={80}
-              avatar={userAvatar}
-              onSelectNewAvatar={onSelectNewAvatar}
-            />
-          </View>
-        </View>
-        {updateMutation.isError && (
-          <View style={styles.errorContainer}>
-            <ErrorMessage message={cleanError(updateMutation.error)} />
-          </View>
-        )}
-        {imageError !== '' && (
-          <View style={styles.errorContainer}>
-            <ErrorMessage message={imageError} />
-          </View>
-        )}
-        <View style={styles.form}>
-          <View style={[s.pb10]}>
-            <View style={[styles.toggleContainer]}>
-              <Text style={[styles.label, pal.text]}>
-                <Trans>Profile Visibility</Trans>
-              </Text>
-              <Button
-                variant="solid"
-                color="secondary"
-                onPress={() => setIsPrivate(!isPrivate)}
-                style={[
-                  styles.visibilityButton,
-                  isPrivate ? styles.private : styles.public,
-                ]}
-                accessibilityHint={_(
-                  msg`Choose to make your profile visible publicly, or only to people you trust`,
-                )}
-                accessibilityLabel={isPrivate ? _('Private') : _('Public')}
-                label={isPrivate ? _('Private') : _('Public')}>
-                <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
-                <ButtonText style={styles.visibilityButtonText}>
-                  {isPrivate ? _('Private') : _('Public')}
-                </ButtonText>
-              </Button>
-            </View>
-            <Admonition type="info">
-              {isPrivate
-                ? _(
-                    "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
-                  )
-                : _('Your profile is visible to everyone')}
-            </Admonition>
-          </View>
-          <View>
-            <Text style={[styles.label, pal.text]}>
-              <Trans>Display Name</Trans>
-            </Text>
-            <TextInput
-              testID="editProfileDisplayNameInput"
-              style={[styles.textInput, pal.border, pal.text]}
-              placeholder={_(msg`e.g. Alice Roberts`)}
-              placeholderTextColor={colors.gray4}
-              value={displayName}
-              onChangeText={v =>
-                setDisplayName(enforceLen(v, MAX_DISPLAY_NAME))
-              }
-              accessible={true}
-              accessibilityLabel={_(msg`Display name`)}
-              accessibilityHint={_(msg`Edit your display name`)}
-            />
-          </View>
-          <View style={s.pb10}>
-            <Text style={[styles.label, pal.text]}>
-              <Trans>Description</Trans>
-            </Text>
-            <TextInput
-              testID="editProfileDescriptionInput"
-              style={[styles.textArea, pal.border, pal.text]}
-              placeholder={_(msg`e.g. Artist, dog-lover, and avid reader.`)}
-              placeholderTextColor={colors.gray4}
-              keyboardAppearance={theme.colorScheme}
-              multiline
-              value={description}
-              onChangeText={v => setDescription(enforceLen(v, MAX_DESCRIPTION))}
-              accessible={true}
-              accessibilityLabel={_(msg`Description`)}
-              accessibilityHint={_(msg`Edit your profile description`)}
-            />
-          </View>
-          <View style={s.pb10}>
-            <Text style={[styles.label, pal.text]}>
-              <Trans>Pronouns</Trans>
-            </Text>
-            <TextInput
-              testID="editProfilePronounsInput"
-              style={[styles.textInput, pal.border, pal.text]}
-              placeholder={_(msg`e.g. she/her, they/them`)}
-              placeholderTextColor={colors.gray4}
-              value={pronouns}
-              onChangeText={setPronouns}
-              accessible={true}
-              accessibilityLabel={_(msg`Pronouns`)}
-              accessibilityHint={_(msg`Edit your pronouns`)}
-            />
-          </View>
+  const handlePrivateProfileInfoAck = useCallback(() => {
+    closeModal()
+    onUpdate?.()
+  }, [closeModal, onUpdate])
 
-          {isPrivate && (
-            <View style={s.pb10}>
+  return (
+    <Fragment>
+      <KeyboardAvoidingView style={s.flex1} behavior="height">
+        <ScrollView style={[pal.view]} testID="editProfileModal">
+          <Text style={[styles.title, pal.text]}>
+            <Trans>Edit my profile</Trans>
+          </Text>
+          <View style={styles.photos}>
+            <UserBanner
+              banner={userBanner}
+              onSelectNewBanner={onSelectNewBanner}
+            />
+            <View style={[styles.avi, {borderColor: pal.colors.background}]}>
+              <EditableUserAvatar
+                size={80}
+                avatar={userAvatar}
+                onSelectNewAvatar={onSelectNewAvatar}
+              />
+            </View>
+          </View>
+          {updateMutation.isError && (
+            <View style={styles.errorContainer}>
+              <ErrorMessage message={cleanError(updateMutation.error)} />
+            </View>
+          )}
+          {imageError !== '' && (
+            <View style={styles.errorContainer}>
+              <ErrorMessage message={imageError} />
+            </View>
+          )}
+          <View style={styles.form}>
+            <View style={[s.pb10]}>
+              <View style={[styles.toggleContainer]}>
+                <Text style={[styles.label, pal.text]}>
+                  <Trans>Profile Visibility</Trans>
+                </Text>
+                <Button
+                  variant="solid"
+                  color="secondary"
+                  onPress={() => setIsPrivate(!isPrivate)}
+                  style={[
+                    styles.visibilityButton,
+                    isPrivate ? styles.private : styles.public,
+                  ]}
+                  accessibilityHint={_(
+                    msg`Choose to make your profile visible publicly, or only to people you trust`,
+                  )}
+                  accessibilityLabel={isPrivate ? _('Private') : _('Public')}
+                  label={isPrivate ? _('Private') : _('Public')}>
+                  <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
+                  <ButtonText style={styles.visibilityButtonText}>
+                    {isPrivate ? _('Private') : _('Public')}
+                  </ButtonText>
+                </Button>
+              </View>
+              <Admonition type="info">
+                {isPrivate
+                  ? _(
+                      "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
+                    )
+                  : _('Your profile is visible to everyone')}
+              </Admonition>
+            </View>
+            <View>
               <Text style={[styles.label, pal.text]}>
-                <Trans>Public Description</Trans>
+                <Trans>Display Name</Trans>
               </Text>
               <TextInput
-                testID="editProfilePublicDescriptionInput"
+                testID="editProfileDisplayNameInput"
+                style={[styles.textInput, pal.border, pal.text]}
+                placeholder={_(msg`e.g. Alice Roberts`)}
+                placeholderTextColor={colors.gray4}
+                value={displayName}
+                onChangeText={v =>
+                  setDisplayName(enforceLen(v, MAX_DISPLAY_NAME))
+                }
+                accessible={true}
+                accessibilityLabel={_(msg`Display name`)}
+                accessibilityHint={_(msg`Edit your display name`)}
+              />
+            </View>
+            <View style={s.pb10}>
+              <Text style={[styles.label, pal.text]}>
+                <Trans>Description</Trans>
+              </Text>
+              <TextInput
+                testID="editProfileDescriptionInput"
                 style={[styles.textArea, pal.border, pal.text]}
-                placeholder={_(
-                  msg`This profile is private and only visible on @spkeasy.social`,
-                )}
+                placeholder={_(msg`e.g. Artist, dog-lover, and avid reader.`)}
                 placeholderTextColor={colors.gray4}
                 keyboardAppearance={theme.colorScheme}
                 multiline
-                value={publicDescription}
-                onChangeText={setPublicDescription}
+                value={description}
+                onChangeText={v =>
+                  setDescription(enforceLen(v, MAX_DESCRIPTION))
+                }
                 accessible={true}
-                accessibilityLabel={_(msg`Public description`)}
-                accessibilityHint={_(
-                  msg`A description of your profile visible to everyone`,
-                )}
+                accessibilityLabel={_(msg`Description`)}
+                accessibilityHint={_(msg`Edit your profile description`)}
               />
             </View>
-          )}
-          {updateMutation.isPending ? (
-            <View style={[styles.btn, s.mt10, {backgroundColor: colors.gray2}]}>
-              <ActivityIndicator />
+            <View style={s.pb10}>
+              <Text style={[styles.label, pal.text]}>
+                <Trans>Pronouns</Trans>
+              </Text>
+              <TextInput
+                testID="editProfilePronounsInput"
+                style={[styles.textInput, pal.border, pal.text]}
+                placeholder={_(msg`e.g. she/her, they/them`)}
+                placeholderTextColor={colors.gray4}
+                value={pronouns}
+                onChangeText={setPronouns}
+                accessible={true}
+                accessibilityLabel={_(msg`Pronouns`)}
+                accessibilityHint={_(msg`Edit your pronouns`)}
+              />
             </View>
-          ) : (
-            <TouchableOpacity
-              testID="editProfileSaveBtn"
-              style={s.mt10}
-              onPress={onPressSave}
-              accessibilityRole="button"
-              accessibilityLabel={_(msg`Save`)}
-              accessibilityHint={_(msg`Saves any changes to your profile`)}>
-              <LinearGradient
-                colors={[gradients.blueLight.start, gradients.blueLight.end]}
-                start={{x: 0, y: 0}}
-                end={{x: 1, y: 1}}
-                style={[styles.btn]}>
-                <Text style={[s.white, s.bold]}>
-                  <Trans>Save Changes</Trans>
+
+            {isPrivate && (
+              <View style={s.pb10}>
+                <Text style={[styles.label, pal.text]}>
+                  <Trans>Public Description</Trans>
                 </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          {!updateMutation.isPending && (
-            <AnimatedTouchableOpacity
-              exiting={!isWeb ? FadeOut : undefined}
-              testID="editProfileCancelBtn"
-              style={s.mt5}
-              onPress={onPressCancel}
-              accessibilityRole="button"
-              accessibilityLabel={_(msg`Cancel profile editing`)}
-              accessibilityHint=""
-              onAccessibilityEscape={onPressCancel}>
-              <View style={[styles.btn]}>
-                <Text style={[s.black, s.bold, pal.text]}>
-                  <Trans>Cancel</Trans>
-                </Text>
+                <TextInput
+                  testID="editProfilePublicDescriptionInput"
+                  style={[styles.textArea, pal.border, pal.text]}
+                  placeholder={_(
+                    msg`This profile is private and only visible on @spkeasy.social`,
+                  )}
+                  placeholderTextColor={colors.gray4}
+                  keyboardAppearance={theme.colorScheme}
+                  multiline
+                  value={publicDescription}
+                  onChangeText={setPublicDescription}
+                  accessible={true}
+                  accessibilityLabel={_(msg`Public description`)}
+                  accessibilityHint={_(
+                    msg`A description of your profile visible to everyone`,
+                  )}
+                />
               </View>
-            </AnimatedTouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            )}
+            {updateMutation.isPending ? (
+              <View
+                style={[styles.btn, s.mt10, {backgroundColor: colors.gray2}]}>
+                <ActivityIndicator />
+              </View>
+            ) : (
+              <TouchableOpacity
+                testID="editProfileSaveBtn"
+                style={s.mt10}
+                onPress={onPressSave}
+                accessibilityRole="button"
+                accessibilityLabel={_(msg`Save`)}
+                accessibilityHint={_(msg`Saves any changes to your profile`)}>
+                <LinearGradient
+                  colors={[gradients.blueLight.start, gradients.blueLight.end]}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}
+                  style={[styles.btn]}>
+                  <Text style={[s.white, s.bold]}>
+                    <Trans>Save Changes</Trans>
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            {!updateMutation.isPending && (
+              <AnimatedTouchableOpacity
+                exiting={!isWeb ? FadeOut : undefined}
+                testID="editProfileCancelBtn"
+                style={s.mt5}
+                onPress={onPressCancel}
+                accessibilityRole="button"
+                accessibilityLabel={_(msg`Cancel profile editing`)}
+                accessibilityHint=""
+                onAccessibilityEscape={onPressCancel}>
+                <View style={[styles.btn]}>
+                  <Text style={[s.black, s.bold, pal.text]}>
+                    <Trans>Cancel</Trans>
+                  </Text>
+                </View>
+              </AnimatedTouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+      <PrivateProfileInfoDialog
+        control={privateProfileInfoControl}
+        onAck={handlePrivateProfileInfoAck}
+      />
+    </Fragment>
   )
 }
 
