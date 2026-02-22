@@ -11,6 +11,15 @@ import {PrivateProfileData} from '#/lib/api/private-profiles'
  *
  * A `null` entry means "checked, no private profile found".
  * An absent key means "not yet checked".
+ * getCachedPrivateProfile() returns undefined for both absent and null; use
+ * isDidChecked(did) when you need to distinguish "not yet checked".
+ *
+ * Two usage patterns:
+ * - Feed/notifications: usePrivateProfileFetcher fills the cache; select()
+ *   merges via getCachedPrivateProfile; privateProfileVersion in selectArgs
+ *   triggers re-run when cache updates.
+ * - Profile screen / post-thread: queryFn fetches and merges inline, and
+ *   (profile only) useMemo re-merges when cache updates via usePrivateProfileCacheVersion().
  *
  * Follows the profile-shadow.ts EventEmitter + Map pattern.
  */

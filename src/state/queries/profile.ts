@@ -127,7 +127,7 @@ export function useProfileQuery({
       const atprotoRes = await agent.getProfile({actor: did ?? ''})
       let result: ProfileViewDetailedWithPrivate = atprotoRes.data
 
-      // Check cache before calling Speakeasy API
+      // Check cache before calling Speakeasy API (avoid re-fetching when we already know the answer)
       if (isDidChecked(did ?? '')) {
         const cached = getCachedPrivateProfile(did ?? '')
         if (cached) {
@@ -139,6 +139,8 @@ export function useProfileQuery({
           }
           return result
         }
+        result._privateProfile = {isPrivate: false}
+        return result
       }
 
       // Skip Speakeasy lookup if displayName doesn't match the sentinel
