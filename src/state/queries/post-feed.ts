@@ -130,7 +130,12 @@ const MIN_POSTS = 30
 export function usePostFeedQuery(
   feedDesc: FeedDescriptor,
   params?: FeedParams,
-  opts?: {enabled?: boolean; ignoreFilterFor?: string},
+  opts?: {
+    enabled?: boolean
+    ignoreFilterFor?: string
+    /** When viewing an author feed, pass the profile so posts show correct author after private→public (no feed refetch). */
+    authorProfile?: AppBskyActorDefs.ProfileViewBasic
+  },
 ) {
   const feedTuners = useFeedTuners(feedDesc)
   const moderationOpts = useModerationOpts()
@@ -153,6 +158,10 @@ export function usePostFeedQuery(
   const isDiscover = feedDesc.includes(DISCOVER_FEED_URI)
   const baseUrl = getBaseCdnUrl(agent)
   const privateProfileVersion = usePrivateProfileCacheVersion()
+  const authorDid = feedDesc.startsWith('author')
+    ? (feedDesc.split('|')[1] as string)
+    : undefined
+  const authorProfile = opts?.authorProfile
 
   /**
    * The number of posts to fetch in a single request. Because we filter
@@ -170,6 +179,8 @@ export function usePostFeedQuery(
       isDiscover,
       baseUrl,
       privateProfileVersion,
+      authorDid,
+      authorProfile,
     }),
     [
       feedTuners,
@@ -178,6 +189,8 @@ export function usePostFeedQuery(
       isDiscover,
       baseUrl,
       privateProfileVersion,
+      authorDid,
+      authorProfile,
     ],
   )
 
@@ -272,7 +285,14 @@ export function usePostFeedQuery(
           moderationOpts: moderationOptsInSelect,
           ignoreFilterFor,
           isDiscover: isDiscoverInSelect,
+          authorDid: authorDidInSelect,
+          authorProfile: authorProfileInSelect,
         } = selectArgs
+        const getPublicProfile =
+          authorDidInSelect != null && authorProfileInSelect != null
+            ? (did: string) =>
+                did === authorDidInSelect ? authorProfileInSelect : undefined
+            : undefined
 
         const tuner = new FeedTuner(feedTunersInSelect)
 
@@ -324,6 +344,7 @@ export function usePostFeedQuery(
                     mergeFeedItemWithPrivateProfiles(
                       item,
                       getCachedPrivateProfile,
+                      getPublicProfile,
                     ),
                   ),
                 )

@@ -406,6 +406,7 @@ function ProfileScreenLoaded({
                 isFocused={isFocused}
                 scrollElRef={scrollElRef as ListRef}
                 ignoreFilterFor={profile.did}
+                authorProfile={profile}
                 setScrollViewTag={setScrollViewTag}
               />
             )
@@ -419,6 +420,7 @@ function ProfileScreenLoaded({
                 isFocused={isFocused}
                 scrollElRef={scrollElRef as ListRef}
                 ignoreFilterFor={profile.did}
+                authorProfile={profile}
                 setScrollViewTag={setScrollViewTag}
               />
             )
@@ -432,6 +434,7 @@ function ProfileScreenLoaded({
                 isFocused={isFocused}
                 scrollElRef={scrollElRef as ListRef}
                 ignoreFilterFor={profile.did}
+                authorProfile={profile}
                 setScrollViewTag={setScrollViewTag}
                 mediaGrid={true}
               />
@@ -446,6 +449,7 @@ function ProfileScreenLoaded({
                 isFocused={isFocused}
                 scrollElRef={scrollElRef as ListRef}
                 ignoreFilterFor={profile.did}
+                authorProfile={profile}
                 setScrollViewTag={setScrollViewTag}
               />
             )

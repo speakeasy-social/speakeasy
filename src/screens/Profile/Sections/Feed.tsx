@@ -1,5 +1,6 @@
 import React from 'react'
 import {findNodeHandle, View} from 'react-native'
+import {AppBskyActorDefs} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
@@ -26,6 +27,8 @@ interface FeedSectionProps {
   ignoreFilterFor?: string
   setScrollViewTag: (tag: number | null) => void
   mediaGrid?: boolean
+  /** Profile for the feed author; used so posts show correct author after private→public without refetch. */
+  authorProfile?: AppBskyActorDefs.ProfileViewBasic
 }
 export const ProfileFeedSection = React.forwardRef<
   SectionRef,
@@ -39,6 +42,7 @@ export const ProfileFeedSection = React.forwardRef<
     ignoreFilterFor,
     setScrollViewTag,
     mediaGrid,
+    authorProfile,
   },
   ref,
 ) {
@@ -88,6 +92,7 @@ export const ProfileFeedSection = React.forwardRef<
         progressViewOffset={ios(0)}
         renderEndOfFeed={ProfileEndOfFeed}
         ignoreFilterFor={ignoreFilterFor}
+        authorProfile={authorProfile}
         initialNumToRender={
           shouldUseAdjustedNumToRender ? adjustedInitialNumToRender : undefined
         }
