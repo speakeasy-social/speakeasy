@@ -402,18 +402,22 @@ type MergeableProfile = {
 }
 
 /**
- * Merges private profile data into an AT Protocol profile.
- * If privateData is provided, overlays displayName, description, avatar, and banner.
+ * Single place that determines profile to display; do not duplicate this logic elsewhere.
+ * Rule: displayProfile = isPrivateProfile(public) ? (private ? merge(public, private) : public) : public.
+ * Only overlay private when the public/ATProto profile has the sentinel; otherwise return public as-is.
  *
- * @param atprotoProfile - The base AT Protocol profile
- * @param privateData - Optional decrypted private profile data
- * @returns Merged profile with private data overlaid if available
+ * @param atprotoProfile - The base AT Protocol profile (from feed, profile query, etc.)
+ * @param privateData - Optional decrypted private profile data from cache
+ * @returns Profile to display: merged when public is sentinel and we have private; else public
  */
 export function mergePrivateProfileData<T extends MergeableProfile>(
   atprotoProfile: T,
   privateData: PrivateProfileData | null | undefined,
 ): T {
-  if (!privateData) {
+  if (
+    !privateData ||
+    atprotoProfile.displayName !== PRIVATE_PROFILE_DISPLAY_NAME
+  ) {
     return atprotoProfile
   }
 

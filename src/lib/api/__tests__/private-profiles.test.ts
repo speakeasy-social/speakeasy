@@ -136,14 +136,14 @@ describe('savePrivateProfile', () => {
       })
       mockedSpeakeasy.getErrorCode.mockReturnValue('NotFound')
 
-      // Should not throw
+      // Should not throw; returns empty object when switching to public
       await expect(
         savePrivateProfile(mockAgent, mockCall, mockQueryClient, {
           displayName: 'Test User',
           description: 'Test description',
           isPublic: true,
         }),
-      ).resolves.toBeUndefined()
+      ).resolves.toEqual({})
     })
 
     it('propagates other deletion errors', async () => {
