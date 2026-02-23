@@ -27,6 +27,30 @@ import {
 } from './user-keys'
 
 /**
+ * Public / private profile display and caching
+ * ------------------------------------------
+ *
+ * Display profile (single source of truth):
+ *   The only place that decides what profile to show is mergePrivateProfileData().
+ *   Rule: displayProfile = isProfilePrivate(publicProfile)
+ *     ? (privateProfile ? merge(publicProfile, privateProfile) : publicProfile)
+ *     : publicProfile
+ *   "Private" is determined by the public/ATProto profile (e.g. sentinel displayName);
+ *   use shouldCheckPrivateProfile() for that. Never duplicate this logic elsewhere.
+ *
+ * Caching:
+ *   Public profile data comes from ATProto (feeds, getProfile, etc.). Private profile
+ *   data is fetched from Speakeasy, decrypted, and stored in the private-profile cache.
+ *   At read time, consumers merge via mergePrivateProfileData(public, getCachedPrivateProfile(did)).
+ *
+ * Optimistic updates:
+ *   All profile updates must be optimistic: update the private-profile cache and/or
+ *   React Query profile data (setQueryData) so the UI reflects changes immediately
+ *   without refetch. This avoids content flashes when saving private profile or
+ *   switching to public.
+ */
+
+/**
  * Constants for the @spkeasy.social mention in anonymized profiles
  */
 export const SPKEASY_MENTION = '@spkeasy.social'
@@ -121,9 +145,18 @@ export const PRIVATE_PROFILE_DISPLAY_NAME = 'Private Profile'
 const CHECK_ALL_PROFILES = false
 
 /**
- * Returns whether we should attempt to load private profile data for this
- * profile. Detection is opaque and may change (e.g. sentinel displayName today,
- * server hint or other signal later).
+ * Minimal metadata attached to merged profile when viewer has access to private data.
+ * Used by feed/thread/notification authors; full PrivateProfileMetadata lives in profile.ts.
+ */
+export type ProfileWithPrivateMeta = {
+  _privateProfile?: {isPrivate: boolean}
+}
+
+/**
+ * Whether the public/ATProto profile indicates a private profile (e.g. sentinel
+ * displayName). Use this to decide if we should fetch and merge private data.
+ * The actual display profile is always computed by mergePrivateProfileData();
+ * do not duplicate that logic.
  */
 export function shouldCheckPrivateProfile(
   profile: AppBskyActorDefs.ProfileViewBasic | null | undefined,
@@ -131,6 +164,36 @@ export function shouldCheckPrivateProfile(
   return (
     CHECK_ALL_PROFILES || profile?.displayName === PRIVATE_PROFILE_DISPLAY_NAME
   )
+}
+
+/**
+ * True when the profile is private (sentinel displayName or _privateProfile.isPrivate).
+ * Use with hasAccessToPrivateProfile to choose pill vs icon-only.
+ */
+export function isPrivateProfile(
+  profile:
+    | (AppBskyActorDefs.ProfileViewBasic & ProfileWithPrivateMeta)
+    | null
+    | undefined,
+): boolean {
+  if (!profile) return false
+  return (
+    profile.displayName === PRIVATE_PROFILE_DISPLAY_NAME ||
+    profile._privateProfile?.isPrivate === true
+  )
+}
+
+/**
+ * True when the viewer has access to the private profile (decrypted data merged).
+ * Only true when _privateProfile.isPrivate is set (by mergePrivateProfileData).
+ */
+export function hasAccessToPrivateProfile(
+  profile:
+    | (AppBskyActorDefs.ProfileViewBasic & ProfileWithPrivateMeta)
+    | null
+    | undefined,
+): boolean {
+  return profile?._privateProfile?.isPrivate === true
 }
 
 /**
@@ -402,9 +465,11 @@ type MergeableProfile = {
 }
 
 /**
- * Single place that determines profile to display; do not duplicate this logic elsewhere.
- * Rule: displayProfile = isPrivateProfile(public) ? (private ? merge(public, private) : public) : public.
- * Only overlay private when the public/ATProto profile has the sentinel; otherwise return public as-is.
+ * Single place that determines the profile to display. Implements:
+ *   displayProfile = isProfilePrivate(public) ? (private ? merge(public, private) : public) : public
+ * Only overlays private when the public profile has the private sentinel (see
+ * shouldCheckPrivateProfile); otherwise returns public as-is. All UI must use
+ * the result of this function (or of hooks that call it) — do not duplicate.
  *
  * @param atprotoProfile - The base AT Protocol profile (from feed, profile query, etc.)
  * @param privateData - Optional decrypted private profile data from cache
@@ -438,19 +503,24 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
     avatar: privateData.avatarUri ?? atprotoProfile.avatar,
     banner: privateData.bannerUri ?? atprotoProfile.banner,
     ...(nativePronouns !== undefined ? {pronouns: nativePronouns} : {}),
-  }
+    _privateProfile: {isPrivate: true},
+  } as T & ProfileWithPrivateMeta
 }
 
 /**
  * Creates an anonymized ATProto profile record for private profile mode.
- * Removes avatar/banner and sets placeholder display name and bio.
+ * Builds the record from scratch (no spread of existing). Removes avatar, banner,
+ * and pronouns; sets placeholder display name and bio. Optionally preserves
+ * pinnedPost (or other fields passed in preserve).
  */
 export function anonymizeAtProtoProfile(
   publicDescription?: string,
+  preserve?: Pick<AppBskyActorProfile.Record, 'pinnedPost'>,
 ): AppBskyActorProfile.Record {
   return {
     displayName: PRIVATE_PROFILE_DISPLAY_NAME,
     description: publicDescription || DEFAULT_PRIVATE_DESCRIPTION,
+    ...(preserve?.pinnedPost != null && {pinnedPost: preserve.pinnedPost}),
   }
 }
 
@@ -548,6 +618,21 @@ export function getSpeakeasyMediaUrl(key: string, agent: BskyAgent): string {
 }
 
 /**
+ * If the URL is a Speakeasy CDN media URL, returns the media key (e.g. "media/abc123").
+ * Otherwise returns null. Used to avoid re-downloading/re-uploading when saving private
+ * profile with existing Speakeasy avatar/banner URLs (e.g. after toggling public then back to private).
+ */
+export function parseSpeakeasyMediaKeyFromUrl(
+  url: string,
+  agent: BskyAgent,
+): string | null {
+  const baseUrl = getBaseCdnUrl(agent)
+  if (!url.startsWith(baseUrl)) return null
+  const key = url.slice(baseUrl.length).replace(/^\//, '')
+  return key || null
+}
+
+/**
  * Fetches Speakeasy media as a Blob via the API with auth (avoids CORS on web).
  */
 async function fetchSpeakeasyMediaBlob(
@@ -623,7 +708,141 @@ export async function migrateMediaToSpeakeasy(
 type NewMedia = {path: string; mime: string}
 
 /**
+ * Parameters for resolving private profile media (step 1 of Public → Private).
+ * Same as savePrivateProfile profileData but without isPublic.
+ */
+export type ResolvePrivateProfileMediaParams = {
+  displayName: string
+  description: string
+  newAvatar?: NewMedia | null // null = delete, undefined = keep existing
+  newBanner?: NewMedia | null
+  existingAvatarUri?: string
+  existingBannerUri?: string
+  pronouns?: string | PronounSet[]
+}
+
+/**
+ * Step 1 of Public → Private: resolve avatar and banner (upload/migrate to Speakeasy).
+ * Returns session and URIs for use in writePrivateProfileRecord.
+ */
+export async function resolvePrivateProfileMedia(
+  agent: BskyAgent,
+  call: SpeakeasyApiCall,
+  queryClient: QueryClient,
+  profileData: ResolvePrivateProfileMediaParams,
+): Promise<{
+  sessionId: string
+  sessionKey: string
+  avatarUri?: string
+  bannerUri?: string
+}> {
+  const {sessionId, sessionKey} = await getOrCreateProfileSession(
+    agent,
+    call,
+    queryClient,
+  )
+
+  const {newAvatar, newBanner, existingAvatarUri, existingBannerUri} =
+    profileData
+
+  const resolveAvatar = async (): Promise<string | undefined> => {
+    if (newAvatar === null) return undefined
+    if (newAvatar) {
+      const blob = await pathToBlob(newAvatar.path)
+      const result = await uploadMediaToSpeakeasy(
+        agent,
+        blob,
+        newAvatar.mime,
+        sessionId,
+      )
+      return result.data.blob.key
+    }
+    if (existingAvatarUri?.startsWith('http')) {
+      const key = parseSpeakeasyMediaKeyFromUrl(existingAvatarUri, agent)
+      if (key) return key
+      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
+    }
+    return existingAvatarUri
+  }
+
+  const resolveBanner = async (): Promise<string | undefined> => {
+    if (newBanner === null) return undefined
+    if (newBanner) {
+      const blob = await pathToBlob(newBanner.path)
+      const result = await uploadMediaToSpeakeasy(
+        agent,
+        blob,
+        newBanner.mime,
+        sessionId,
+      )
+      return result.data.blob.key
+    }
+    if (existingBannerUri?.startsWith('http')) {
+      const key = parseSpeakeasyMediaKeyFromUrl(existingBannerUri, agent)
+      if (key) return key
+      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
+    }
+    return existingBannerUri
+  }
+
+  const [avatarUri, bannerUri] = await Promise.all([
+    resolveAvatar(),
+    resolveBanner(),
+  ])
+
+  return {sessionId, sessionKey, avatarUri, bannerUri}
+}
+
+/**
+ * Step 2 of Public → Private: write the private record to Speakeasy (encrypt + put).
+ * Call after resolvePrivateProfileMedia; call clear public profile only after this succeeds.
+ */
+export async function writePrivateProfileRecord(
+  call: SpeakeasyApiCall,
+  params: {
+    sessionId: string
+    sessionKey: string
+    displayName: string
+    description: string
+    avatarUri?: string
+    bannerUri?: string
+    pronouns?: string | PronounSet[]
+  },
+): Promise<void> {
+  const {
+    sessionId,
+    sessionKey,
+    displayName,
+    description,
+    avatarUri,
+    bannerUri,
+    pronouns,
+  } = params
+  const privateData: PrivateProfileData = {
+    displayName,
+    description,
+    avatarUri,
+    bannerUri,
+    pronouns,
+  }
+  const encryptedContent = await encryptProfileData(privateData, sessionKey)
+  await putPrivateProfile(
+    {
+      sessionId,
+      encryptedContent,
+      isPublic: false,
+      avatarUri,
+      bannerUri,
+    },
+    call,
+  )
+}
+
+/**
  * Saves a private profile by orchestrating session management, media upload, and encryption.
+ * For Public → Private transitions, callers should use resolvePrivateProfileMedia,
+ * writePrivateProfileRecord, then clear public profile (with rollback on failure) so the
+ * order of operations avoids data loss.
  *
  * @param agent - The BskyAgent containing user information
  * @param call - The API call function
@@ -662,85 +881,23 @@ export async function savePrivateProfile(
     return {}
   }
 
-  // Private profile: get/create session and save encrypted data
-  const {sessionId, sessionKey} = await getOrCreateProfileSession(
-    agent,
-    call,
-    queryClient,
-  )
-
-  const {
-    displayName,
-    description,
-    newAvatar,
-    newBanner,
-    existingAvatarUri,
-    existingBannerUri,
-    pronouns,
-  } = profileData
-
-  const resolveAvatar = async (): Promise<string | undefined> => {
-    if (newAvatar === null) return undefined
-    if (newAvatar) {
-      const blob = await pathToBlob(newAvatar.path)
-      const result = await uploadMediaToSpeakeasy(
-        agent,
-        blob,
-        newAvatar.mime,
-        sessionId,
-      )
-      return result.data.blob.key
-    }
-    if (existingAvatarUri?.startsWith('http')) {
-      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
-    }
-    return existingAvatarUri
-  }
-
-  const resolveBanner = async (): Promise<string | undefined> => {
-    if (newBanner === null) return undefined
-    if (newBanner) {
-      const blob = await pathToBlob(newBanner.path)
-      const result = await uploadMediaToSpeakeasy(
-        agent,
-        blob,
-        newBanner.mime,
-        sessionId,
-      )
-      return result.data.blob.key
-    }
-    if (existingBannerUri?.startsWith('http')) {
-      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
-    }
-    return existingBannerUri
-  }
-
-  const [avatarUri, bannerUri] = await Promise.all([
-    resolveAvatar(),
-    resolveBanner(),
-  ])
-
-  // Build and encrypt profile data
-  const privateData: PrivateProfileData = {
-    displayName,
-    description,
-    avatarUri,
-    bannerUri,
-    pronouns,
-  }
-  const encryptedContent = await encryptProfileData(privateData, sessionKey)
-
-  // Save to API
-  await putPrivateProfile(
-    {
-      sessionId,
-      encryptedContent,
-      isPublic: false,
-      avatarUri,
-      bannerUri,
-    },
-    call,
-  )
-
-  return {avatarUri, bannerUri}
+  const resolved = await resolvePrivateProfileMedia(agent, call, queryClient, {
+    displayName: profileData.displayName,
+    description: profileData.description,
+    newAvatar: profileData.newAvatar,
+    newBanner: profileData.newBanner,
+    existingAvatarUri: profileData.existingAvatarUri,
+    existingBannerUri: profileData.existingBannerUri,
+    pronouns: profileData.pronouns,
+  })
+  await writePrivateProfileRecord(call, {
+    sessionId: resolved.sessionId,
+    sessionKey: resolved.sessionKey,
+    displayName: profileData.displayName,
+    description: profileData.description,
+    avatarUri: resolved.avatarUri,
+    bannerUri: resolved.bannerUri,
+    pronouns: profileData.pronouns,
+  })
+  return {avatarUri: resolved.avatarUri, bannerUri: resolved.bannerUri}
 }

@@ -7,7 +7,12 @@ import {PrivateProfileData} from '#/lib/api/private-profiles'
  * Module-level singleton cache for decrypted private profile data.
  *
  * Stores decrypted profiles by DID so they can be merged at read time
- * via `select` callbacks, rather than mutating React Query caches directly.
+ * via mergePrivateProfileData(publicProfile, getCachedPrivateProfile(did))
+ * (see private-profiles.ts). Display rule: use that single merge point only.
+ *
+ * Optimistic updates: profile mutations must call upsertCachedPrivateProfiles()
+ * (and/or setQueryData for the profile query) so the UI updates without refetch
+ * and avoids content flashes. Do not rely on refetch after save.
  *
  * A `null` entry means "checked, no private profile found".
  * An absent key means "not yet checked".
