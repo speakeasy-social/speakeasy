@@ -29,14 +29,16 @@ import {
   migrateMediaToAtProto,
   PRIVATE_PROFILE_DISPLAY_NAME,
   type PrivateProfileData,
+  resolvePrivateProfileMedia,
   resolvePrivateProfileUrls,
-  savePrivateProfile,
   shouldCheckPrivateProfile,
+  writePrivateProfileRecord,
 } from '#/lib/api/private-profiles'
 import {callSpeakeasyApiWithAgent, getErrorCode} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
+import {logger} from '#/logger'
 import {
   claimDids,
   evictDid,
@@ -103,6 +105,7 @@ export type ProfileViewDetailedWithPrivate =
 
 /**
  * Returns a profile with _privateProfile set from cached private data or isPrivate: false.
+ * Used when building the final profile object after mergePrivateProfileData().
  */
 function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
   profile: T,
@@ -120,6 +123,14 @@ function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
   }
 }
 
+/**
+ * Single place for "display profile" for a DID: fetches public (ATProto) and
+ * private (Speakeasy) when needed, then applies mergePrivateProfileData(public,
+ * getCachedPrivateProfile(did)) so displayProfile = isProfilePrivate(public)
+ * ? (private ? merge(public, private) : public) : public. Re-merges when the
+ * private-profile cache updates (useMemo + usePrivateProfileCacheVersion) so
+ * optimistic cache updates from mutations show immediately without refetch.
+ */
 export function useProfileQuery({
   did,
   staleTime = STALE.SECONDS.FIFTEEN,
@@ -223,8 +234,8 @@ export function useProfileQuery({
     enabled: !!did,
   })
 
-  // Re-merge with private profile cache when it updates (e.g. filled by feed or
-  // another component), so the profile screen updates without refetching.
+  // Apply display rule: re-merge with private cache when it updates (e.g. after
+  // optimistic upsert from save). No refetch — cache + this useMemo avoid flash.
   const data = useMemo(() => {
     const base = query.data
     if (!base || !did) return base
@@ -530,31 +541,25 @@ export function useProfileUpdateMutation() {
         callSpeakeasyApiWithAgent(agent, options)
 
       if (isPrivate) {
-        // Becoming private or staying private:
-        // 1. Save to Speakeasy first (handles media upload internally)
-        // 2. Then anonymize ATProto profile
-
+        // Becoming private or staying private. Order: 1) save avatar/banner, 2) write private record, 3) clear public.
+        // If step 3 fails, roll back by deleting the private record so profile is considered still public.
         const privatePronouns = pronouns
           ? resolvePrivatePronouns(pronouns)
           : undefined
 
-        const saved = await savePrivateProfile(agent, call, queryClient, {
+        const mediaParams = {
           displayName:
             privateDisplayName ??
             (typeof updates === 'function' ? '' : updates.displayName || ''),
           description:
             privateDescription ??
             (typeof updates === 'function' ? '' : updates.description || ''),
-          isPublic: false,
           newAvatar: newUserAvatar
             ? {path: newUserAvatar.path, mime: newUserAvatar.mime}
             : newUserAvatar, // null or undefined
           newBanner: newUserBanner
             ? {path: newUserBanner.path, mime: newUserBanner.mime}
             : newUserBanner,
-          // If no new avatar, prefer the raw Speakeasy media key (avoids
-          // re-downloading CDN URLs for already-private profiles), falling
-          // back to the ATProto avatar for first-time private migration.
           existingAvatarUri:
             newUserAvatar === undefined
               ? existingPrivateAvatarUri ??
@@ -566,45 +571,59 @@ export function useProfileUpdateMutation() {
                 (profile.banner as string | undefined)
               : undefined,
           pronouns: privatePronouns,
-        })
-
-        // Anonymize ATProto profile (clears native pronouns field)
-        const anonymized = anonymizeAtProtoProfile(publicDescription)
-        await agent.upsertProfile(existing => ({
-          ...existing,
-          displayName: anonymized.displayName,
-          description: anonymized.description,
-          avatar: undefined,
-          banner: undefined,
-        }))
-
-        // Delete extended pronouns AT Proto record
-        try {
-          await agent.api.com.atproto.repo.deleteRecord({
-            repo: profile.did,
-            collection: 'app.nearhorizon.actor.pronouns',
-            rkey: 'self',
-          })
-        } catch (e: any) {
-          if (!e.message?.includes('Could not locate record')) {
-            throw e
-          }
         }
 
-        await whenAppViewReady(agent, profile.did, res => {
-          return (
-            res.data.displayName === anonymized.displayName &&
-            res.data.description === anonymized.description
-          )
+        const resolved = await resolvePrivateProfileMedia(
+          agent,
+          call,
+          queryClient,
+          mediaParams,
+        )
+        await writePrivateProfileRecord(call, {
+          sessionId: resolved.sessionId,
+          sessionKey: resolved.sessionKey,
+          displayName: mediaParams.displayName,
+          description: mediaParams.description,
+          avatarUri: resolved.avatarUri,
+          bannerUri: resolved.bannerUri,
+          pronouns: mediaParams.pronouns,
         })
 
-        return saved
-      } else {
-        // Becoming public or staying public:
-        // 1. Build avatar/banner promises (upload or migrate from Speakeasy)
-        // 2. Delete private profile from Speakeasy (ignore NotFound)
-        // 3. Save to ATProto with upsertProfile
+        try {
+          // Step 3: clear public profile
+          await agent.upsertProfile(existing =>
+            anonymizeAtProtoProfile(
+              publicDescription,
+              existing ? {pinnedPost: existing.pinnedPost} : undefined,
+            ),
+          )
+          try {
+            await agent.api.com.atproto.repo.deleteRecord({
+              repo: profile.did,
+              collection: 'app.nearhorizon.actor.pronouns',
+              rkey: 'self',
+            })
+          } catch (e: any) {
+            if (!e.message?.includes('Could not locate record')) {
+              throw e
+            }
+          }
+          const expectedAnonymized = anonymizeAtProtoProfile(publicDescription)
+          await whenAppViewReady(agent, profile.did, res => {
+            return (
+              res.data.displayName === expectedAnonymized.displayName &&
+              res.data.description === expectedAnonymized.description
+            )
+          })
+        } catch (clearError) {
+          await deletePrivateProfile(call)
+          throw clearError
+        }
 
+        return {avatarUri: resolved.avatarUri, bannerUri: resolved.bannerUri}
+      } else {
+        // Becoming public or staying public. Order: 1) save avatar/banner, 2) write public record, 3) clear private.
+        // If step 3 fails, profile is still considered public (don't rethrow).
         const {newUserAvatarPromise, newUserBannerPromise} =
           buildAvatarBannerPromisesForPublicProfile(
             agent,
@@ -615,15 +634,12 @@ export function useProfileUpdateMutation() {
             existingPrivateBannerUri,
           )
 
-        try {
-          await deletePrivateProfile(call)
-        } catch (error) {
-          if (getErrorCode(error) !== 'NotFound') {
-            throw error
-          }
-        }
+        const [avatarRes, bannerRes] = await Promise.all([
+          newUserAvatarPromise ?? Promise.resolve(undefined),
+          newUserBannerPromise ?? Promise.resolve(undefined),
+        ])
 
-        await agent.upsertProfile(async existing => {
+        await agent.upsertProfile(existing => {
           existing = existing || {}
           if (typeof updates === 'function') {
             existing = updates(existing)
@@ -634,15 +650,13 @@ export function useProfileUpdateMutation() {
               existing.pinnedPost = updates.pinnedPost
             }
           }
-          if (newUserAvatarPromise) {
-            const res = await newUserAvatarPromise
-            existing.avatar = res.data.blob
+          if (avatarRes) {
+            existing.avatar = avatarRes.data.blob
           } else if (newUserAvatar === null) {
             existing.avatar = undefined
           }
-          if (newUserBannerPromise) {
-            const res = await newUserBannerPromise
-            existing.banner = res.data.blob
+          if (bannerRes) {
+            existing.banner = bannerRes.data.blob
           } else if (newUserBanner === null) {
             existing.banner = undefined
           }
@@ -659,9 +673,20 @@ export function useProfileUpdateMutation() {
               newUserBanner,
             ),
         )
+
+        try {
+          await deletePrivateProfile(call)
+        } catch (error) {
+          if (getErrorCode(error) !== 'NotFound') {
+            logger.error('Failed to clear private profile after going public', {
+              message: String(error),
+            })
+          }
+        }
       }
     },
     onSuccess(data, variables) {
+      // Optimistic update: write cache + setQueryData so UI updates without refetch (avoids flash).
       const did = variables.profile.did
       if (variables.isPrivate) {
         const raw = buildOptimisticPrivateProfileFromUpdateParams(
@@ -672,7 +697,7 @@ export function useProfileUpdateMutation() {
         const resolved = resolvePrivateProfileUrls(raw, baseUrl)
         upsertCachedPrivateProfiles(new Map([[did, resolved]]))
         markDidsChecked([did])
-        // Optimistic profile query: merged view so UI updates without refetch
+        // Merged view so profile screen shows new data immediately
         const sentinelProfile = {
           ...variables.profile,
           displayName: PRIVATE_PROFILE_DISPLAY_NAME,
@@ -688,16 +713,24 @@ export function useProfileUpdateMutation() {
         )
       } else {
         evictDid(did)
-        // Optimistic profile query: public profile we just saved so UI updates without refetch
-        const optimisticPublic = buildOptimisticPublicProfileFromUpdateParams(
-          variables.profile,
-          variables.updates,
-        )
+        // Optimistic profile query: public profile we just saved so UI updates without refetch.
+        // Clear avatar/banner to match anonymized AT Proto profile (avoids stale Speakeasy URLs).
+        const optimisticPublic = {
+          ...buildOptimisticPublicProfileFromUpdateParams(
+            variables.profile,
+            variables.updates,
+          ),
+          avatar: undefined,
+          banner: undefined,
+        }
         queryClient.setQueryData(
           RQKEY(did),
           withPrivateProfileMeta(optimisticPublic, null),
         )
       }
+    },
+    onError(_error, variables) {
+      queryClient.invalidateQueries({queryKey: RQKEY(variables.profile.did)})
     },
   })
 }
