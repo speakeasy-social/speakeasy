@@ -24,6 +24,7 @@ import {useLikeMutation, useUnlikeMutation} from '#/state/queries/like'
 import {usePreferencesQuery} from '#/state/queries/preferences'
 import {useRequireAuth, useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
+import {PrivateProfileIndicator} from '#/view/com/util/PrivateProfileIndicator'
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a, tokens, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
@@ -235,7 +236,13 @@ let ProfileHeaderLabeler = ({
           <ProfileMenu profile={profile} />
         </View>
         <View style={[a.flex_col, a.gap_2xs, a.pt_2xs, a.pb_md]}>
-          <ProfileHeaderDisplayName profile={profile} moderation={moderation} />
+          <View style={[a.flex_row, a.align_center, a.gap_sm, a.flex_wrap]}>
+            <ProfileHeaderDisplayName
+              profile={profile}
+              moderation={moderation}
+            />
+            <PrivateProfileIndicator profile={profileUnshadowed} />
+          </View>
           <ProfileHeaderHandle profile={profile} />
         </View>
         {!isPlaceholderProfile && (
