@@ -21,6 +21,7 @@ import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {
   anonymizeAtProtoProfile,
   decryptProfileIfAccessible,
+  DEFAULT_PRIVATE_DESCRIPTION,
   deletePrivateProfile,
   fetchPrivateProfiles,
   getPrivateProfile,
@@ -383,6 +384,26 @@ function buildAvatarBannerPromisesForPublicProfile(
 }
 
 /**
+ * Builds the optimistic public profile for setQueryData when going public.
+ * Uses mutation variables so we don't need to refetch.
+ */
+function buildOptimisticPublicProfileFromUpdateParams(
+  profile: AppBskyActorDefs.ProfileView,
+  updates:
+    | AppBskyActorProfile.Record
+    | ((existing: AppBskyActorProfile.Record) => AppBskyActorProfile.Record),
+): AppBskyActorDefs.ProfileViewDetailed {
+  if (typeof updates === 'function') {
+    return profile as AppBskyActorDefs.ProfileViewDetailed
+  }
+  return {
+    ...profile,
+    displayName: updates.displayName ?? profile.displayName,
+    description: updates.description ?? profile.description,
+  } as AppBskyActorDefs.ProfileViewDetailed
+}
+
+/**
  * Default checkCommitted for public profile save: wait until avatar/banner and
  * display fields match what we sent.
  */
@@ -651,14 +672,32 @@ export function useProfileUpdateMutation() {
         const resolved = resolvePrivateProfileUrls(raw, baseUrl)
         upsertCachedPrivateProfiles(new Map([[did, resolved]]))
         markDidsChecked([did])
+        // Optimistic profile query: merged view so UI updates without refetch
+        const sentinelProfile = {
+          ...variables.profile,
+          displayName: PRIVATE_PROFILE_DISPLAY_NAME,
+          description:
+            variables.publicDescription ?? DEFAULT_PRIVATE_DESCRIPTION,
+          avatar: undefined,
+          banner: undefined,
+        } as AppBskyActorDefs.ProfileViewDetailed
+        const merged = mergePrivateProfileData(sentinelProfile, resolved)
+        queryClient.setQueryData(
+          RQKEY(did),
+          withPrivateProfileMeta(merged, resolved),
+        )
       } else {
-        // Evict from private profile cache so next query re-fetches from API
         evictDid(did)
+        // Optimistic profile query: public profile we just saved so UI updates without refetch
+        const optimisticPublic = buildOptimisticPublicProfileFromUpdateParams(
+          variables.profile,
+          variables.updates,
+        )
+        queryClient.setQueryData(
+          RQKEY(did),
+          withPrivateProfileMeta(optimisticPublic, null),
+        )
       }
-      // invalidate cache
-      queryClient.invalidateQueries({
-        queryKey: RQKEY(did),
-      })
     },
   })
 }
