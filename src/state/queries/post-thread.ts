@@ -17,6 +17,7 @@ import {
   fetchEncryptedPostThread,
   fetchMixedPosts,
   formatPostView,
+  getDEKMap,
   profileToAuthorView,
 } from '#/lib/api/feed/private-posts'
 import {getBaseCdnUrl} from '#/lib/api/feed/utils'
@@ -190,11 +191,13 @@ export function usePostThreadQuery(uri: string | undefined) {
 
         const encryptedPostIndex = encryptedReplyPosts.length
 
+        const dekMap = await getDEKMap(agent, encryptedSessionKeys)
+
         const {posts: allPosts, authorProfileMap} =
           await decryptPostsAndFetchAuthorProfiles(
             agent,
             allEncryptedPosts,
-            encryptedSessionKeys,
+            dekMap,
           )
 
         const privateProfileDids = Array.from(authorProfileMap.entries())
@@ -241,6 +244,7 @@ export function usePostThreadQuery(uri: string | undefined) {
           authorProfileMap,
           postMap,
           cursor,
+          dekMap,
         )
 
         return {
@@ -318,12 +322,20 @@ function nestReplies(
   replyPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
   postMap: Map<string, AppBskyFeedDefs.PostView>,
+  dekMap: Map<string, string>,
 ): ThreadNode[] {
   // Map of uri -> ThreadNode
   const nodeMap = new Map<string, ThreadNode>()
   // Prepare all nodes (depth will be set later)
   for (const reply of replyPosts) {
-    const node = formatThreadNode(agent, reply, authorProfileMap, postMap, 0)
+    const node = formatThreadNode(
+      agent,
+      reply,
+      authorProfileMap,
+      postMap,
+      0,
+      dekMap,
+    )
     nodeMap.set(reply.uri, node)
   }
   // Attach children to parents (do not set depth yet)
@@ -368,6 +380,7 @@ function buildParentChain(
   parentPosts: DecryptedPost[],
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
   postMap: Map<string, AppBskyFeedDefs.PostView>,
+  dekMap: Map<string, string>,
 ): ThreadNode | undefined {
   if (!parentPosts.length) return undefined
   // Start from the furthest parent (root-most)
@@ -380,6 +393,7 @@ function buildParentChain(
       authorProfileMap,
       postMap,
       -1 - i,
+      dekMap,
     ) as ThreadPost
     node.parent = parentNode
     parentNode = node
@@ -395,6 +409,7 @@ export async function formatPostsForThread(
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
   postMap: Map<string, AppBskyFeedDefs.PostView>,
   hasMore: string | boolean,
+  dekMap: Map<string, string>,
 ) {
   const baseUrl = getBaseCdnUrl(agent)
 
@@ -403,6 +418,7 @@ export async function formatPostsForThread(
   const quotedPost = postMap.get(threadPost.embed?.record?.uri)
 
   const author = authorProfileMap.get(threadPost.authorDid)
+  const dek = dekMap.get(threadPost.sessionId) || ''
 
   // Convert the private post to a thread node
   const thread: ThreadPost = {
@@ -411,15 +427,22 @@ export async function formatPostsForThread(
     _reactKey: threadPost.uri,
     uri: threadPost.uri,
 
-    post: formatPostView(threadPost, author, baseUrl, quotedPost),
+    post: formatPostView(threadPost, author, baseUrl, dek, quotedPost),
     record: threadPost,
-    parent: buildParentChain(agent, parentPosts, authorProfileMap, postMap),
+    parent: buildParentChain(
+      agent,
+      parentPosts,
+      authorProfileMap,
+      postMap,
+      dekMap,
+    ),
     replies: nestReplies(
       agent,
       threadPost,
       replyPosts,
       authorProfileMap,
       postMap,
+      dekMap,
     ),
     ctx: {
       depth: 0,
@@ -439,6 +462,7 @@ function formatThreadNode(
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
   postMap: Map<string, AppBskyFeedDefs.PostView>,
   depth: number,
+  dekMap: Map<string, string>,
 ): ThreadNode {
   const profile = authorProfileMap.get(post.authorDid)
   const author = profileToAuthorView(post.authorDid, profile)
@@ -446,6 +470,7 @@ function formatThreadNode(
   // @ts-ignore
   const quotedPost = postMap.get(post.embed?.record?.uri)
   const baseUrl = getBaseCdnUrl(agent)
+  const dek = dekMap.get(post.sessionId) || ''
 
   return {
     type: 'post',
@@ -456,7 +481,7 @@ function formatThreadNode(
     author: author,
     record: post,
     _reactKey: post.uri,
-    post: formatPostView(post, author, baseUrl, quotedPost),
+    post: formatPostView(post, author, baseUrl, dek, quotedPost),
 
     embed: undefined,
 

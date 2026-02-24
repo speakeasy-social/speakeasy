@@ -19,13 +19,13 @@ import {
   decryptPosts,
   fetchEncryptedPosts,
   formatPostView,
+  getDEKMap,
 } from '#/lib/api/feed/private-posts'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
 import {
   listPrivateNotifications,
   PrivateNotification,
 } from '#/lib/api/private-notifications'
-import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
-import {getPrivateKeyOrWarn} from '#/lib/api/user-keys'
 import {awaitWithTimeout} from '#/lib/async/timeout'
 import {labelIsHideableOffense} from '#/lib/moderation'
 import {precacheProfile} from '../profile'
@@ -256,25 +256,14 @@ async function fetchSubjects(
           fetchEncryptedPosts(agent, {
             uris: Array.from(privatePostUris),
           }).then(async res => {
-            const privateKey = await getPrivateKeyOrWarn(
-              agent.assertDid,
-              options => callSpeakeasyApiWithAgent(agent, options),
-            )
-            if (!privateKey) {
-              return []
-            }
-            const encryptedSessionKeys = res.encryptedSessionKeys
-            return await decryptPosts(
-              agent,
-              res.encryptedPosts,
-              encryptedSessionKeys,
-              privateKey,
-            )
+            const dekMap = await getDEKMap(agent, res.encryptedSessionKeys)
+            const posts = await decryptPosts(agent, res.encryptedPosts, dekMap)
+            return {posts, dekMap}
           }),
           3000, // 3 second timeout
-          [], // Return empty array on timeout
+          {posts: [], dekMap: new Map<string, string>()},
         )
-      : Promise.resolve([])
+      : Promise.resolve({posts: [] as any[], dekMap: new Map<string, string>()})
 
   const postUriChunks = chunk(Array.from(postUris), 25)
   const packUriChunks = chunk(Array.from(packUris), 25)
@@ -313,14 +302,18 @@ async function fetchSubjects(
     ]),
   )
 
-  const privatePosts = await privatePostsPromise
+  const {posts: privatePosts, dekMap: privatePostDekMap} =
+    await privatePostsPromise
+  const baseUrl = getBaseCdnUrl(agent)
 
   // Merge private posts into the posts map
   for (const post of privatePosts) {
+    const dek = privatePostDekMap.get(post.sessionId) || ''
     const postView = formatPostView(
       post,
       authorProfileMap.get(post.authorDid),
-      '',
+      baseUrl,
+      dek,
       undefined,
     )
     if (post.uri) {

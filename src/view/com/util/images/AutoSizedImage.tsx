@@ -5,6 +5,7 @@ import {AppBskyEmbedImages} from '@atproto/api'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {HandleRef, useHandleRef} from '#/lib/hooks/useHandleRef'
 import type {Dimensions} from '#/lib/media/types'
 import {isNative} from '#/platform/detection'
@@ -77,6 +78,9 @@ export function AutoSizedImage({
   const largeAlt = useLargeAltBadgeEnabled()
   const containerRef = useHandleRef()
   const fetchedDimsRef = useRef<{width: number; height: number} | null>(null)
+  const privateDek = (image as any)._privateDek as string | undefined
+  const decryptedThumb = useDecryptedImageUrl(image.thumb, privateDek)
+  const thumbUri = decryptedThumb ?? (privateDek ? undefined : image.thumb)
 
   let aspectRatio: number | undefined
   const dims = image.aspectRatio
@@ -104,23 +108,25 @@ export function AutoSizedImage({
 
   const contents = (
     <View ref={containerRef} collapsable={false} style={{flex: 1}}>
-      <Image
-        contentFit={isContain ? 'contain' : 'cover'}
-        style={[a.w_full, a.h_full]}
-        source={image.thumb}
-        accessible={true} // Must set for `accessibilityLabel` to work
-        accessibilityIgnoresInvertColors
-        accessibilityLabel={image.alt}
-        accessibilityHint=""
-        onLoad={e => {
-          if (!isContain) {
-            fetchedDimsRef.current = {
-              width: e.source.width,
-              height: e.source.height,
+      {thumbUri ? (
+        <Image
+          contentFit={isContain ? 'contain' : 'cover'}
+          style={[a.w_full, a.h_full]}
+          source={thumbUri}
+          accessible={true} // Must set for `accessibilityLabel` to work
+          accessibilityIgnoresInvertColors
+          accessibilityLabel={image.alt}
+          accessibilityHint=""
+          onLoad={e => {
+            if (!isContain) {
+              fetchedDimsRef.current = {
+                width: e.source.width,
+                height: e.source.height,
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+      ) : null}
       <MediaInsetBorder />
 
       {(hasAlt || isCropped) && !hideBadge ? (

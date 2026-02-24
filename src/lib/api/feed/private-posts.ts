@@ -17,7 +17,7 @@ import {
   getPrivateKeyOrWarn,
   SpeakeasyPrivateKey,
 } from '#/lib/api/user-keys'
-import {decryptBatch} from '#/lib/encryption'
+import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
 import {transformPrivateEmbed} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
@@ -87,13 +87,13 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         author: author || this.author,
       })
 
-      const truncatedPosts = encryptedPosts
+      const dekMap = await getDEKMap(this.agent, encryptedSessionKeys)
 
       const {posts, authorProfileMap} =
         await decryptPostsAndFetchAuthorProfiles(
           this.agent,
-          truncatedPosts,
-          encryptedSessionKeys,
+          encryptedPosts,
+          dekMap,
         )
 
       /** fetch supporting posts for replies or embeds **/
@@ -109,6 +109,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         posts,
         postMap,
         authorProfileMap,
+        dekMap,
       )
 
       return {
@@ -252,11 +253,13 @@ export async function fetchMixedPosts(
     },
   )
 
+  const dekMap = await getDEKMap(agent, encryptedSessionKeys)
+
   const {posts: decryptedPosts, authorProfileMap: newAuthorProfileMap} =
     await decryptPostsAndFetchAuthorProfiles(
       agent,
       encryptedPosts,
-      encryptedSessionKeys,
+      dekMap,
       authorProfileMap,
     )
 
@@ -265,6 +268,7 @@ export async function fetchMixedPosts(
     decryptedPosts,
     new Map<string, AppBskyFeedDefs.PostView>(),
     newAuthorProfileMap,
+    dekMap,
   )
 
   const bskyPosts = await bskyPostsPromise
@@ -543,26 +547,52 @@ export type EncryptedSessionKey = {
 }
 
 /**
+ * Decrypts all session DEKs for a set of encrypted session keys.
+ * Returns a Map of sessionId → plaintext DEK string.
+ * Returns an empty Map if the private key is unavailable.
+ */
+export async function getDEKMap(
+  agent: BskyAgent,
+  encryptedSessionKeys: EncryptedSessionKey[],
+): Promise<Map<string, string>> {
+  const privateKey = await getPrivateKeyOrWarn(agent.session!.did, options =>
+    callSpeakeasyApiWithAgent(agent, options),
+  )
+
+  if (!privateKey) return new Map()
+
+  const entries = await Promise.all(
+    encryptedSessionKeys.map(async ({sessionId, encryptedDek}) => {
+      try {
+        const dek = await decryptDEK(encryptedDek, privateKey.privateKey)
+        return [sessionId, dek] as [string, string]
+      } catch {
+        return null
+      }
+    }),
+  )
+
+  return new Map(entries.filter(Boolean) as [string, string][])
+}
+
+/**
  * Decrypts encrypted posts and hydrates and formats them to fit the FeedViewPost format
  * @param agent - The BskyAgent instance to use for API calls
  * @param encryptedPosts - Array of encrypted posts to process
- * @param encryptedSessionKeys - Array of session keys for decryption
- * @returns Promise resolving to an array of hydrated FeedViewPost objects
+ * @param dekMap - Map of sessionId to plaintext DEK
+ * @param authorProfileMap - Optional existing author profile map to merge into
+ * @returns Promise resolving to decrypted posts and merged author profile map
  */
 export async function decryptPostsAndFetchAuthorProfiles(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
-  encryptedSessionKeys: EncryptedSessionKey[],
+  dekMap: Map<string, string>,
   authorProfileMap?: Map<string, AppBskyActorDefs.ProfileViewBasic>,
 ): Promise<{
   posts: DecryptedPost[]
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>
 }> {
-  const privateKey = await getPrivateKeyOrWarn(agent.session!.did, options =>
-    callSpeakeasyApiWithAgent(agent, options),
-  )
-
-  if (!privateKey) {
+  if (dekMap.size === 0) {
     return {
       posts: [],
       authorProfileMap: authorProfileMap ?? new Map(),
@@ -579,7 +609,7 @@ export async function decryptPostsAndFetchAuthorProfiles(
 
   const [newAuthorProfileMap, decryptedPosts] = await Promise.all([
     fetchProfiles(agent, authorDids),
-    decryptPosts(agent, encryptedPosts, encryptedSessionKeys, privateKey),
+    decryptPosts(agent, encryptedPosts, dekMap),
   ])
 
   const mergedAuthorProfileMap = authorProfileMap
@@ -590,42 +620,34 @@ export async function decryptPostsAndFetchAuthorProfiles(
 }
 
 /**
- * Decrypts a list of encrypted posts using the provided session keys and private key.
- * Uses the shared decryptBatch utility for parallel decryption.
- * @param agent - The BskyAgent instance to use for API calls
+ * Decrypts a list of encrypted posts using a pre-computed DEK map.
+ * @param agent - The BskyAgent instance (kept for API consistency)
  * @param encryptedPosts - Array of encrypted posts to decrypt
- * @param encryptedSessionKeys - Array of session keys for decryption
- * @param privateKey - The private key to use for decryption
+ * @param dekMap - Map of sessionId to plaintext DEK string
  * @returns Promise resolving to an array of decrypted posts
  */
 export async function decryptPosts(
   agent: BskyAgent,
   encryptedPosts: EncryptedPost[],
-  encryptedSessionKeys: EncryptedSessionKey[],
-  privateKey: SpeakeasyPrivateKey,
+  dekMap: Map<string, string>,
 ): Promise<DecryptedPost[]> {
-  const items = encryptedPosts.map(p => ({
-    id: p.uri,
-    encryptedContent: p.encryptedContent,
-    sessionId: p.sessionId,
-  }))
-
-  const decryptedMap = await decryptBatch(
-    items,
-    encryptedSessionKeys,
-    privateKey.privateKey,
+  const results = await Promise.all(
+    encryptedPosts.map(async post => {
+      const dek = dekMap.get(post.sessionId)
+      if (!dek) return null
+      try {
+        const content = await decryptContent(post.encryptedContent, dek)
+        return {
+          ...JSON.parse(content),
+          ...post,
+        }
+      } catch {
+        return null
+      }
+    }),
   )
 
-  return encryptedPosts
-    .map(post => {
-      const content = decryptedMap.get(post.uri)
-      if (!content) return null
-      return {
-        ...JSON.parse(content),
-        ...post,
-      }
-    })
-    .filter(Boolean) as DecryptedPost[]
+  return results.filter(Boolean) as DecryptedPost[]
 }
 
 /**
@@ -634,6 +656,7 @@ export async function decryptPosts(
  * @param decryptedPosts - Array of decrypted posts to format
  * @param postMap - Map of post URIs to their PostView objects
  * @param authorProfileMap - Map of author DIDs to their profile information
+ * @param dekMap - Map of sessionId to plaintext DEK (for attaching to image embeds)
  * @returns Promise resolving to an array of formatted FeedViewPost objects
  */
 async function formatPostsForFeed(
@@ -641,6 +664,7 @@ async function formatPostsForFeed(
   decryptedPosts: any[],
   postMap: Map<string, AppBskyFeedDefs.PostView>,
   authorProfileMap: Map<string, AppBskyActorDefs.ProfileViewBasic>,
+  dekMap: Map<string, string>,
 ): Promise<AppBskyFeedDefs.FeedViewPost[]> {
   const baseUrl = getBaseCdnUrl(agent)
 
@@ -663,11 +687,12 @@ async function formatPostsForFeed(
 
     const authorProfile = authorProfileMap.get(post.authorDid)
     const quotedPost = postMap.get(post.embed?.record?.uri)
+    const dek = dekMap.get(post.sessionId) || ''
 
     const postView: FeedViewPost = {
       $type: 'social.spkeasy.feed.defs#privatePostView',
 
-      post: formatPostView(post, authorProfile, baseUrl, quotedPost),
+      post: formatPostView(post, authorProfile, baseUrl, dek, quotedPost),
       reply: post.reply
         ? {
             root: postMap.get(post.reply.root?.uri) || {
@@ -694,6 +719,7 @@ export function formatPostView(
   post: DecryptedPost,
   authorProfile: AppBskyActorDefs.ProfileViewBasic | undefined,
   baseUrl: string,
+  dek: string,
   quotedPost: PostView | undefined,
 ): PostView {
   return {
@@ -743,7 +769,13 @@ export function formatPostView(
     },
     embed:
       baseUrl && post.embed
-        ? transformPrivateEmbed(post.embed, post.authorDid, baseUrl, quotedPost)
+        ? transformPrivateEmbed(
+            post.embed,
+            post.authorDid,
+            baseUrl,
+            dek,
+            quotedPost,
+          )
         : undefined,
     replyCount: 0,
     repostCount: 0,

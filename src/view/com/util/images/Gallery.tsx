@@ -5,6 +5,7 @@ import {AppBskyEmbedImages} from '@atproto/api'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {HandleRef} from '#/lib/hooks/useHandleRef'
 import {Dimensions} from '#/lib/media/types'
 import {useLargeAltBadgeEnabled} from '#/state/preferences/large-alt-badge'
@@ -48,6 +49,9 @@ export function GalleryItem({
   const {_} = useLingui()
   const largeAltBadge = useLargeAltBadgeEnabled()
   const image = images[index]
+  const privateDek = (image as any)._privateDek as string | undefined
+  const decryptedThumb = useDecryptedImageUrl(image.thumb, privateDek)
+  const thumbUri = decryptedThumb ?? (privateDek ? undefined : image.thumb)
   const hasAlt = !!image.alt
   const hideBadges =
     viewContext === PostEmbedViewContext.FeedEmbedRecordWithMedia
@@ -70,20 +74,22 @@ export function GalleryItem({
         accessibilityRole="button"
         accessibilityLabel={image.alt || _(msg`Image`)}
         accessibilityHint="">
-        <Image
-          source={{uri: image.thumb}}
-          style={[a.flex_1, imageStyle]}
-          accessible={true}
-          accessibilityLabel={image.alt}
-          accessibilityHint=""
-          accessibilityIgnoresInvertColors
-          onLoad={e => {
-            thumbDimsRef.current[index] = {
-              width: e.source.width,
-              height: e.source.height,
-            }
-          }}
-        />
+        {thumbUri ? (
+          <Image
+            source={{uri: thumbUri}}
+            style={[a.flex_1, imageStyle]}
+            accessible={true}
+            accessibilityLabel={image.alt}
+            accessibilityHint=""
+            accessibilityIgnoresInvertColors
+            onLoad={e => {
+              thumbDimsRef.current[index] = {
+                width: e.source.width,
+                height: e.source.height,
+              }
+            }}
+          />
+        ) : null}
         <MediaInsetBorder style={insetBorderStyle} />
       </Pressable>
       {hasAlt && !hideBadges ? (
