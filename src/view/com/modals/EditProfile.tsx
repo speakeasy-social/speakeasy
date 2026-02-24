@@ -95,6 +95,7 @@ export function Component({
   const [newUserAvatar, setNewUserAvatar] = useState<
     RNImage | undefined | null
   >()
+  const [savingStage, setSavingStage] = useState('')
 
   // #region debug
   logger.info('[EditProfile] mount', {
@@ -162,6 +163,10 @@ export function Component({
   const onPressSave = useCallback(async () => {
     if (pronounsTooLong) return
     setImageError('')
+    const transitioningToPrivate = !privateProfileMeta?.isPrivate && isPrivate
+    if (transitioningToPrivate) {
+      privateProfileInfoControl.open()
+    }
     try {
       await updateMutation.mutateAsync({
         profile,
@@ -183,6 +188,7 @@ export function Component({
         pronouns: {native: nativePronounsValue, sets: parsedSets},
         privateDisplayName: displayName,
         privateDescription: description,
+        onStateChange: setSavingStage,
       })
       if (!isPrivate) {
         await savePronounsMutation.mutateAsync({
@@ -191,14 +197,14 @@ export function Component({
         })
       }
       Toast.show(_(msg`Profile updated`))
-      const transitioningToPrivate = !privateProfileMeta?.isPrivate && isPrivate
-      if (transitioningToPrivate) {
-        privateProfileInfoControl.open()
-      } else {
+      if (!transitioningToPrivate) {
         onUpdate?.()
         closeModal()
       }
     } catch (e: any) {
+      if (transitioningToPrivate) {
+        privateProfileInfoControl.close()
+      }
       logger.error('Failed to update user profile', {message: String(e)})
     }
   }, [
@@ -375,6 +381,11 @@ export function Component({
               <View
                 style={[styles.btn, s.mt10, {backgroundColor: colors.gray2}]}>
                 <ActivityIndicator />
+                {savingStage ? (
+                  <Text style={[pal.textLight, {fontSize: 13, marginLeft: 8}]}>
+                    {savingStage}
+                  </Text>
+                ) : null}
               </View>
             ) : (
               <TouchableOpacity
@@ -418,6 +429,8 @@ export function Component({
       <PrivateProfileInfoDialog
         control={privateProfileInfoControl}
         onAck={handlePrivateProfileInfoAck}
+        isPending={updateMutation.isPending}
+        savingStage={savingStage}
       />
     </Fragment>
   )

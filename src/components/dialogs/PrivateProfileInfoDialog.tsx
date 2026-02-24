@@ -3,18 +3,23 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {atoms as a, useTheme} from '#/alf'
-import {Button, ButtonText} from '#/components/Button'
+import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
+import {Loader} from '#/components/Loader'
 import {Text} from '#/components/Typography'
 
 export interface PrivateProfileInfoDialogProps {
   control: Dialog.DialogControlProps
   onAck: () => void
+  isPending?: boolean
+  savingStage?: string
 }
 
 export function PrivateProfileInfoDialog({
   control,
   onAck,
+  isPending,
+  savingStage,
 }: PrivateProfileInfoDialogProps) {
   const {_} = useLingui()
   const t = useTheme()
@@ -84,11 +89,27 @@ export function PrivateProfileInfoDialog({
               color="primary"
               size="large"
               label={_(msg`Got it`)}
+              disabled={isPending}
               onPress={handleGotIt}>
-              <ButtonText>
-                <Trans>Got it</Trans>
-              </ButtonText>
+              {isPending ? (
+                <ButtonIcon icon={Loader} />
+              ) : (
+                <ButtonText>
+                  <Trans>Got it</Trans>
+                </ButtonText>
+              )}
             </Button>
+            {isPending && savingStage ? (
+              <Text
+                style={[
+                  a.text_sm,
+                  a.text_center,
+                  t.atoms.text_contrast_medium,
+                  a.pt_sm,
+                ]}>
+                {savingStage}
+              </Text>
+            ) : null}
           </View>
         </View>
       </Dialog.ScrollableInner>
