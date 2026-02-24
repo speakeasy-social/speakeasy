@@ -650,23 +650,18 @@ async function fetchSpeakeasyMediaBlob(
 
 /**
  * Result of migrating one media asset from Speakeasy to ATProto.
- * blobUrl is set on web so the optimistic profile can show the image immediately
- * without relying on getProfile or Speakeasy CDN after delete.
  */
 export type MigrateMediaToAtProtoResult = {
   response: ComAtprotoRepoUploadBlob.Response
-  blobUrl?: string
 }
 
 /**
  * Migrates media from Speakeasy storage to ATProto blob storage.
  * Used when switching from private to public profile.
  * On web, fetches via authenticated API to avoid CORS (direct CDN fetch fails).
- * Returns the upload response and a blob URL (when createObjectURL is available)
- * so the optimistic profile can display the image before refetch.
  * @param speakeasyKey - The media key from the private profile
  * @param agent - The BskyAgent for uploading
- * @returns Upload response and optional blob URL for optimistic display
+ * @returns Upload response
  */
 export async function migrateMediaToAtProto(
   speakeasyKey: string,
@@ -679,12 +674,8 @@ export async function migrateMediaToAtProto(
     const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
     blob = await pathToBlob(url)
   }
-  const blobUrl =
-    typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-      ? URL.createObjectURL(blob)
-      : undefined
   const response = await uploadBlob(agent, blob, blob.type || 'image/jpeg')
-  return {response, blobUrl}
+  return {response}
 }
 
 /**
@@ -770,9 +761,6 @@ export async function resolvePrivateProfileMedia(
       if (key) return key
       return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
     }
-    if (existingAvatarUri?.startsWith('blob:')) {
-      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
-    }
     return existingAvatarUri
   }
 
@@ -791,9 +779,6 @@ export async function resolvePrivateProfileMedia(
     if (existingBannerUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingBannerUri, agent)
       if (key) return key
-      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
-    }
-    if (existingBannerUri?.startsWith('blob:')) {
       return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
     }
     return existingBannerUri

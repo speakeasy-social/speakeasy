@@ -23,7 +23,8 @@ These rules were distilled from the feature/private-profile-editor branch. **Fol
 
 - **`profileMutationFn`** (exported, testable): orchestrates the save and returns a discriminated `ProfileMutationResult` (`type: ‘private’ | ‘public’`) with **complete** optimistic data — no reconstruction needed in `onSuccess`.
   - Private path returns `privateData` (raw Speakeasy keys) + `optimisticProfile` (sentinel merged with resolved private data).
-  - Public path returns `optimisticProfile` with `blob:` URLs from migration (or existing avatar/banner).
+  - Public path fetches a fresh profile via `getProfile` after `whenAppViewReady` confirms indexing, returning canonical CDN URLs as `optimisticProfile`.
+  - Accepts `onStateChange?: (stage: string) => void` for progress UX — called at key steps (media upload, profile save, waiting for indexing, cleanup).
 - **`profileOnSuccess`** (exported, testable): simple setter — resolves URLs, upserts cache, sets query data. No data reconstruction from fragments.
 - **`useProfileUpdateMutation`**: thin hook that wires `profileMutationFn` and `profileOnSuccess` to `useMutation`.
 
@@ -31,8 +32,7 @@ These rules were distilled from the feature/private-profile-editor branch. **Fol
 
 - **All profile updates must be optimistic**: update the private-profile cache and/or React Query profile data (`setQueryData`) so the UI updates immediately **without refetch**. Relying on refetch causes content flash when saving private or switching to public.
 - **Cancel in-flight queries before optimistic updates** (`cancelQueries` before `setQueryData`). When going public, `invalidateQueries` triggers a background refetch. If the user then saves as private before that refetch completes, the stale refetch can overwrite the optimistic data with public-only data. Because `mergePrivateProfileData` requires the sentinel `displayName` to overlay private data, the stale public name causes the merge to no-op and the profile appears public. `cancelQueries` prevents this race.
-- After save: `upsertCachedPrivateProfiles` + `markDidsChecked` for private; for public, call `evictDid(did)` **then** `markDidsChecked([did])` (so the DID is "checked, no private profile"), then setQueryData with optimistic profile (keep current avatar/banner so content doesn’t disappear; refetch will replace with canonical refs). Without `markDidsChecked`, the batch fetcher or a refetch can re-fetch and re-populate the cache with private data, making the profile appear private again until refresh.
-- **Do not `invalidateQueries` after public save**: the optimistic data uses `blob:` URLs from `URL.createObjectURL` (web) which render correctly. An immediate refetch can overwrite them with CDN URLs that haven’t indexed yet. The staleTime refetch (15s) replaces with canonical ATProto CDN URLs. If the user goes back to private before the refetch, `resolvePrivateProfileMedia` handles `blob:` URLs by migrating them to Speakeasy (see Media section).
+- After save: `upsertCachedPrivateProfiles` + `markDidsChecked` for private; for public, call `evictDid(did)` **then** `markDidsChecked([did])` (so the DID is "checked, no private profile"), then setQueryData with the fresh profile from `getProfile` (canonical CDN URLs). Without `markDidsChecked`, the batch fetcher or a refetch can re-fetch and re-populate the cache with private data, making the profile appear private again until refresh.
 
 ## Save flow (private)
 
@@ -41,14 +41,14 @@ These rules were distilled from the feature/private-profile-editor branch. **Fol
 
 ## Save flow (public)
 
-- **Order**: 1) Migrate avatar/banner to ATProto (including when switching from private — use existing Speakeasy media keys / upload new blobs), 2) Write public record, 3) Delete private (`deletePrivateProfile`). If step 3 fails, log but don’t rethrow; profile is already public.
-- **whenAppViewReady must check avatar/banner after migration**: `defaultCheckCommittedForPublicProfile` skips avatar/banner checks when `newUserAvatar`/`newUserBanner` are `undefined`. When migrating private media to ATProto (i.e., `avatarRes`/`bannerRes` from migration exist), pass a custom check that waits for the app view to index the new avatar/banner. Otherwise `invalidateQueries` can overwrite optimistic data with stale (no-avatar) app view data.
+- **Order**: 1) Migrate avatar/banner to ATProto (including when switching from private — use existing Speakeasy media keys / upload new blobs), 2) Write public record, 3) Wait for app view (`whenAppViewReady`), 4) Fetch fresh profile via `getProfile` (canonical CDN URLs), 5) Delete private (`deletePrivateProfile`). If step 5 fails, log but don’t rethrow; profile is already public.
+- **whenAppViewReady must check avatar/banner after migration**: `defaultCheckCommittedForPublicProfile` skips avatar/banner checks when `newUserAvatar`/`newUserBanner` are `undefined`. When migrating private media to ATProto (i.e., `avatarRes`/`bannerRes` from migration exist), pass a custom check that waits for the app view to index the new avatar/banner.
 
 ## Media and types
 
 - **PrivateProfileData**: `avatarUri`/`bannerUri` = resolved CDN URLs (for display). `rawAvatarUri`/`rawBannerUri` = Speakeasy media keys (for save/migration and `_privateProfile` metadata). Resolve with `resolvePrivateProfileUrls(data, baseUrl)` before putting in cache or displaying.
 - **PrivateProfileMetadata** (on profile query): `avatarUri`/`bannerUri` are **raw Speakeasy media keys**, not CDN URLs (used for migration when going public).
-- **`blob:` URLs in `resolvePrivateProfileMedia`**: After public save, optimistic `profile.avatar` may be a `blob:` URL from `URL.createObjectURL`. If the user goes back to private before the staleTime refetch, this `blob:` URL leaks into `existingAvatarUri`. `resolvePrivateProfileMedia` detects `blob:` URIs and migrates them to Speakeasy via `migrateMediaToSpeakeasy` (pathToBlob supports `blob:` URLs on web). Without this, the `blob:` URL would be stored as a Speakeasy media key and `resolvePrivateProfileUrls` would produce a garbage URL.
+- **No `blob:` URLs**: The public save path fetches a fresh profile from `getProfile` after `whenAppViewReady`, so optimistic data always has canonical CDN URLs. No `URL.createObjectURL` or `blob:` URL handling is needed.
 
 ## Fetcher and batch
 

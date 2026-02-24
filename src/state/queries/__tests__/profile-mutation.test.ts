@@ -82,7 +82,8 @@ const mockedMigrateMedia = migrateMediaToAtProto as jest.MockedFunction<
 const mockDid = 'did:plc:testuser123'
 const mockAvatarKey = 'media/avatar-abc123'
 const mockBannerKey = 'media/banner-def456'
-const mockBlobUrl = 'blob:http://localhost/avatar-blob'
+const mockCdnAvatar = 'https://cdn.bsky.app/img/avatar/migrated.jpg'
+const mockCdnBanner = 'https://cdn.bsky.app/img/banner/migrated.jpg'
 
 function makeProfile(
   overrides: Partial<AppBskyActorDefs.ProfileViewDetailed> = {},
@@ -111,8 +112,16 @@ function makeAgent(): BskyAgent {
         actor: {
           getProfile: jest.fn<any>().mockResolvedValue({
             data: {
-              displayName: 'Private Profile',
-              description: 'private desc',
+              did: mockDid,
+              handle: 'test.bsky.social',
+              displayName: 'Alice Public',
+              description: 'My public bio',
+              avatar: mockCdnAvatar,
+              banner: mockCdnBanner,
+              followersCount: 10,
+              followsCount: 5,
+              postsCount: 42,
+              indexedAt: '2024-01-01T00:00:00Z',
             },
           }),
         },
@@ -320,10 +329,9 @@ describe('profileMutationFn + profileOnSuccess', () => {
   })
 
   describe('save as public', () => {
-    it('returns optimistic profile with blob URLs from migration', async () => {
+    it('returns optimistic profile with canonical CDN URLs from getProfile', async () => {
       mockedMigrateMedia.mockResolvedValue({
         response: {data: {blob: 'blob-ref'}} as any,
-        blobUrl: mockBlobUrl,
       })
 
       const result = await profileMutationFn(
@@ -335,19 +343,20 @@ describe('profileMutationFn + profileOnSuccess', () => {
       )
 
       expect(result.type).toBe('public')
-      expect(result.optimisticProfile.avatar).toBe(mockBlobUrl)
+      expect(result.optimisticProfile.avatar).toBe(mockCdnAvatar)
     })
 
-    it('returns existing avatar when no migration needed', async () => {
-      const profile = makeProfile()
+    it('returns fresh profile from getProfile when no migration needed', async () => {
       const result = await profileMutationFn(
         mockAgent,
         queryClient,
-        makePublicParams({profile}),
+        makePublicParams(),
       )
 
       expect(result.type).toBe('public')
-      expect(result.optimisticProfile.avatar).toBe(profile.avatar)
+      // Uses the canonical CDN URL from the fresh getProfile fetch
+      expect(result.optimisticProfile.avatar).toBe(mockCdnAvatar)
+      expect(result.optimisticProfile.banner).toBe(mockCdnBanner)
     })
 
     it('waits for app view to index migrated media (migrationAwareCheck)', async () => {
@@ -359,7 +368,6 @@ describe('profileMutationFn + profileOnSuccess', () => {
 
       mockedMigrateMedia.mockResolvedValue({
         response: {data: {blob: 'blob-ref'}} as any,
-        blobUrl: mockBlobUrl,
       })
 
       await profileMutationFn(
@@ -370,6 +378,22 @@ describe('profileMutationFn + profileOnSuccess', () => {
 
       // until is called by whenAppViewReady
       expect(mockedUntil).toHaveBeenCalled()
+    })
+
+    it('fetches fresh profile from getProfile after whenAppViewReady', async () => {
+      const result = await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makePublicParams(),
+      )
+
+      // getProfile is called twice: once by whenAppViewReady (via until), once for fresh profile
+      const getProfileMock = mockAgent.app.bsky.actor
+        .getProfile as jest.MockedFunction<any>
+      // The fresh fetch after whenAppViewReady
+      expect(getProfileMock).toHaveBeenCalled()
+      expect(result.optimisticProfile.avatar).toBe(mockCdnAvatar)
+      expect(result.optimisticProfile.displayName).toBe('Alice Public')
     })
   })
 
@@ -422,17 +446,16 @@ describe('profileMutationFn + profileOnSuccess', () => {
       expect(isChecked).toBe(true)
     })
 
-    it('sets query data with optimistic profile (blob URLs)', async () => {
+    it('sets query data with canonical CDN URLs from getProfile', async () => {
       mockedMigrateMedia.mockResolvedValue({
         response: {data: {blob: 'blob-ref'}} as any,
-        blobUrl: mockBlobUrl,
       })
 
       const {queryData} = await runMutationAndOnSuccess(
         makePublicParams({existingPrivateAvatarUri: mockAvatarKey}),
       )
 
-      expect(queryData.avatar).toBe(mockBlobUrl)
+      expect(queryData.avatar).toBe(mockCdnAvatar)
     })
 
     it('does NOT invalidateQueries', async () => {
@@ -451,14 +474,13 @@ describe('profileMutationFn + profileOnSuccess', () => {
   })
 
   describe('full flows', () => {
-    it('private→public: query data has working avatar/banner', async () => {
+    it('private→public: query data has canonical CDN URLs', async () => {
       // Save as private first
       await runMutationAndOnSuccess(makePrivateParams())
 
       // Now go public with migration
       mockedMigrateMedia.mockResolvedValue({
         response: {data: {blob: 'blob-ref'}} as any,
-        blobUrl: mockBlobUrl,
       })
 
       const {queryData, cachedPrivate} = await runMutationAndOnSuccess(
@@ -470,8 +492,9 @@ describe('profileMutationFn + profileOnSuccess', () => {
 
       // Private cache evicted
       expect(cachedPrivate).toBeUndefined()
-      // Query data has blob URLs from migration
-      expect(queryData.avatar).toBe(mockBlobUrl)
+      // Query data has canonical CDN URLs from getProfile
+      expect(queryData.avatar).toBe(mockCdnAvatar)
+      expect(queryData.banner).toBe(mockCdnBanner)
       expect(queryData._privateProfile.isPrivate).toBe(false)
     })
 
@@ -482,7 +505,6 @@ describe('profileMutationFn + profileOnSuccess', () => {
       // Go public
       mockedMigrateMedia.mockResolvedValue({
         response: {data: {blob: 'blob-ref'}} as any,
-        blobUrl: mockBlobUrl,
       })
       await runMutationAndOnSuccess(
         makePublicParams({existingPrivateAvatarUri: mockAvatarKey}),
@@ -506,28 +528,26 @@ describe('profileMutationFn + profileOnSuccess', () => {
       expect(queryData.avatar).toBe(`https://cdn.test/${newAvatarKey}`)
     })
 
-    it('private→public→private: blob: URLs migrated, not stored as keys', async () => {
-      // After going public, optimistic profile may have blob: URL
-      // When going back to private, resolvePrivateProfileMedia handles blob: migration
-      // (tested in private-profiles.test.ts); here we verify the mutation doesn't
-      // store blob: URLs as Speakeasy keys
+    it('private→public→private: CDN URLs from getProfile migrated correctly', async () => {
+      // After going public, optimistic profile has canonical CDN URLs from getProfile.
+      // When going back to private, resolvePrivateProfileMedia handles HTTP URL migration.
 
       mockedResolveMedia.mockResolvedValue({
         sessionId: 'session-789',
         sessionKey: 'key-ghi',
-        avatarUri: 'media/migrated-from-blob',
+        avatarUri: 'media/migrated-from-cdn',
         bannerUri: undefined,
       })
 
       const {cachedPrivate} = await runMutationAndOnSuccess(
         makePrivateParams({
-          profile: makeProfile({avatar: 'blob:http://localhost/some-blob'}),
+          profile: makeProfile({avatar: mockCdnAvatar}),
         }),
       )
 
-      // Key should be a Speakeasy key, not a blob: URL
-      expect(cachedPrivate!.rawAvatarUri).toBe('media/migrated-from-blob')
-      expect(cachedPrivate!.rawAvatarUri).not.toMatch(/^blob:/)
+      // Key should be a Speakeasy key, not a CDN URL
+      expect(cachedPrivate!.rawAvatarUri).toBe('media/migrated-from-cdn')
+      expect(cachedPrivate!.rawAvatarUri).not.toMatch(/^https?:/)
     })
 
     it('delete avatar while private→reopen: no avatar in cache or query', async () => {

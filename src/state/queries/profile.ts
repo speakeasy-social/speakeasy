@@ -339,16 +339,14 @@ export function usePrefetchProfileQuery() {
   return prefetchProfileQuery
 }
 
-/** Normalized result for avatar/banner upload or migration; blobUrl is set when migrating from Speakeasy (for optimistic display). */
+/** Normalized result for avatar/banner upload or migration. */
 type AvatarBannerUploadResult = {
   response: ComAtprotoRepoUploadBlob.Response
-  blobUrl?: string
 }
 
 /**
  * Builds avatar and banner upload/migration promises for the public-profile path.
- * Caller awaits these inside upsertProfile so media is ready when updating the record.
- * Migration returns blobUrl for optimistic profile display; new file upload does not.
+ * Caller awaits these so media is ready when updating the record.
  */
 function buildAvatarBannerPromisesForPublicProfile(
   agent: BskyAgent,
@@ -456,6 +454,8 @@ export interface ProfileUpdateParams {
   // Explicit values for private profile storage (needed when updates is a function)
   privateDisplayName?: string
   privateDescription?: string
+  // Progress callback for UI display during migration
+  onStateChange?: (stage: string) => void
 }
 export type ProfileMutationResult =
   | {
@@ -491,6 +491,7 @@ export async function profileMutationFn(
     pronouns,
     privateDisplayName,
     privateDescription,
+    onStateChange,
   } = params
 
   const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
@@ -530,12 +531,14 @@ export async function profileMutationFn(
       pronouns: privatePronouns,
     }
 
+    onStateChange?.('Uploading media...')
     const resolved = await resolvePrivateProfileMedia(
       agent,
       call,
       queryClient,
       mediaParams,
     )
+    onStateChange?.('Saving private profile...')
     await writePrivateProfileRecord(call, {
       sessionId: resolved.sessionId,
       sessionKey: resolved.sessionKey,
@@ -548,6 +551,7 @@ export async function profileMutationFn(
 
     try {
       // Step 3: clear public profile
+      onStateChange?.('Updating public profile...')
       await agent.upsertProfile(existing =>
         anonymizeAtProtoProfile(
           publicDescription,
@@ -605,6 +609,9 @@ export async function profileMutationFn(
   } else {
     // Becoming public or staying public. Order: 1) save avatar/banner, 2) write public record, 3) clear private.
     // If step 3 fails, profile is still considered public (don't rethrow).
+    if (existingPrivateAvatarUri || existingPrivateBannerUri) {
+      onStateChange?.('Migrating media...')
+    }
     const {newUserAvatarPromise, newUserBannerPromise} =
       buildAvatarBannerPromisesForPublicProfile(
         agent,
@@ -620,6 +627,7 @@ export async function profileMutationFn(
       newUserBannerPromise ?? Promise.resolve(undefined),
     ])
 
+    onStateChange?.('Saving public profile...')
     await agent.upsertProfile(existing => {
       existing = existing || {}
       if (typeof updates === 'function') {
@@ -645,8 +653,7 @@ export async function profileMutationFn(
     })
     // When migrating media from Speakeasy→ATProto, the default check skips
     // avatar/banner (newUserAvatar/Banner are undefined). Build a check that
-    // waits for the app view to index the migrated blobs so invalidateQueries
-    // doesn't overwrite optimistic data with stale (no-avatar) app view data.
+    // waits for the app view to index the migrated blobs.
     const migrationAwareCheck =
       (!newUserAvatar && avatarRes) || (!newUserBanner && bannerRes)
         ? (res: AppBskyActorGetProfile.Response) => {
@@ -661,6 +668,7 @@ export async function profileMutationFn(
           }
         : undefined
 
+    onStateChange?.('Waiting for profile to update...')
     await whenAppViewReady(
       agent,
       profile.did,
@@ -674,6 +682,12 @@ export async function profileMutationFn(
         ),
     )
 
+    // Fetch the real profile with canonical CDN URLs
+    const freshProfile = await agent.app.bsky.actor.getProfile({
+      actor: profile.did,
+    })
+
+    onStateChange?.('Cleaning up...')
     try {
       await deletePrivateProfile(call)
     } catch (error) {
@@ -684,35 +698,7 @@ export async function profileMutationFn(
       }
     }
 
-    // Build complete optimistic profile
-    const displayName =
-      privateDisplayName ??
-      (typeof updates === 'function'
-        ? profile.displayName
-        : updates.displayName) ??
-      profile.displayName
-    const description =
-      privateDescription ??
-      (typeof updates === 'function'
-        ? profile.description
-        : updates.description) ??
-      profile.description
-
-    const optimisticProfile = {
-      ...profile,
-      displayName,
-      description,
-      avatar:
-        newUserAvatar === null
-          ? undefined
-          : avatarRes?.blobUrl ?? profile.avatar,
-      banner:
-        newUserBanner === null
-          ? undefined
-          : bannerRes?.blobUrl ?? profile.banner,
-    } as AppBskyActorDefs.ProfileViewDetailed
-
-    return {type: 'public', optimisticProfile}
+    return {type: 'public', optimisticProfile: freshProfile.data}
   }
 }
 
@@ -746,11 +732,6 @@ export async function profileOnSuccess(
       RQKEY(did),
       withPrivateProfileMeta(data.optimisticProfile, null),
     )
-    // No invalidateQueries: the optimistic blob: URLs from URL.createObjectURL
-    // render correctly. An immediate refetch can overwrite them with CDN URLs
-    // that aren't ready yet. The staleTime refetch (15s) replaces with canonical
-    // ATProto CDN URLs. If the user goes back to private before the refetch,
-    // resolvePrivateProfileMedia handles blob: URLs by migrating them to Speakeasy.
   }
 }
 
