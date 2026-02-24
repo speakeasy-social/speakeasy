@@ -533,3 +533,209 @@ export function base36decode(encoded: string) {
   const bs36 = basex(BASE36)
   return new TextDecoder().decode(bs36.decode(encoded))
 }
+
+// =====================
+// Media Stream Encryption/Decryption
+// =====================
+
+/**
+ * Low-level: encrypts a ReadableStream using AES-CTR.
+ * Prepends a 16-byte random counter block to the output.
+ */
+async function encryptStream(
+  stream: ReadableStream<Uint8Array>,
+  dek: string,
+): Promise<ReadableStream<Uint8Array>> {
+  const dekBytes = safeAtob(dek)
+  try {
+    const counter = secureGetRandomValues(new Uint8Array(16))
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      dekBytes,
+      {name: 'AES-CTR', length: 256},
+      false,
+      ['encrypt'],
+    )
+
+    const reader = stream.getReader()
+    const chunks: Uint8Array[] = []
+    while (true) {
+      const {done, value} = await reader.read()
+      if (done) break
+      if (value) chunks.push(value)
+    }
+
+    const totalLength = chunks.reduce((acc, c) => acc + c.length, 0)
+    const plaintext = new Uint8Array(totalLength)
+    let offset = 0
+    for (const chunk of chunks) {
+      plaintext.set(chunk, offset)
+      offset += chunk.length
+    }
+
+    const encrypted = new Uint8Array(
+      await crypto.subtle.encrypt(
+        {name: 'AES-CTR', counter, length: 64},
+        key,
+        plaintext,
+      ),
+    )
+
+    const result = new Uint8Array(16 + encrypted.length)
+    result.set(counter)
+    result.set(encrypted, 16)
+
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(result)
+        controller.close()
+      },
+    })
+  } finally {
+    secureWipe(dekBytes)
+  }
+}
+
+/**
+ * Low-level: collects a ReadableStream and decrypts using AES-CTR.
+ * Expects the first 16 bytes to be the counter block.
+ */
+async function decryptStreamToBytes(
+  stream: ReadableStream<Uint8Array>,
+  dek: string,
+): Promise<Uint8Array> {
+  const dekBytes = safeAtob(dek)
+  try {
+    const reader = stream.getReader()
+    const chunks: Uint8Array[] = []
+    while (true) {
+      const {done, value} = await reader.read()
+      if (done) break
+      if (value) chunks.push(value)
+    }
+
+    const totalLength = chunks.reduce((acc, c) => acc + c.length, 0)
+    const buffer = new Uint8Array(totalLength)
+    let offset = 0
+    for (const chunk of chunks) {
+      buffer.set(chunk, offset)
+      offset += chunk.length
+    }
+
+    const counter = buffer.slice(0, 16)
+    const encrypted = buffer.slice(16)
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      dekBytes,
+      {name: 'AES-CTR', length: 256},
+      false,
+      ['decrypt'],
+    )
+
+    return new Uint8Array(
+      await crypto.subtle.decrypt(
+        {name: 'AES-CTR', counter, length: 64},
+        key,
+        encrypted,
+      ),
+    )
+  } finally {
+    secureWipe(dekBytes)
+  }
+}
+
+/**
+ * Encrypts a media stream (e.g. image) for storage.
+ * Plaintext format: [1 byte: mimeType length][N bytes: mimeType][image bytes]
+ * Output: AES-CTR encrypted stream with 16-byte counter prepended.
+ *
+ * @param stream - ReadableStream of raw media bytes
+ * @param dek - Data Encryption Key in SafeText format
+ * @param mimeType - MIME type of the media (e.g. 'image/jpeg')
+ */
+export async function encryptMediaStream(
+  stream: ReadableStream,
+  dek: string,
+  mimeType: string,
+): Promise<ReadableStream> {
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  while (true) {
+    const {done, value} = await reader.read()
+    if (done) break
+    if (value) chunks.push(value as Uint8Array)
+  }
+
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0)
+  const mimeTypeBytes = new TextEncoder().encode(mimeType)
+
+  const plaintext = new Uint8Array(1 + mimeTypeBytes.length + totalLength)
+  plaintext[0] = mimeTypeBytes.length
+  plaintext.set(mimeTypeBytes, 1)
+  let offset = 1 + mimeTypeBytes.length
+  for (const chunk of chunks) {
+    plaintext.set(chunk, offset)
+    offset += chunk.length
+  }
+
+  return encryptStream(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(plaintext)
+        controller.close()
+      },
+    }),
+    dek,
+  )
+}
+
+/**
+ * Fetches a media URL and decrypts it if encrypted.
+ * Detects encryption via Content-Type: application/x-spkeasy-encrypted-media.
+ * Returns a Blob with the original MIME type.
+ *
+ * @param url - CDN URL to fetch (public, content is encrypted not gated)
+ * @param dek - Data Encryption Key in SafeText format
+ */
+export async function decryptMediaBlob(
+  url: string,
+  dek: string,
+): Promise<Blob> {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch media: ${response.status} ${response.statusText}`,
+    )
+  }
+
+  const contentType = response.headers.get('Content-Type') ?? ''
+
+  if (!contentType.includes('application/x-spkeasy-encrypted-media')) {
+    return response.blob()
+  }
+
+  if (!response.body) {
+    throw new Error('Response body is null')
+  }
+
+  const decrypted = await decryptStreamToBytes(response.body, dek)
+
+  if (decrypted.length < 1) {
+    throw new Error('Decrypted content too short')
+  }
+
+  const mimeTypeLength = decrypted[0]
+  if (decrypted.length < 1 + mimeTypeLength) {
+    throw new Error('Decrypted content too short for MIME type header')
+  }
+
+  const mimeType = new TextDecoder().decode(
+    decrypted.slice(1, 1 + mimeTypeLength),
+  )
+  const imageData = decrypted.slice(1 + mimeTypeLength)
+
+  return new Blob([imageData], {type: mimeType})
+}
