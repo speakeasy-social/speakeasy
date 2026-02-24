@@ -8,7 +8,12 @@ import {
 } from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
-import {decryptBatch, decryptDEK, encryptContent} from '#/lib/encryption'
+import {
+  decryptBatch,
+  decryptDEK,
+  encryptContent,
+  encryptMediaStream,
+} from '#/lib/encryption'
 import {isWeb} from '#/platform/detection'
 import {type PronounSet} from '#/state/queries/pronouns'
 import {getBaseCdnUrl} from './feed/utils'
@@ -690,12 +695,20 @@ export async function migrateMediaToSpeakeasy(
   atprotoUrl: string,
   agent: BskyAgent,
   sessionId: string,
+  sessionKey: string,
 ): Promise<string> {
   const blob = await pathToBlob(atprotoUrl)
+  const mimeType = blob.type || 'image/jpeg'
+  const encryptedStream = await encryptMediaStream(
+    blob.stream(),
+    sessionKey,
+    mimeType,
+  )
+  const encryptedBlob = await new Response(encryptedStream).blob()
   const result = await uploadMediaToSpeakeasy(
     agent,
-    blob,
-    blob.type || 'image/jpeg',
+    encryptedBlob,
+    'application/x-spkeasy-encrypted-media',
     sessionId,
   )
   return result.data.blob.key
@@ -748,10 +761,17 @@ export async function resolvePrivateProfileMedia(
     if (newAvatar === null) return undefined
     if (newAvatar) {
       const blob = await pathToBlob(newAvatar.path)
+      const mimeType = blob.type || newAvatar.mime
+      const encryptedStream = await encryptMediaStream(
+        blob.stream(),
+        sessionKey,
+        mimeType,
+      )
+      const encryptedBlob = await new Response(encryptedStream).blob()
       const result = await uploadMediaToSpeakeasy(
         agent,
-        blob,
-        newAvatar.mime,
+        encryptedBlob,
+        'application/x-spkeasy-encrypted-media',
         sessionId,
       )
       return result.data.blob.key
@@ -759,7 +779,12 @@ export async function resolvePrivateProfileMedia(
     if (existingAvatarUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingAvatarUri, agent)
       if (key) return key
-      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
+      return migrateMediaToSpeakeasy(
+        existingAvatarUri,
+        agent,
+        sessionId,
+        sessionKey,
+      )
     }
     return existingAvatarUri
   }
@@ -768,10 +793,17 @@ export async function resolvePrivateProfileMedia(
     if (newBanner === null) return undefined
     if (newBanner) {
       const blob = await pathToBlob(newBanner.path)
+      const mimeType = blob.type || newBanner.mime
+      const encryptedStream = await encryptMediaStream(
+        blob.stream(),
+        sessionKey,
+        mimeType,
+      )
+      const encryptedBlob = await new Response(encryptedStream).blob()
       const result = await uploadMediaToSpeakeasy(
         agent,
-        blob,
-        newBanner.mime,
+        encryptedBlob,
+        'application/x-spkeasy-encrypted-media',
         sessionId,
       )
       return result.data.blob.key
@@ -779,7 +811,12 @@ export async function resolvePrivateProfileMedia(
     if (existingBannerUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingBannerUri, agent)
       if (key) return key
-      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
+      return migrateMediaToSpeakeasy(
+        existingBannerUri,
+        agent,
+        sessionId,
+        sessionKey,
+      )
     }
     return existingBannerUri
   }

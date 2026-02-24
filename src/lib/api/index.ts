@@ -25,7 +25,7 @@ import {sha256} from 'js-sha256'
 import {CID} from 'multiformats/cid'
 import * as Hasher from 'multiformats/hashes/hasher'
 
-import {encryptContent} from '#/lib/encryption'
+import {encryptContent, encryptMediaStream} from '#/lib/encryption'
 import {isNetworkError} from '#/lib/strings/errors'
 import {shortenLinks, stripInvalidMentions} from '#/lib/strings/rich-text-manip'
 import {logger} from '#/logger'
@@ -877,28 +877,18 @@ async function uploadBlobToSpeakeasy(
       throw new TypeError(`Invalid uploadBlob input: ${typeof path}`)
     }
 
-    // Benchmark encryption if session key is provided
-    if (sessionKey === 'encryption not implemented yet') {
-      console.log(
-        new Date().toISOString(),
-        '- Starting media encryption benchmark',
+    if (sessionKey) {
+      const encryptedStream = await encryptMediaStream(
+        blob.stream(),
+        sessionKey,
+        mime,
       )
-      console.log(`Blob size: ${blob.size} bytes`)
-
-      // Convert blob to Base64 string for encryption
-      const arrayBuffer = await blob.arrayBuffer()
-      const base64String = btoa(
-        new Uint8Array(arrayBuffer).reduce(
-          (data, byte) => data + String.fromCharCode(byte),
-          '',
-        ),
-      )
-
-      // Encrypt the blob
-      await encryptContent(base64String, sessionKey)
-      console.log(
-        new Date().toISOString(),
-        '- Finished media encryption benchmark',
+      const encryptedBlob = await new Response(encryptedStream).blob()
+      return await uploadMediaToSpeakeasy(
+        agent,
+        encryptedBlob,
+        'application/x-spkeasy-encrypted-media',
+        realSessionId,
       )
     }
 
