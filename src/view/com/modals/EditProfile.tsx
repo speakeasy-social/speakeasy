@@ -96,6 +96,19 @@ export function Component({
     RNImage | undefined | null
   >()
 
+  // #region debug
+  logger.info('[EditProfile] mount', {
+    avatar: profile.avatar?.substring(0, 80),
+    banner: profile.banner?.substring(0, 80),
+    displayName: profile.displayName,
+    isPrivate: (profile as any)._privateProfile?.isPrivate,
+    privateAvatarUri: (profile as any)._privateProfile?.avatarUri?.substring(
+      0,
+      60,
+    ),
+  })
+  // #endregion
+
   // Pronouns state
   const {
     pronouns,
