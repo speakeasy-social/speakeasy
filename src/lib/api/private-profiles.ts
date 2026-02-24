@@ -30,24 +30,15 @@ import {
  * Public / private profile display and caching
  * ------------------------------------------
  *
- * Display profile (single source of truth):
- *   The only place that decides what profile to show is mergePrivateProfileData().
- *   Rule: displayProfile = isProfilePrivate(publicProfile)
- *     ? (privateProfile ? merge(publicProfile, privateProfile) : publicProfile)
- *     : publicProfile
- *   "Private" is determined by the public/ATProto profile (e.g. sentinel displayName);
- *   use shouldCheckPrivateProfile() for that. Never duplicate this logic elsewhere.
+ * Full rules (display, cache, save order, optimistic updates, fetcher, notifications):
+ *   docs/private-profiles.md
+ * Follow them so future revisions go forward, not backward.
  *
- * Caching:
- *   Public profile data comes from ATProto (feeds, getProfile, etc.). Private profile
- *   data is fetched from Speakeasy, decrypted, and stored in the private-profile cache.
- *   At read time, consumers merge via mergePrivateProfileData(public, getCachedPrivateProfile(did)).
- *
- * Optimistic updates:
- *   All profile updates must be optimistic: update the private-profile cache and/or
- *   React Query profile data (setQueryData) so the UI reflects changes immediately
- *   without refetch. This avoids content flashes when saving private profile or
- *   switching to public.
+ * Summary:
+ *   Display: Only mergePrivateProfileData(public, getCachedPrivateProfile(did)) decides
+ *   what to show. Only overlay when public has the sentinel (shouldCheckPrivateProfile).
+ *   Caching: Private data in module cache; merge at read time; clearAll() on account switch/logout.
+ *   Optimistic: Every profile mutation must update cache and/or setQueryData — no refetch-only.
  */
 
 /**
@@ -658,17 +649,29 @@ async function fetchSpeakeasyMediaBlob(
 }
 
 /**
+ * Result of migrating one media asset from Speakeasy to ATProto.
+ * blobUrl is set on web so the optimistic profile can show the image immediately
+ * without relying on getProfile or Speakeasy CDN after delete.
+ */
+export type MigrateMediaToAtProtoResult = {
+  response: ComAtprotoRepoUploadBlob.Response
+  blobUrl?: string
+}
+
+/**
  * Migrates media from Speakeasy storage to ATProto blob storage.
  * Used when switching from private to public profile.
  * On web, fetches via authenticated API to avoid CORS (direct CDN fetch fails).
+ * Returns the upload response and a blob URL (when createObjectURL is available)
+ * so the optimistic profile can display the image before refetch.
  * @param speakeasyKey - The media key from the private profile
  * @param agent - The BskyAgent for uploading
- * @returns ATProto blob upload response
+ * @returns Upload response and optional blob URL for optimistic display
  */
 export async function migrateMediaToAtProto(
   speakeasyKey: string,
   agent: BskyAgent,
-): Promise<ComAtprotoRepoUploadBlob.Response> {
+): Promise<MigrateMediaToAtProtoResult> {
   let blob: Blob
   if (isWeb) {
     blob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
@@ -676,7 +679,12 @@ export async function migrateMediaToAtProto(
     const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
     blob = await pathToBlob(url)
   }
-  return uploadBlob(agent, blob, blob.type || 'image/jpeg')
+  const blobUrl =
+    typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+      ? URL.createObjectURL(blob)
+      : undefined
+  const response = await uploadBlob(agent, blob, blob.type || 'image/jpeg')
+  return {response, blobUrl}
 }
 
 /**
@@ -762,6 +770,9 @@ export async function resolvePrivateProfileMedia(
       if (key) return key
       return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
     }
+    if (existingAvatarUri?.startsWith('blob:')) {
+      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
+    }
     return existingAvatarUri
   }
 
@@ -780,6 +791,9 @@ export async function resolvePrivateProfileMedia(
     if (existingBannerUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingBannerUri, agent)
       if (key) return key
+      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
+    }
+    if (existingBannerUri?.startsWith('blob:')) {
       return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
     }
     return existingBannerUri
