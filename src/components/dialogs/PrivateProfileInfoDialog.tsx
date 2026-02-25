@@ -13,6 +13,7 @@ export interface PrivateProfileInfoDialogProps {
   onAck: () => void
   isPending?: boolean
   savingStage?: string
+  handle?: string
 }
 
 export function PrivateProfileInfoDialog({
@@ -20,6 +21,7 @@ export function PrivateProfileInfoDialog({
   onAck,
   isPending,
   savingStage,
+  handle,
 }: PrivateProfileInfoDialogProps) {
   const {_} = useLingui()
   const t = useTheme()
@@ -72,6 +74,16 @@ export function PrivateProfileInfoDialog({
               <Trans>Things that will still be visible to the public:</Trans>
             </Text>
             <View style={[a.pl_md, a.gap_xs]}>
+              {handle && (
+                <Text
+                  style={[
+                    a.text_md,
+                    a.leading_snug,
+                    t.atoms.text_contrast_high,
+                  ]}>
+                  <Trans>• Your handle (@{handle})</Trans>
+                </Text>
+              )}
               <Text
                 style={[a.text_md, a.leading_snug, t.atoms.text_contrast_high]}>
                 <Trans>• Who you follow / who follows you</Trans>
