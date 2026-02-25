@@ -267,38 +267,40 @@ export function Component({
             </View>
           )}
           <View style={styles.form}>
-            <View style={[s.pb10]}>
-              <View style={[styles.toggleContainer]}>
-                <Text style={[styles.label, pal.text]}>
-                  <Trans>Profile Visibility</Trans>
-                </Text>
-                <Button
-                  variant="solid"
-                  color="secondary"
-                  onPress={() => setIsPrivate(!isPrivate)}
-                  style={[
-                    styles.visibilityButton,
-                    isPrivate ? styles.private : styles.public,
-                  ]}
-                  accessibilityHint={_(
-                    msg`Choose to make your profile visible publicly, or only to people you trust`,
-                  )}
-                  accessibilityLabel={isPrivate ? _('Private') : _('Public')}
-                  label={isPrivate ? _('Private') : _('Public')}>
-                  <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
-                  <ButtonText style={styles.visibilityButtonText}>
-                    {isPrivate ? _('Private') : _('Public')}
-                  </ButtonText>
-                </Button>
+            {__DEV__ && (
+              <View style={[s.pb10]}>
+                <View style={[styles.toggleContainer]}>
+                  <Text style={[styles.label, pal.text]}>
+                    <Trans>Profile Visibility</Trans>
+                  </Text>
+                  <Button
+                    variant="solid"
+                    color="secondary"
+                    onPress={() => setIsPrivate(!isPrivate)}
+                    style={[
+                      styles.visibilityButton,
+                      isPrivate ? styles.private : styles.public,
+                    ]}
+                    accessibilityHint={_(
+                      msg`Choose to make your profile visible publicly, or only to people you trust`,
+                    )}
+                    accessibilityLabel={isPrivate ? _('Private') : _('Public')}
+                    label={isPrivate ? _('Private') : _('Public')}>
+                    <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
+                    <ButtonText style={styles.visibilityButtonText}>
+                      {isPrivate ? _('Private') : _('Public')}
+                    </ButtonText>
+                  </Button>
+                </View>
+                <Admonition type="info">
+                  {isPrivate
+                    ? _(
+                        "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
+                      )
+                    : _('Your profile is visible to everyone')}
+                </Admonition>
               </View>
-              <Admonition type="info">
-                {isPrivate
-                  ? _(
-                      "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
-                    )
-                  : _('Your profile is visible to everyone')}
-              </Admonition>
-            </View>
+            )}
             <View>
               <Text style={[styles.label, pal.text]}>
                 <Trans>Display Name</Trans>
@@ -432,6 +434,7 @@ export function Component({
         onAck={handlePrivateProfileInfoAck}
         isPending={updateMutation.isPending}
         savingStage={savingStage}
+        handle={profile.handle}
       />
     </Fragment>
   )
