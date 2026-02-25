@@ -122,7 +122,8 @@ let ProfileHeaderStandard = ({
       profile={profile}
       moderation={moderation}
       hideBackButton={hideBackButton}
-      isPlaceholderProfile={isPlaceholderProfile}>
+      isPlaceholderProfile={isPlaceholderProfile}
+      dek={profileUnshadowed._privateProfile?.dek}>
       <View
         style={[a.px_lg, a.pt_md, a.pb_sm, a.overflow_hidden]}
         pointerEvents={isIOS ? 'auto' : 'box-none'}>

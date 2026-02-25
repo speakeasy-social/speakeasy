@@ -205,6 +205,7 @@ export function Component({
       if (transitioningToPrivate) {
         privateProfileInfoControl.close()
       }
+      Toast.show(_(msg`Failed to save profile`), 'xmark')
       logger.error('Failed to update user profile', {message: String(e)})
     }
   }, [

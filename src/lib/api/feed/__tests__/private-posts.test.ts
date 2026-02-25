@@ -5,8 +5,14 @@ import * as encryption from '#/lib/encryption'
 import {
   decryptPosts,
   EncryptedPost,
-  EncryptedSessionKey,
+  // EncryptedSessionKey,
 } from '../private-posts'
+
+// Mock post-feed to prevent the module-level setInterval in react-query.tsx
+// from being registered (triggered by: post-feed → labeler → react-query).
+jest.mock('#/state/queries/post-feed', () => ({
+  transformPrivateEmbed: jest.fn(),
+}))
 
 jest.mock('#/lib/encryption')
 
@@ -28,16 +34,16 @@ function makeEncryptedPost(
   }
 }
 
-function makeSessionKey(
-  overrides: Partial<EncryptedSessionKey> = {},
-): EncryptedSessionKey {
-  return {
-    sessionId: 'session-1',
-    encryptedDek: 'encrypted-dek-session-1',
-    recipientDid: 'did:plc:viewer',
-    ...overrides,
-  }
-}
+// function makeSessionKey(
+//   overrides: Partial<EncryptedSessionKey> = {},
+// ): EncryptedSessionKey {
+//   return {
+//     sessionId: 'session-1',
+//     encryptedDek: 'encrypted-dek-session-1',
+//     recipientDid: 'did:plc:viewer',
+//     ...overrides,
+//   }
+// }
 
 function makeDecryptedContent(text: string) {
   return JSON.stringify({
@@ -52,71 +58,32 @@ function makeDecryptedContent(text: string) {
 
 describe('decryptPosts', () => {
   const mockAgent = {} as BskyAgent
-  const mockPrivateKey = {privateKey: 'mock-private-key', userKeyPairId: 'kp-1'}
   const mockDek = 'mock-dek-256bit'
 
   beforeEach(() => {
     jest.clearAllMocks()
 
-    mockedEncryption.decryptDEK.mockResolvedValue(mockDek)
     mockedEncryption.decryptContent.mockImplementation(
       async (_encrypted: string, _dek: string) => {
         throw new Error('decryptContent not set up for this input')
       },
     )
-
-    // Set up decryptBatch to delegate to decryptDEK + decryptContent mocks.
-    // This makes the test work with both old code (which calls them directly)
-    // and new code (which calls decryptBatch).
-    // Guard: decryptBatch only exists after the refactor.
-    if (mockedEncryption.decryptBatch) {
-      mockedEncryption.decryptBatch.mockImplementation(
-        async (items: any[], sessionKeys: any[], privateKey: string) => {
-          const keyMap = new Map(
-            sessionKeys.map((k: any) => [k.sessionId, k.encryptedDek]),
-          )
-          const result = new Map<string, string>()
-          for (const item of items) {
-            const encryptedDek = keyMap.get(item.sessionId)
-            if (!encryptedDek) continue
-            try {
-              const dek = await mockedEncryption.decryptDEK(
-                encryptedDek,
-                privateKey,
-              )
-              const content = await mockedEncryption.decryptContent(
-                item.encryptedContent,
-                dek,
-              )
-              result.set(item.id, content)
-            } catch {
-              // skip failed items
-            }
-          }
-          return result
-        },
-      )
-    }
   })
 
   it('returns empty array for empty input', async () => {
-    const result = await decryptPosts(mockAgent, [], [], mockPrivateKey)
+    const dekMap = new Map<string, string>()
+    const result = await decryptPosts(mockAgent, [], dekMap)
     expect(result).toEqual([])
   })
 
   it('decrypts posts with matching session keys', async () => {
     const post = makeEncryptedPost({encryptedContent: 'enc-hello'})
-    const sessionKey = makeSessionKey()
     const decryptedJson = makeDecryptedContent('Hello world')
 
     mockedEncryption.decryptContent.mockResolvedValue(decryptedJson)
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    const dekMap = new Map([['session-1', mockDek]])
+    const result = await decryptPosts(mockAgent, [post], dekMap)
 
     expect(result).toHaveLength(1)
     expect(result[0].text).toBe('Hello world')
@@ -131,17 +98,12 @@ describe('decryptPosts', () => {
       createdAt: '2026-01-20T10:00:00Z',
       langs: ['en', 'fr'],
     })
-    const sessionKey = makeSessionKey()
     const decryptedJson = makeDecryptedContent('Bonjour')
 
     mockedEncryption.decryptContent.mockResolvedValue(decryptedJson)
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    const dekMap = new Map([['session-1', mockDek]])
+    const result = await decryptPosts(mockAgent, [post], dekMap)
 
     expect(result).toHaveLength(1)
     // Encrypted post metadata should be preserved
@@ -164,26 +126,22 @@ describe('decryptPosts', () => {
       sessionId: 'session-unknown',
       encryptedContent: 'enc-2',
     })
-    const sessionKey = makeSessionKey({sessionId: 'session-1'})
 
     mockedEncryption.decryptContent.mockResolvedValue(
       makeDecryptedContent('Post 1'),
     )
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post1, post2],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    // dekMap only has session-1, not session-unknown
+    const dekMap = new Map([['session-1', mockDek]])
+    const result = await decryptPosts(mockAgent, [post1, post2], dekMap)
 
-    // Filter nulls — old code returns null for skipped posts, new code filters them
+    // Filter nulls — code filters posts with missing sessionId from dekMap
     const successful = result.filter(Boolean)
     expect(successful).toHaveLength(1)
     expect(successful[0].uri).toBe(post1.uri)
   })
 
-  it('skips posts where DEK decryption fails', async () => {
+  it('skips posts where DEK was not in the dekMap (e.g. DEK decryption failed upstream)', async () => {
     const post1 = makeEncryptedPost({
       uri: 'at://did:plc:a/social.spkeasy.private-post/1',
       sessionId: 'session-good',
@@ -194,33 +152,14 @@ describe('decryptPosts', () => {
       sessionId: 'session-bad',
       encryptedContent: 'enc-2',
     })
-    const goodKey = makeSessionKey({
-      sessionId: 'session-good',
-      encryptedDek: 'good-dek',
-    })
-    const badKey = makeSessionKey({
-      sessionId: 'session-bad',
-      encryptedDek: 'bad-dek',
-    })
 
-    mockedEncryption.decryptDEK.mockImplementation(
-      async (encryptedDek: string) => {
-        if (encryptedDek === 'bad-dek') {
-          throw new Error('DEK decryption failed')
-        }
-        return mockDek
-      },
-    )
     mockedEncryption.decryptContent.mockResolvedValue(
       makeDecryptedContent('Good post'),
     )
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post1, post2],
-      [goodKey, badKey],
-      mockPrivateKey,
-    )
+    // session-bad has no DEK (simulates getDEKMap failing to decrypt it)
+    const dekMap = new Map([['session-good', mockDek]])
+    const result = await decryptPosts(mockAgent, [post1, post2], dekMap)
 
     const successful = result.filter(Boolean)
     expect(successful).toHaveLength(1)
@@ -236,7 +175,6 @@ describe('decryptPosts', () => {
       uri: 'at://did:plc:a/social.spkeasy.private-post/2',
       encryptedContent: 'enc-corrupted',
     })
-    const sessionKey = makeSessionKey()
 
     mockedEncryption.decryptContent.mockImplementation(
       async (encrypted: string) => {
@@ -247,12 +185,8 @@ describe('decryptPosts', () => {
       },
     )
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post1, post2],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    const dekMap = new Map([['session-1', mockDek]])
+    const result = await decryptPosts(mockAgent, [post1, post2], dekMap)
 
     const successful = result.filter(Boolean)
     expect(successful).toHaveLength(1)
@@ -270,9 +204,6 @@ describe('decryptPosts', () => {
       encryptedContent: 'enc-2',
       sessionId: 'shared-session',
     })
-    const sessionKey = makeSessionKey({
-      sessionId: 'shared-session',
-    })
 
     let callCount = 0
     mockedEncryption.decryptContent.mockImplementation(async () => {
@@ -280,12 +211,8 @@ describe('decryptPosts', () => {
       return makeDecryptedContent(`Post ${callCount}`)
     })
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post1, post2],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    const dekMap = new Map([['shared-session', mockDek]])
+    const result = await decryptPosts(mockAgent, [post1, post2], dekMap)
 
     expect(result).toHaveLength(2)
     // Both posts should have been decrypted
@@ -297,7 +224,6 @@ describe('decryptPosts', () => {
       encryptedContent: 'enc-content',
       createdAt: '2026-01-15T12:00:00Z',
     })
-    const sessionKey = makeSessionKey()
 
     // The decrypted JSON has a createdAt that differs from the encrypted metadata
     const decryptedJson = JSON.stringify({
@@ -312,12 +238,8 @@ describe('decryptPosts', () => {
 
     mockedEncryption.decryptContent.mockResolvedValue(decryptedJson)
 
-    const result = await decryptPosts(
-      mockAgent,
-      [post],
-      [sessionKey],
-      mockPrivateKey,
-    )
+    const dekMap = new Map([['session-1', mockDek]])
+    const result = await decryptPosts(mockAgent, [post], dekMap)
 
     expect(result).toHaveLength(1)
     // Encrypted metadata spreads last, so encrypted createdAt wins

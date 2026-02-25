@@ -712,6 +712,7 @@ export function transformHiddenEmbed(
         JSON.parse(atob(privateMessage.encodedMessage)),
         post.author.did, // Pass the parent post's author DID
         baseUrl,
+        '', // No DEK for public-hidden posts (not encrypted media)
       )
 
       // Store the original record as coverRecord
@@ -800,6 +801,7 @@ function transformImageEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
 ): any {
   if (embed?.$type === 'app.bsky.embed.images' && embed.images?.length > 0) {
     return {
@@ -812,9 +814,11 @@ function transformImageEmbed(
         return {
           thumb: `${baseUrl}/${mediaKey}`,
           fullsize: `${baseUrl}/${mediaKey}`,
+          // mimeType intentionally omitted for encrypted images — embedded in blob
           mimeType: img.image.mimeType,
           alt: img.alt || '',
           aspectRatio: img.aspectRatio,
+          _privateDek: dek || undefined,
         }
       }),
     }
@@ -884,11 +888,12 @@ function transformRecordWithMediaEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
 ): any {
   if (embed?.$type === 'app.bsky.embed.recordWithMedia') {
     const transformedMedia =
       embed.media?.$type === 'app.bsky.embed.images'
-        ? transformImageEmbed(embed.media, authorDid, baseUrl)
+        ? transformImageEmbed(embed.media, authorDid, baseUrl, dek)
         : embed.media?.$type === 'app.bsky.embed.video'
         ? transformVideoEmbed(embed.media, authorDid, baseUrl)
         : embed.media
@@ -907,6 +912,7 @@ export function transformPrivateEmbed(
   embed: any,
   authorDid: string,
   baseUrl: string,
+  dek: string,
   quotedPost?: any,
 ): any {
   // Transform any embeds into view format
@@ -917,6 +923,7 @@ export function transformPrivateEmbed(
         transformedEmbed,
         authorDid,
         baseUrl,
+        dek,
       )
     } else if (transformedEmbed.$type === 'app.bsky.embed.video') {
       transformedEmbed = transformVideoEmbed(
@@ -948,6 +955,7 @@ export function transformPrivateEmbed(
         transformedEmbed,
         authorDid,
         baseUrl,
+        dek,
       )
       // If we have a quoted post, use it to enhance the record embed
       if (quotedPost) {
@@ -969,6 +977,7 @@ export function formatPrivatePostForFeed(
   post: any,
   authorDid: string,
   baseUrl: string,
+  dek = '',
 ): AppBskyFeedDefs.PostView {
   try {
     const text = post.record?.text || post.text || ''
@@ -977,6 +986,7 @@ export function formatPrivatePostForFeed(
       post.embed,
       authorDid,
       baseUrl,
+      dek,
     )
 
     // Also transform any embeds in the record
@@ -985,6 +995,7 @@ export function formatPrivatePostForFeed(
         post.record.embed,
         authorDid,
         baseUrl,
+        dek,
       )
     }
 

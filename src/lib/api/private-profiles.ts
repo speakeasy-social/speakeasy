@@ -8,8 +8,14 @@ import {
 } from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
-import {decryptBatch, decryptDEK, encryptContent} from '#/lib/encryption'
+import {
+  decryptContent,
+  decryptDEK,
+  encryptContent,
+  encryptMediaStream,
+} from '#/lib/encryption'
 import {isWeb} from '#/platform/detection'
+import {setCachedDek} from '#/state/cache/private-profile-cache'
 import {type PronounSet} from '#/state/queries/pronouns'
 import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
@@ -245,32 +251,19 @@ export async function decryptProfileIfAccessible(
   encryptedResponse: EncryptedProfileResponse,
   userDid: string,
   call: SpeakeasyApiCall,
-): Promise<PrivateProfileData | null> {
+): Promise<{data: PrivateProfileData; dek: string} | null> {
   const privateKey = await getPrivateKeyOrWarn(userDid, call)
   if (!privateKey) {
     return null
   }
 
-  const decryptedMap = await decryptBatch(
-    [
-      {
-        id: encryptedResponse.did,
-        encryptedContent: encryptedResponse.encryptedContent,
-        sessionId: encryptedResponse.did,
-      },
-    ],
-    [
-      {
-        sessionId: encryptedResponse.did,
-        encryptedDek: encryptedResponse.encryptedDek,
-      },
-    ],
+  const dek = await decryptDEK(
+    encryptedResponse.encryptedDek,
     privateKey.privateKey,
   )
-
-  const content = decryptedMap.get(encryptedResponse.did)
+  const content = await decryptContent(encryptedResponse.encryptedContent, dek)
   if (!content) return null
-  return JSON.parse(content) as PrivateProfileData
+  return {data: JSON.parse(content) as PrivateProfileData, dek}
 }
 
 /**
@@ -417,28 +410,21 @@ export async function fetchPrivateProfiles(
   const privateKey = await getPrivateKeyOrWarn(userDid, call)
   if (!privateKey) return new Map()
 
-  // Normalize into decryptBatch shape (use DID as session key)
-  const items = encrypted.map(p => ({
-    id: p.did,
-    encryptedContent: p.encryptedContent,
-    sessionId: p.did,
-  }))
-  const sessionKeys = encrypted.map(p => ({
-    sessionId: p.did,
-    encryptedDek: p.encryptedDek,
-  }))
-
-  const decryptedMap = await decryptBatch(
-    items,
-    sessionKeys,
-    privateKey.privateKey,
-  )
-
   const result = new Map<string, PrivateProfileData>()
-  for (const [did, content] of decryptedMap) {
-    const data = JSON.parse(content) as PrivateProfileData
-    result.set(did, resolvePrivateProfileUrls(data, baseUrl))
-  }
+  await Promise.all(
+    encrypted.map(async p => {
+      try {
+        const dek = await decryptDEK(p.encryptedDek, privateKey.privateKey)
+        const content = await decryptContent(p.encryptedContent, dek)
+        if (!content) return
+        const data = JSON.parse(content) as PrivateProfileData
+        setCachedDek(p.did, dek)
+        result.set(p.did, resolvePrivateProfileUrls(data, baseUrl))
+      } catch {
+        // Skip profiles we can't decrypt
+      }
+    }),
+  )
   return result
 }
 
@@ -690,12 +676,20 @@ export async function migrateMediaToSpeakeasy(
   atprotoUrl: string,
   agent: BskyAgent,
   sessionId: string,
+  sessionKey: string,
 ): Promise<string> {
   const blob = await pathToBlob(atprotoUrl)
+  const mimeType = blob.type || 'image/jpeg'
+  const encryptedStream = await encryptMediaStream(
+    blob.stream(),
+    sessionKey,
+    mimeType,
+  )
+  const encryptedBlob = await new Response(encryptedStream).blob()
   const result = await uploadMediaToSpeakeasy(
     agent,
-    blob,
-    blob.type || 'image/jpeg',
+    encryptedBlob,
+    'application/x-spkeasy-encrypted-media',
     sessionId,
   )
   return result.data.blob.key
@@ -748,10 +742,17 @@ export async function resolvePrivateProfileMedia(
     if (newAvatar === null) return undefined
     if (newAvatar) {
       const blob = await pathToBlob(newAvatar.path)
+      const mimeType = blob.type || newAvatar.mime
+      const encryptedStream = await encryptMediaStream(
+        blob.stream(),
+        sessionKey,
+        mimeType,
+      )
+      const encryptedBlob = await new Response(encryptedStream).blob()
       const result = await uploadMediaToSpeakeasy(
         agent,
-        blob,
-        newAvatar.mime,
+        encryptedBlob,
+        'application/x-spkeasy-encrypted-media',
         sessionId,
       )
       return result.data.blob.key
@@ -759,7 +760,12 @@ export async function resolvePrivateProfileMedia(
     if (existingAvatarUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingAvatarUri, agent)
       if (key) return key
-      return migrateMediaToSpeakeasy(existingAvatarUri, agent, sessionId)
+      return migrateMediaToSpeakeasy(
+        existingAvatarUri,
+        agent,
+        sessionId,
+        sessionKey,
+      )
     }
     return existingAvatarUri
   }
@@ -768,10 +774,17 @@ export async function resolvePrivateProfileMedia(
     if (newBanner === null) return undefined
     if (newBanner) {
       const blob = await pathToBlob(newBanner.path)
+      const mimeType = blob.type || newBanner.mime
+      const encryptedStream = await encryptMediaStream(
+        blob.stream(),
+        sessionKey,
+        mimeType,
+      )
+      const encryptedBlob = await new Response(encryptedStream).blob()
       const result = await uploadMediaToSpeakeasy(
         agent,
-        blob,
-        newBanner.mime,
+        encryptedBlob,
+        'application/x-spkeasy-encrypted-media',
         sessionId,
       )
       return result.data.blob.key
@@ -779,7 +792,12 @@ export async function resolvePrivateProfileMedia(
     if (existingBannerUri?.startsWith('http')) {
       const key = parseSpeakeasyMediaKeyFromUrl(existingBannerUri, agent)
       if (key) return key
-      return migrateMediaToSpeakeasy(existingBannerUri, agent, sessionId)
+      return migrateMediaToSpeakeasy(
+        existingBannerUri,
+        agent,
+        sessionId,
+        sessionKey,
+      )
     }
     return existingBannerUri
   }
