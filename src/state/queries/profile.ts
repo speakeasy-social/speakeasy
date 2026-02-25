@@ -549,8 +549,8 @@ export async function profileMutationFn(
       pronouns: privatePronouns,
     })
 
+    // Step 3a: Anonymize ATProto — only roll back if this fails
     try {
-      // Step 3: clear public profile
       onStateChange?.('Updating public profile...')
       await agent.upsertProfile(existing =>
         anonymizeAtProtoProfile(
@@ -569,6 +569,13 @@ export async function profileMutationFn(
           throw e
         }
       }
+    } catch (clearError) {
+      await deletePrivateProfile(call)
+      throw clearError
+    }
+
+    // Step 3b: Wait for PDS sync — non-fatal timeout, profile is already saved
+    try {
       const expectedAnonymized = anonymizeAtProtoProfile(publicDescription)
       await whenAppViewReady(agent, profile.did, res => {
         return (
@@ -576,9 +583,8 @@ export async function profileMutationFn(
           res.data.description === expectedAnonymized.description
         )
       })
-    } catch (clearError) {
-      await deletePrivateProfile(call)
-      throw clearError
+    } catch {
+      // Timeout is non-fatal — ATProto upsert already succeeded
     }
 
     // Build complete private profile data with raw keys
