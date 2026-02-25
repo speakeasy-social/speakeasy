@@ -30,6 +30,7 @@ import {PrivateProfileData} from '#/lib/api/private-profiles'
  */
 
 const cache = new Map<string, PrivateProfileData | null>()
+const dekCache = new Map<string, string>()
 const inflightDids = new Set<string>()
 const emitter = new EventEmitter()
 
@@ -43,6 +44,14 @@ export function getCachedPrivateProfile(
 
 export function isDidChecked(did: string): boolean {
   return cache.has(did)
+}
+
+export function getCachedDek(did: string): string | undefined {
+  return dekCache.get(did)
+}
+
+export function setCachedDek(did: string, dek: string): void {
+  dekCache.set(did, dek)
 }
 
 // --- Write API ---
@@ -121,6 +130,7 @@ export function releaseDids(dids: string[]): void {
  */
 export function clearAll(): void {
   cache.clear()
+  dekCache.clear()
   inflightDids.clear()
   emitter.emit('change')
 }

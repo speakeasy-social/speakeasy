@@ -30,6 +30,7 @@ interface Props {
   moderation: ModerationDecision
   hideBackButton?: boolean
   isPlaceholderProfile?: boolean
+  dek?: string
 }
 
 let ProfileHeaderShell = ({
@@ -38,6 +39,7 @@ let ProfileHeaderShell = ({
   moderation,
   hideBackButton = false,
   isPlaceholderProfile,
+  dek,
 }: React.PropsWithChildren<Props>): React.ReactNode => {
   const t = useTheme()
   const {currentAccount} = useSession()
@@ -141,6 +143,7 @@ let ProfileHeaderShell = ({
               type={profile.associated?.labeler ? 'labeler' : 'default'}
               banner={profile.banner}
               moderation={moderation.ui('banner')}
+              dek={dek}
             />
           )}
         </GrowableBanner>
@@ -180,6 +183,7 @@ let ProfileHeaderShell = ({
                 size={90}
                 avatar={profile.avatar}
                 moderation={moderation.ui('avatar')}
+                dek={dek}
               />
             </View>
           </View>

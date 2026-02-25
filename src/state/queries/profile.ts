@@ -42,10 +42,12 @@ import {logger} from '#/logger'
 import {
   claimDids,
   evictDid,
+  getCachedDek,
   getCachedPrivateProfile,
   isDidChecked,
   markDidsChecked,
   releaseDids,
+  setCachedDek,
   upsertCachedPrivateProfiles,
   usePrivateProfileCacheVersion,
 } from '#/state/cache/private-profile-cache'
@@ -93,6 +95,7 @@ export type PrivateProfileMetadata = {
   bannerUri?: string // Speakeasy media key for migration
   publicDescription?: string // ATProto description before private merge
   loadError?: boolean // true if non-404 error occurred loading private profile
+  dek?: string // DEK for decrypting encrypted media (avatar/banner)
 }
 
 /**
@@ -110,6 +113,7 @@ export type ProfileViewDetailedWithPrivate =
 function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
   profile: T,
   cached: PrivateProfileData | null | undefined,
+  dek?: string,
 ): T & {_privateProfile: PrivateProfileMetadata} {
   return {
     ...profile,
@@ -118,6 +122,7 @@ function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
           isPrivate: true,
           avatarUri: cached.rawAvatarUri,
           bannerUri: cached.rawBannerUri,
+          dek,
         }
       : {isPrivate: false},
   }
@@ -190,17 +195,22 @@ export function useProfileQuery({
         const privateResult = await getPrivateProfile(safeDid, call)
 
         if (privateResult) {
-          const decryptedRaw = await decryptProfileIfAccessible(
+          const decryptedResult = await decryptProfileIfAccessible(
             privateResult,
             currentAccount?.did ?? '',
             call,
           )
-          if (decryptedRaw) {
+          if (decryptedResult) {
             const baseUrl = getBaseCdnUrl(agent)
-            const decrypted = resolvePrivateProfileUrls(decryptedRaw, baseUrl)
+            const decrypted = resolvePrivateProfileUrls(
+              decryptedResult.data,
+              baseUrl,
+            )
+            setCachedDek(safeDid, decryptedResult.dek)
             result = withPrivateProfileMeta(
               mergePrivateProfileData(result, decrypted),
               decrypted,
+              decryptedResult.dek,
             )
             upsertCachedPrivateProfiles(new Map([[safeDid, decrypted]]))
             markDidsChecked([safeDid])
@@ -241,7 +251,12 @@ export function useProfileQuery({
     if (!base || !did) return base
     const cached = getCachedPrivateProfile(did)
     if (!cached) return base
-    return withPrivateProfileMeta(mergePrivateProfileData(base, cached), cached)
+    const dek = getCachedDek(did)
+    return withPrivateProfileMeta(
+      mergePrivateProfileData(base, cached),
+      cached,
+      dek,
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- privateProfileCacheVersion forces re-merge when cache updates
   }, [query.data, privateProfileCacheVersion, did])
 
@@ -462,6 +477,7 @@ export type ProfileMutationResult =
       type: 'private'
       privateData: PrivateProfileData
       optimisticProfile: AppBskyActorDefs.ProfileViewDetailed
+      dek: string
     }
   | {
       type: 'public'
@@ -611,7 +627,12 @@ export async function profileMutationFn(
       resolvedData,
     )
 
-    return {type: 'private', privateData, optimisticProfile}
+    return {
+      type: 'private',
+      privateData,
+      optimisticProfile,
+      dek: resolved.sessionKey,
+    }
   } else {
     // Becoming public or staying public. Order: 1) save avatar/banner, 2) write public record, 3) clear private.
     // If step 3 fails, profile is still considered public (don't rethrow).
@@ -725,11 +746,12 @@ export async function profileOnSuccess(
   if (data.type === 'private') {
     const baseUrl = getBaseCdnUrl(agent)
     const resolved = resolvePrivateProfileUrls(data.privateData, baseUrl)
+    setCachedDek(did, data.dek)
     upsertCachedPrivateProfiles(new Map([[did, resolved]]))
     markDidsChecked([did])
     queryClient.setQueryData(
       RQKEY(did),
-      withPrivateProfileMeta(data.optimisticProfile, resolved),
+      withPrivateProfileMeta(data.optimisticProfile, resolved, data.dek),
     )
   } else {
     evictDid(did)

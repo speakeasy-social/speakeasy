@@ -8,6 +8,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
+import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {
   useCameraPermission,
@@ -47,6 +48,7 @@ interface UserAvatarProps extends BaseUserAvatarProps {
   moderation?: ModerationUI
   usePlainRNImage?: boolean
   onLoad?: () => void
+  dek?: string
 }
 
 interface EditableUserAvatarProps extends BaseUserAvatarProps {
@@ -179,10 +181,13 @@ let UserAvatar = ({
   moderation,
   usePlainRNImage = false,
   onLoad,
+  dek,
 }: UserAvatarProps): React.ReactNode => {
   const pal = usePalette('default')
   const backgroundColor = pal.colors.backgroundLight
   const finalShape = overrideShape ?? (type === 'user' ? 'circle' : 'square')
+  const decryptedUri = useDecryptedImageUrl(avatar || undefined, dek)
+  const resolvedAvatar = dek ? decryptedUri ?? null : avatar
 
   const aviStyle = useMemo(() => {
     if (finalShape === 'square') {
@@ -216,7 +221,7 @@ let UserAvatar = ({
     )
   }, [moderation?.alert, size, pal])
 
-  return avatar &&
+  return resolvedAvatar &&
     !((moderation?.blur && isAndroid) /* android crashes with blur */) ? (
     <View style={{width: size, height: size}}>
       {usePlainRNImage ? (
@@ -226,7 +231,9 @@ let UserAvatar = ({
           style={aviStyle}
           resizeMode="cover"
           source={{
-            uri: hackModifyThumbnailPath(avatar, size < 90),
+            uri: dek
+              ? resolvedAvatar
+              : hackModifyThumbnailPath(resolvedAvatar, size < 90),
           }}
           blurRadius={moderation?.blur ? BLUR_AMOUNT : 0}
           onLoad={onLoad}
@@ -237,7 +244,9 @@ let UserAvatar = ({
           style={aviStyle}
           contentFit="cover"
           source={{
-            uri: hackModifyThumbnailPath(avatar, size < 90),
+            uri: dek
+              ? resolvedAvatar
+              : hackModifyThumbnailPath(resolvedAvatar, size < 90),
           }}
           blurRadius={moderation?.blur ? BLUR_AMOUNT : 0}
           onLoad={onLoad}

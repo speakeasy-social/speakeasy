@@ -6,6 +6,7 @@ import {ModerationUI} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {
   useCameraPermission,
@@ -32,11 +33,13 @@ export function UserBanner({
   banner,
   moderation,
   onSelectNewBanner,
+  dek,
 }: {
   type?: 'labeler' | 'default'
   banner?: string | null
   moderation?: ModerationUI
   onSelectNewBanner?: (img: RNImage | null) => void
+  dek?: string
 }) {
   const pal = usePalette('default')
   const theme = useTheme()
@@ -45,6 +48,8 @@ export function UserBanner({
   const {requestCameraAccessIfNeeded} = useCameraPermission()
   const {requestPhotoAccessIfNeeded} = usePhotoLibraryPermission()
   const sheetWrapper = useSheetWrapper()
+  const decryptedUri = useDecryptedImageUrl(banner || undefined, dek)
+  const resolvedBanner = dek ? decryptedUri ?? null : banner
 
   const onOpenCamera = React.useCallback(async () => {
     if (!(await requestCameraAccessIfNeeded())) {
@@ -162,7 +167,7 @@ export function UserBanner({
         </Menu.Outer>
       </Menu.Root>
     </EventStopper>
-  ) : banner &&
+  ) : resolvedBanner &&
     !((moderation?.blur && isAndroid) /* android crashes with blur */) ? (
     <Image
       testID="userBannerImage"
@@ -171,7 +176,7 @@ export function UserBanner({
         {backgroundColor: theme.palette.default.backgroundLight},
       ]}
       resizeMode="cover"
-      source={{uri: banner}}
+      source={{uri: resolvedBanner}}
       blurRadius={moderation?.blur ? 100 : 0}
       accessible={true}
       accessibilityIgnoresInvertColors
