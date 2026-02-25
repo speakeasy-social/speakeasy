@@ -23,6 +23,7 @@ import {
 
 import {HandleRef, measureHandle} from '#/lib/hooks/useHandleRef'
 import {usePalette} from '#/lib/hooks/usePalette'
+import {decryptAndCacheImage} from '#/lib/media/encrypted-image-cache'
 import {useLightboxControls} from '#/state/lightbox'
 import {useGridLayoutEnabled} from '#/state/preferences'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
@@ -170,13 +171,28 @@ export function PostEmbeds({
         alt: img.alt,
         dimensions: img.aspectRatio ?? null,
       }))
-      const _openLightbox = (
+      const deks = embed.images.map(
+        img => (img as any)._privateDek as string | undefined,
+      )
+      const _openLightbox = async (
         index: number,
         thumbRects: (MeasuredDimensions | null)[],
         fetchedDims: (Dimensions | null)[],
       ) => {
+        const resolvedItems = await Promise.all(
+          items.map(async (item, i) => {
+            const dek = deks[i]
+            if (!dek) return item
+            try {
+              const blobUrl = await decryptAndCacheImage(item.uri, dek)
+              return {...item, uri: blobUrl, thumbUri: blobUrl}
+            } catch {
+              return item
+            }
+          }),
+        )
         openLightbox({
-          images: items.map((item, i) => ({
+          images: resolvedItems.map((item, i) => ({
             ...item,
             thumbRect: thumbRects[i] ?? null,
             thumbDimensions: fetchedDims[i] ?? null,
@@ -198,9 +214,13 @@ export function PostEmbeds({
         })()
       }
       const onPressIn = (_: number) => {
-        InteractionManager.runAfterInteractions(() => {
-          Image.prefetch(items.map(i => i.uri))
-        })
+        // Only prefetch non-private images — encrypted URLs don't benefit from prefetch
+        const publicUris = items.filter((_, i) => !deks[i]).map(i => i.uri)
+        if (publicUris.length > 0) {
+          InteractionManager.runAfterInteractions(() => {
+            Image.prefetch(publicUris)
+          })
+        }
       }
 
       if (images.length === 1) {
