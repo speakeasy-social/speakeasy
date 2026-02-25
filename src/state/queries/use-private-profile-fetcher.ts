@@ -93,6 +93,8 @@ export function usePrivateProfileFetcher<TPage>({
     } finally {
       releaseDids(claimedDids)
       isFetchingRef.current = false
+      // Re-run to pick up DIDs that appeared in the query while this batch was in flight
+      queueMicrotask(() => fetchProfiles())
     }
   }, [
     agent,

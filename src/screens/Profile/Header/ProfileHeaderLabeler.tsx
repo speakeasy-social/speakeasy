@@ -15,7 +15,7 @@ import {MAX_LABELERS} from '#/lib/constants'
 import {useHaptics} from '#/lib/haptics'
 import {isAppLabeler} from '#/lib/moderation'
 import {logger} from '#/logger'
-import {isIOS, isWeb} from '#/platform/detection'
+import {isIOS} from '#/platform/detection'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {Shadow} from '#/state/cache/types'
 import {useModalControls} from '#/state/modals'
@@ -24,10 +24,11 @@ import {useLikeMutation, useUnlikeMutation} from '#/state/queries/like'
 import {usePreferencesQuery} from '#/state/queries/preferences'
 import {useRequireAuth, useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
+import {PrivateProfileIndicator} from '#/view/com/util/PrivateProfileIndicator'
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a, tokens, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
-import {DialogOuterProps, useDialogControl} from '#/components/Dialog'
+import {DialogOuterProps} from '#/components/Dialog'
 import {
   Heart2_Filled_Stroke2_Corner0_Rounded as HeartFilled,
   Heart2_Stroke2_Corner0_Rounded as Heart,
@@ -37,7 +38,6 @@ import * as Prompt from '#/components/Prompt'
 import {RichText} from '#/components/RichText'
 import {Text} from '#/components/Typography'
 import {ProfileHeaderDisplayName} from './DisplayName'
-import {EditProfileDialog} from './EditProfileDialog'
 import {ProfileHeaderHandle} from './Handle'
 import {ProfileHeaderMetrics} from './Metrics'
 import {ProfileHeaderShell} from './Shell'
@@ -118,18 +118,12 @@ let ProfileHeaderLabeler = ({
   }, [labeler, playHaptic, likeUri, unlikeMod, likeMod, _])
 
   const {openModal} = useModalControls()
-  const editProfileControl = useDialogControl()
   const onPressEditProfile = React.useCallback(() => {
-    if (isWeb) {
-      // temp, while we figure out the nested dialog bug
-      openModal({
-        name: 'edit-profile',
-        profile,
-      })
-    } else {
-      editProfileControl.open()
-    }
-  }, [editProfileControl, openModal, profile])
+    openModal({
+      name: 'edit-profile',
+      profile,
+    })
+  }, [openModal, profile])
 
   const onPressSubscribe = React.useCallback(
     () =>
@@ -189,10 +183,6 @@ let ProfileHeaderLabeler = ({
                   <Trans>Edit Profile</Trans>
                 </ButtonText>
               </Button>
-              <EditProfileDialog
-                profile={profile}
-                control={editProfileControl}
-              />
             </>
           ) : !isAppLabeler(profile.did) ? (
             <>
@@ -246,7 +236,13 @@ let ProfileHeaderLabeler = ({
           <ProfileMenu profile={profile} />
         </View>
         <View style={[a.flex_col, a.gap_2xs, a.pt_2xs, a.pb_md]}>
-          <ProfileHeaderDisplayName profile={profile} moderation={moderation} />
+          <View style={[a.flex_row, a.align_center, a.gap_sm, a.flex_wrap]}>
+            <ProfileHeaderDisplayName
+              profile={profile}
+              moderation={moderation}
+            />
+            <PrivateProfileIndicator profile={profileUnshadowed} />
+          </View>
           <ProfileHeaderHandle profile={profile} />
         </View>
         {!isPlaceholderProfile && (

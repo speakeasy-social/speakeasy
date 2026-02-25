@@ -6,9 +6,18 @@ import {atoms as a, useTheme} from '#/alf'
 import {Lock_Stroke2_Corner0_Rounded as LockIcon} from '#/components/icons/Lock'
 import {Text} from '#/components/Typography'
 
-export function PrivatePostPill() {
+/**
+ * Shared pill: lock icon + label. Used by PrivatePostPill and PrivateProfileIndicator.
+ */
+export function LockPill({
+  label,
+  ariaLabel,
+}: {
+  label: string
+  ariaLabel?: string
+}) {
   const t = useTheme()
-  const {_} = useLingui()
+  const a11y = ariaLabel ?? label
 
   return (
     <View
@@ -25,8 +34,8 @@ export function PrivatePostPill() {
         style={{color: t.atoms.text_contrast_medium.color}}
         width={12}
         height={12}
-        title={_(msg`Private post`)}
-        aria-label={_(msg`Private post`)}
+        title={a11y}
+        aria-label={a11y}
       />
       <Text
         style={[
@@ -36,8 +45,15 @@ export function PrivatePostPill() {
           t.atoms.text_contrast_medium,
           {paddingRight: 3},
         ]}>
-        {_(msg`Private Post`)}
+        {label}
       </Text>
     </View>
+  )
+}
+
+export function PrivatePostPill() {
+  const {_} = useLingui()
+  return (
+    <LockPill label={_(msg`Private Post`)} ariaLabel={_(msg`Private post`)} />
   )
 }

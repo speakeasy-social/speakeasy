@@ -202,10 +202,12 @@ let PostFeed = ({
   initialNumToRender: initialNumToRenderOverride,
   isVideoFeed = false,
   mediaGrid = false,
+  authorProfile,
 }: {
   feed: FeedDescriptor
   feedParams?: FeedParams
   ignoreFilterFor?: string
+  authorProfile?: AppBskyActorDefs.ProfileViewBasic
   style?: StyleProp<ViewStyle>
   enabled?: boolean
   pollInterval?: number
@@ -257,8 +259,8 @@ let PostFeed = ({
 
   const feedCacheKey = feedParams?.feedCacheKey
   const opts = React.useMemo(
-    () => ({enabled, ignoreFilterFor}),
-    [enabled, ignoreFilterFor],
+    () => ({enabled, ignoreFilterFor, authorProfile}),
+    [enabled, ignoreFilterFor, authorProfile],
   )
   const {
     data,

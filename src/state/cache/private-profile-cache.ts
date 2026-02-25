@@ -7,10 +7,24 @@ import {PrivateProfileData} from '#/lib/api/private-profiles'
  * Module-level singleton cache for decrypted private profile data.
  *
  * Stores decrypted profiles by DID so they can be merged at read time
- * via `select` callbacks, rather than mutating React Query caches directly.
+ * via mergePrivateProfileData(publicProfile, getCachedPrivateProfile(did))
+ * (see private-profiles.ts). Display rule: use that single merge point only.
+ *
+ * Optimistic updates: profile mutations must call upsertCachedPrivateProfiles()
+ * (and/or setQueryData for the profile query) so the UI updates without refetch
+ * and avoids content flashes. Do not rely on refetch after save.
  *
  * A `null` entry means "checked, no private profile found".
  * An absent key means "not yet checked".
+ * getCachedPrivateProfile() returns undefined for both absent and null; use
+ * isDidChecked(did) when you need to distinguish "not yet checked".
+ *
+ * Two usage patterns:
+ * - Feed/notifications: usePrivateProfileFetcher fills the cache; select()
+ *   merges via getCachedPrivateProfile; privateProfileVersion in selectArgs
+ *   triggers re-run when cache updates.
+ * - Profile screen / post-thread: queryFn fetches and merges inline, and
+ *   (profile only) useMemo re-merges when cache updates via usePrivateProfileCacheVersion().
  *
  * Follows the profile-shadow.ts EventEmitter + Map pattern.
  */
@@ -46,7 +60,8 @@ export function upsertCachedPrivateProfiles(
       existing.avatarUri !== data.avatarUri ||
       existing.bannerUri !== data.bannerUri ||
       existing.rawAvatarUri !== data.rawAvatarUri ||
-      existing.rawBannerUri !== data.rawBannerUri
+      existing.rawBannerUri !== data.rawBannerUri ||
+      JSON.stringify(existing.pronouns) !== JSON.stringify(data.pronouns)
     ) {
       cache.set(did, data)
       changed = true

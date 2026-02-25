@@ -1,6 +1,15 @@
+import {useMemo} from 'react'
 import {AppBskyActorDefs} from '@atproto/api'
 
-import {getProfilePronouns, usePronounsQuery} from '#/state/queries/pronouns'
+import {
+  getCachedPrivateProfile,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
+import {
+  formatPronounSets,
+  getProfilePronouns,
+  usePronounsQuery,
+} from '#/state/queries/pronouns'
 import {atoms as a, useTheme} from '#/alf'
 import {Text} from '#/components/Typography'
 
@@ -16,10 +25,26 @@ export function Pronouns({
   prefix?: string
 }) {
   const t = useTheme()
-  const nativePronouns = getProfilePronouns(profile)
-  const {data: pronouns} = usePronounsQuery({did, nativePronouns})
+  const cacheVersion = usePrivateProfileCacheVersion()
+  const privatePronouns = useMemo(() => {
+    const cached = getCachedPrivateProfile(did)
+    if (!cached?.pronouns) return undefined
+    if (Array.isArray(cached.pronouns)) {
+      return formatPronounSets({sets: cached.pronouns})
+    }
+    return cached.pronouns
+  }, [did, cacheVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!pronouns) return null
+  const nativePronouns = getProfilePronouns(profile)
+  const {data: atProtoPronouns} = usePronounsQuery({
+    did,
+    nativePronouns,
+    enabled: !privatePronouns,
+  })
+
+  const displayText = privatePronouns || atProtoPronouns
+
+  if (!displayText) return null
 
   return (
     <Text
@@ -30,7 +55,7 @@ export function Pronouns({
       ]}
       numberOfLines={1}>
       {prefix}
-      {pronouns}
+      {displayText}
     </Text>
   )
 }

@@ -192,11 +192,15 @@ export async function updateUserKeyPair(
 
 /**
  * Gets or creates a public key for the given agent.
+ * Always returns a privateKey (fetches from API when user already has keys).
  * @param {any} agent - The agent object containing user information
  * @param {any} call - The API call function
- * @returns {Promise<{publicKey: string, privateKey: string}>} The public and private key pair
+ * @returns {Promise<{publicKey: string, privateKey: string, userKeyPairId: string}>} The public and private key pair
  */
-export async function getOrCreatePublicKey(agent: BskyAgent, call: any) {
+export async function getOrCreatePublicKey(
+  agent: BskyAgent,
+  call: any,
+): Promise<{publicKey: string; privateKey: string; userKeyPairId: string}> {
   let publicKey: string
   let privateKey: string | null = null
   let userKeyPairId: string
@@ -215,5 +219,14 @@ export async function getOrCreatePublicKey(agent: BskyAgent, call: any) {
       throw error
     }
   }
+
+  if (privateKey === null) {
+    const cached = await getCachedPrivateKey(agent.did!, call)
+    if (!cached) {
+      throw new Error('Unable to load private key')
+    }
+    privateKey = cached.privateKey
+  }
+
   return {publicKey, privateKey, userKeyPairId}
 }

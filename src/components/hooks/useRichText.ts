@@ -1,6 +1,7 @@
 import React from 'react'
 import {RichText as RichTextAPI} from '@atproto/api'
 
+import {ensureSpkeasyMention} from '#/lib/api/private-profiles'
 import {useAgent} from '#/state/session'
 
 export function useRichText(text: string): [RichTextAPI, boolean] {
@@ -20,6 +21,7 @@ export function useRichText(text: string): [RichTextAPI, boolean] {
       // new each time
       const resolvedRT = new RichTextAPI({text})
       await resolvedRT.detectFacets(agent)
+      ensureSpkeasyMention(resolvedRT)
       if (!ignore) {
         setResolvedRT(resolvedRT)
       }

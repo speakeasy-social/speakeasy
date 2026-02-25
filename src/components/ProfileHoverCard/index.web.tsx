@@ -16,6 +16,7 @@ import {usePrefetchProfileQuery, useProfileQuery} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {TrustButton} from '#/view/com/profile/TrustButton'
 import {formatCount} from '#/view/com/util/numeric/format'
+import {PrivateProfileIndicator} from '#/view/com/util/PrivateProfileIndicator'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {ProfileHeaderHandle} from '#/screens/Profile/Header/Handle'
 import {atoms as a, useTheme} from '#/alf'
@@ -470,13 +471,16 @@ function Inner({
 
       <Link to={profileURL} label={_(msg`View profile`)} onPress={hide}>
         <View style={[a.pb_sm, a.flex_1]}>
-          <Text
-            style={[a.pt_md, a.pb_xs, a.text_lg, a.font_bold, a.self_start]}>
-            {sanitizeDisplayName(
-              profile.displayName || sanitizeHandle(profile.handle),
-              moderation.ui('displayName'),
-            )}
-          </Text>
+          <View
+            style={[a.flex_row, a.align_center, a.gap_xs, a.pt_md, a.pb_xs]}>
+            <Text style={[a.text_lg, a.font_bold, a.self_start]}>
+              {sanitizeDisplayName(
+                profile.displayName || sanitizeHandle(profile.handle),
+                moderation.ui('displayName'),
+              )}
+            </Text>
+            <PrivateProfileIndicator profile={profile} preview />
+          </View>
 
           <ProfileHeaderHandle profile={profileShadow} disableTaps />
           <Pronouns did={profile.did} profile={profile} size="sm" />
