@@ -37,6 +37,7 @@ import {
 import {callSpeakeasyApiWithAgent, getErrorCode} from '#/lib/api/speakeasy'
 import {until} from '#/lib/async/until'
 import {useToggleMutationQueue} from '#/lib/hooks/useToggleMutationQueue'
+import {decryptAndCacheImage} from '#/lib/media/encrypted-image-cache'
 import {logEvent, LogEvents, toClout} from '#/lib/statsig/statsig'
 import {logger} from '#/logger'
 import {
@@ -57,7 +58,10 @@ import {
   removeCachedFollowerDid,
 } from '#/state/followers-cache'
 import {STALE} from '#/state/queries'
-import {resetProfilePostsQueries} from '#/state/queries/post-feed'
+import {
+  resetProfilePostsQueries,
+  RQKEY_ROOT as FEED_RQKEY_ROOT,
+} from '#/state/queries/post-feed'
 import {type PronounSet} from '#/state/queries/pronouns'
 import * as userActionHistory from '#/state/userActionHistory'
 import {updateProfileShadow} from '../cache/profile-shadow'
@@ -114,6 +118,7 @@ function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
   profile: T,
   cached: PrivateProfileData | null | undefined,
   dek?: string,
+  publicDescription?: string,
 ): T & {_privateProfile: PrivateProfileMetadata} {
   return {
     ...profile,
@@ -123,9 +128,99 @@ function withPrivateProfileMeta<T extends AppBskyActorDefs.ProfileViewDetailed>(
           avatarUri: cached.rawAvatarUri,
           bannerUri: cached.rawBannerUri,
           dek,
+          publicDescription,
         }
       : {isPrivate: false},
   }
+}
+
+/**
+ * Fetches and merges ATProto + Speakeasy private profile data for a given DID.
+ * Extracted from useProfileQuery so it can be unit-tested without React rendering.
+ */
+export async function profileQueryFn(
+  agent: BskyAgent,
+  did: string,
+  currentAccountDid: string,
+): Promise<ProfileViewDetailedWithPrivate> {
+  // Create call function for Speakeasy API
+  const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+    callSpeakeasyApiWithAgent(agent, options)
+
+  // ATProto fetch is always unconditional
+  const atprotoRes = await agent.getProfile({actor: did})
+  let result: ProfileViewDetailedWithPrivate = atprotoRes.data
+
+  // Check cache before calling Speakeasy API (avoid re-fetching when we already know the answer)
+  if (isDidChecked(did)) {
+    const cached = getCachedPrivateProfile(did)
+    return withPrivateProfileMeta(
+      cached ? mergePrivateProfileData(result, cached) : result,
+      cached ?? null,
+    )
+  }
+
+  // Skip Speakeasy lookup if displayName doesn't match the sentinel
+  if (!shouldCheckPrivateProfile(result)) {
+    result._privateProfile = {isPrivate: false}
+    return result
+  }
+
+  const claimed = claimDids([did])
+  if (claimed.length === 0) {
+    // DID already being fetched by batch fetcher; return atproto result and
+    // merge from cache if already present; useMemo will re-merge when cache updates
+    const cached = getCachedPrivateProfile(did)
+    return withPrivateProfileMeta(
+      cached ? mergePrivateProfileData(result, cached) : result,
+      cached ?? null,
+    )
+  }
+
+  try {
+    const privateResult = await getPrivateProfile(did, call)
+
+    if (privateResult) {
+      const decryptedResult = await decryptProfileIfAccessible(
+        privateResult,
+        currentAccountDid,
+        call,
+      )
+      if (decryptedResult) {
+        const baseUrl = getBaseCdnUrl(agent)
+        const decrypted = resolvePrivateProfileUrls(
+          decryptedResult.data,
+          baseUrl,
+        )
+        setCachedDek(did, decryptedResult.dek)
+        result = withPrivateProfileMeta(
+          mergePrivateProfileData(result, decrypted),
+          decrypted,
+          decryptedResult.dek,
+        )
+        upsertCachedPrivateProfiles(new Map([[did, decrypted]]))
+        markDidsChecked([did])
+      } else {
+        markDidsChecked([did])
+        result = withPrivateProfileMeta(result, null)
+      }
+    } else {
+      if (result.displayName !== PRIVATE_PROFILE_DISPLAY_NAME) {
+        evictDid(did)
+        markDidsChecked([did])
+      }
+      result = withPrivateProfileMeta(result, null)
+    }
+  } catch (err) {
+    if (getErrorCode(err) !== 'NotFound') {
+      logger.error('Failed to load private profile', {message: err})
+    }
+    result._privateProfile = {isPrivate: false, loadError: true}
+  } finally {
+    releaseDids([did])
+  }
+
+  return result
 }
 
 /**
@@ -155,85 +250,7 @@ export function useProfileQuery({
     // -prf
     staleTime,
     queryKey: RQKEY(did ?? ''),
-    queryFn: async () => {
-      // Create call function for Speakeasy API
-      const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
-        callSpeakeasyApiWithAgent(agent, options)
-
-      // ATProto fetch is always unconditional
-      const atprotoRes = await agent.getProfile({actor: did ?? ''})
-      let result: ProfileViewDetailedWithPrivate = atprotoRes.data
-
-      // Check cache before calling Speakeasy API (avoid re-fetching when we already know the answer)
-      if (isDidChecked(did ?? '')) {
-        const cached = getCachedPrivateProfile(did ?? '')
-        return withPrivateProfileMeta(
-          cached ? mergePrivateProfileData(result, cached) : result,
-          cached ?? null,
-        )
-      }
-
-      // Skip Speakeasy lookup if displayName doesn't match the sentinel
-      if (!shouldCheckPrivateProfile(result)) {
-        result._privateProfile = {isPrivate: false}
-        return result
-      }
-
-      const safeDid = did ?? ''
-      const claimed = claimDids([safeDid])
-      if (claimed.length === 0) {
-        // DID already being fetched by batch fetcher; return atproto result and
-        // merge from cache if already present; useMemo will re-merge when cache updates
-        const cached = getCachedPrivateProfile(safeDid)
-        return withPrivateProfileMeta(
-          cached ? mergePrivateProfileData(result, cached) : result,
-          cached ?? null,
-        )
-      }
-
-      try {
-        const privateResult = await getPrivateProfile(safeDid, call)
-
-        if (privateResult) {
-          const decryptedResult = await decryptProfileIfAccessible(
-            privateResult,
-            currentAccount?.did ?? '',
-            call,
-          )
-          if (decryptedResult) {
-            const baseUrl = getBaseCdnUrl(agent)
-            const decrypted = resolvePrivateProfileUrls(
-              decryptedResult.data,
-              baseUrl,
-            )
-            setCachedDek(safeDid, decryptedResult.dek)
-            result = withPrivateProfileMeta(
-              mergePrivateProfileData(result, decrypted),
-              decrypted,
-              decryptedResult.dek,
-            )
-            upsertCachedPrivateProfiles(new Map([[safeDid, decrypted]]))
-            markDidsChecked([safeDid])
-          } else {
-            markDidsChecked([safeDid])
-            result = withPrivateProfileMeta(result, null)
-          }
-        } else {
-          if (result.displayName !== PRIVATE_PROFILE_DISPLAY_NAME) {
-            evictDid(safeDid)
-            markDidsChecked([safeDid])
-          }
-          result = withPrivateProfileMeta(result, null)
-        }
-      } catch {
-        markDidsChecked([safeDid])
-        result._privateProfile = {isPrivate: false, loadError: true}
-      } finally {
-        releaseDids([safeDid])
-      }
-
-      return result
-    },
+    queryFn: () => profileQueryFn(agent, did ?? '', currentAccount?.did ?? ''),
     placeholderData: () => {
       if (!did) return
 
@@ -311,7 +328,12 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
       const mergedProfiles = res.data.profiles.map(profile => {
         const privateData =
           freshDataMap.get(profile.did) ?? getCachedPrivateProfile(profile.did)
-        return mergePrivateProfileData(profile, privateData)
+        const dek = getCachedDek(profile.did)
+        return withPrivateProfileMeta(
+          mergePrivateProfileData(profile, privateData),
+          privateData ?? null,
+          dek,
+        )
       })
 
       return {
@@ -370,6 +392,7 @@ function buildAvatarBannerPromisesForPublicProfile(
   newUserBanner: RNImage | undefined | null,
   existingPrivateAvatarUri: string | undefined,
   existingPrivateBannerUri: string | undefined,
+  dek: string | undefined,
 ): {
   newUserAvatarPromise: Promise<AvatarBannerUploadResult> | undefined
   newUserBannerPromise: Promise<AvatarBannerUploadResult> | undefined
@@ -384,9 +407,12 @@ function buildAvatarBannerPromisesForPublicProfile(
       newUserAvatar.mime,
     ).then(response => ({response}))
   } else if (newUserAvatar === undefined && existingPrivateAvatarUri) {
+    if (!dek)
+      throw new Error('dek required to migrate private avatar to ATProto')
     newUserAvatarPromise = migrateMediaToAtProto(
       existingPrivateAvatarUri,
       agent,
+      dek,
     )
   } else {
     newUserAvatarPromise = undefined
@@ -399,9 +425,12 @@ function buildAvatarBannerPromisesForPublicProfile(
       newUserBanner.mime,
     ).then(response => ({response}))
   } else if (newUserBanner === undefined && existingPrivateBannerUri) {
+    if (!dek)
+      throw new Error('dek required to migrate private banner to ATProto')
     newUserBannerPromise = migrateMediaToAtProto(
       existingPrivateBannerUri,
       agent,
+      dek,
     )
   } else {
     newUserBannerPromise = undefined
@@ -414,7 +443,7 @@ function buildAvatarBannerPromisesForPublicProfile(
  * Default checkCommitted for public profile save: wait until avatar/banner and
  * display fields match what we sent.
  */
-function defaultCheckCommittedForPublicProfile(
+export function defaultCheckCommittedForPublicProfile(
   profile: AppBskyActorDefs.ProfileView,
   updates:
     | AppBskyActorProfile.Record
@@ -425,11 +454,11 @@ function defaultCheckCommittedForPublicProfile(
   return res => {
     if (typeof newUserAvatar !== 'undefined') {
       if (newUserAvatar === null && res.data.avatar) return false
-      if (res.data.avatar === profile.avatar) return false
+      if ((res.data.avatar ?? null) === (profile.avatar ?? null)) return false
     }
     if (typeof newUserBanner !== 'undefined') {
       if (newUserBanner === null && res.data.banner) return false
-      if (res.data.banner === profile.banner) return false
+      if ((res.data.banner ?? null) === (profile.banner ?? null)) return false
     }
     if (typeof updates === 'function') return true
     return (
@@ -554,6 +583,25 @@ export async function profileMutationFn(
       queryClient,
       mediaParams,
     )
+
+    // Pre-warm decrypted image cache so UserAvatar doesn't flash a white circle
+    // while decrypting. Runs in parallel with subsequent network calls so is
+    // likely complete before re-render. Errors are non-critical (fallback is
+    // the current flash behaviour).
+    const prewarmBaseUrl = getBaseCdnUrl(agent)
+    if (resolved.avatarUri) {
+      decryptAndCacheImage(
+        `${prewarmBaseUrl}/${resolved.avatarUri}`,
+        resolved.sessionKey,
+      ).catch(() => {})
+    }
+    if (resolved.bannerUri) {
+      decryptAndCacheImage(
+        `${prewarmBaseUrl}/${resolved.bannerUri}`,
+        resolved.sessionKey,
+      ).catch(() => {})
+    }
+
     onStateChange?.('Saving private profile...')
     await writePrivateProfileRecord(call, {
       sessionId: resolved.sessionId,
@@ -647,6 +695,7 @@ export async function profileMutationFn(
         newUserBanner,
         existingPrivateAvatarUri,
         existingPrivateBannerUri,
+        getCachedDek(profile.did),
       )
 
     const [avatarRes, bannerRes] = await Promise.all([
@@ -709,10 +758,13 @@ export async function profileMutationFn(
         ),
     )
 
-    // Fetch the real profile with canonical CDN URLs
-    const freshProfile = await agent.app.bsky.actor.getProfile({
-      actor: profile.did,
-    })
+    // Fetch the real profile with canonical CDN URLs, retrying if media URLs
+    // are not yet serving real images (eventual consistency on local AppView)
+    const freshProfile = await fetchProfileWithValidatedMedia(
+      agent,
+      profile.did,
+      onStateChange,
+    )
 
     onStateChange?.('Cleaning up...')
     try {
@@ -751,7 +803,12 @@ export async function profileOnSuccess(
     markDidsChecked([did])
     queryClient.setQueryData(
       RQKEY(did),
-      withPrivateProfileMeta(data.optimisticProfile, resolved, data.dek),
+      withPrivateProfileMeta(
+        data.optimisticProfile,
+        resolved,
+        data.dek,
+        variables.publicDescription ?? DEFAULT_PRIVATE_DESCRIPTION,
+      ),
     )
   } else {
     evictDid(did)
@@ -760,6 +817,9 @@ export async function profileOnSuccess(
       RQKEY(did),
       withPrivateProfileMeta(data.optimisticProfile, null),
     )
+    // Feed caches embed stale ATProto profile data (sentinel displayName, no avatar).
+    // Invalidate so the next render of any feed containing this user refetches fresh data.
+    queryClient.invalidateQueries({queryKey: [FEED_RQKEY_ROOT]})
   }
 }
 
@@ -1086,6 +1146,66 @@ async function whenAppViewReady(
     fn,
     () => agent.app.bsky.actor.getProfile({actor}),
   )
+}
+
+/**
+ * Validates that a media URL serves an actual image.
+ * Returns true if the URL should be discarded (retry needed):
+ *   - URL contains 'cdn.appview.com' → discard immediately
+ *   - Fetch returns non-image content-type or error → discard
+ *   - Fetch throws CORS error → accept (can't verify, hope for the best)
+ */
+async function isMediaUrlInvalid(url: string): Promise<boolean> {
+  if (url.includes('cdn.appview.com')) {
+    return true
+  }
+  try {
+    const res = await fetch(url, {method: 'HEAD'})
+    const contentType = res.headers.get('content-type') ?? ''
+    return !res.ok || !contentType.startsWith('image/')
+  } catch {
+    // CORS or network error — can't verify, accept the URL
+    return false
+  }
+}
+
+/**
+ * Fetches getProfile, retrying every 500ms (up to 4s total) if any
+ * avatar/banner URL is invalid (cdn.appview.com or non-image response).
+ * Returns the best available result when the timeout expires.
+ */
+async function fetchProfileWithValidatedMedia(
+  agent: BskyAgent,
+  did: string,
+  onStateChange?: (stage: string) => void,
+): Promise<AppBskyActorGetProfile.Response> {
+  const maxElapsed = 4000
+  const retryDelay = 500
+  const start = Date.now()
+
+  while (true) {
+    const res = await agent.app.bsky.actor.getProfile({actor: did})
+
+    const mediaUrls = [res.data.avatar, res.data.banner].filter(
+      (u): u is string => !!u,
+    )
+    const invalid = await Promise.all(mediaUrls.map(isMediaUrlInvalid))
+
+    if (!invalid.some(Boolean)) {
+      return res
+    }
+
+    const elapsed = Date.now() - start
+    if (elapsed + retryDelay > maxElapsed) {
+      logger.warn(
+        'fetchProfileWithValidatedMedia: timed out waiting for valid media URLs',
+      )
+      return res
+    }
+
+    onStateChange?.('Waiting for media to be ready...')
+    await new Promise(resolve => setTimeout(resolve, retryDelay))
+  }
 }
 
 export function* findAllProfilesInQueryData(
