@@ -16,7 +16,10 @@ import {isWeb} from '#/platform/detection'
 import {emitSoftReset} from '#/state/events'
 import {useKawaiiMode} from '#/state/preferences/kawaii'
 import {useUnreadNotifications} from '#/state/queries/notifications/unread'
-import {useProfileQuery} from '#/state/queries/profile'
+import {
+  ProfileViewDetailedWithPrivate,
+  useProfileQuery,
+} from '#/state/queries/profile'
 import {SessionAccount, useSession} from '#/state/session'
 import {useSetDrawerOpen} from '#/state/shell'
 import {formatCount} from '#/view/com/util/numeric/format'
@@ -78,6 +81,7 @@ let DrawerProfileCard = ({
         // See https://github.com/bluesky-social/social-app/pull/1801:
         usePlainRNImage={true}
         type={profile?.associated?.labeler ? 'labeler' : 'user'}
+        dek={(profile as ProfileViewDetailedWithPrivate)?._privateProfile?.dek}
       />
       <View style={[a.gap_2xs]}>
         <Text

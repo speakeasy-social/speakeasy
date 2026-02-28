@@ -23,7 +23,10 @@ import {emitSoftReset} from '#/state/events'
 import {useHomeBadge} from '#/state/home-badge'
 import {useFetchHandle} from '#/state/queries/handle'
 import {useUnreadMessageCount} from '#/state/queries/messages/list-conversations'
-import {useProfilesQuery} from '#/state/queries/profile'
+import {
+  ProfileViewDetailedWithPrivate,
+  useProfilesQuery,
+} from '#/state/queries/profile'
 import {SessionAccount, useSession, useSessionApi} from '#/state/session'
 import {useComposerControls} from '#/state/shell/composer'
 import {useLoggedOutViewControls} from '#/state/shell/logged-out'
@@ -149,6 +152,10 @@ function ProfileCard() {
                       avatar={profile.avatar}
                       size={size}
                       type={profile?.associated?.labeler ? 'labeler' : 'user'}
+                      dek={
+                        (profile as ProfileViewDetailedWithPrivate)
+                          ?._privateProfile?.dek
+                      }
                     />
                   </View>
                   {gtTablet && (

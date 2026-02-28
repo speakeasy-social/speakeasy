@@ -48,8 +48,12 @@ export function UserBanner({
   const {requestCameraAccessIfNeeded} = useCameraPermission()
   const {requestPhotoAccessIfNeeded} = usePhotoLibraryPermission()
   const sheetWrapper = useSheetWrapper()
-  const decryptedUri = useDecryptedImageUrl(banner || undefined, dek)
-  const resolvedBanner = dek ? decryptedUri ?? null : banner
+  const isBannerHttp = banner?.startsWith('http')
+  const decryptedUri = useDecryptedImageUrl(
+    isBannerHttp ? banner || undefined : undefined,
+    dek,
+  )
+  const resolvedBanner = dek && isBannerHttp ? decryptedUri ?? null : banner
 
   const onOpenCamera = React.useCallback(async () => {
     if (!(await requestCameraAccessIfNeeded())) {
@@ -100,11 +104,11 @@ export function UserBanner({
         <Menu.Trigger label={_(msg`Edit avatar`)}>
           {({props}) => (
             <Pressable {...props} testID="changeBannerBtn">
-              {banner ? (
+              {resolvedBanner ? (
                 <Image
                   testID="userBannerImage"
                   style={styles.bannerImage}
-                  source={{uri: banner}}
+                  source={{uri: resolvedBanner}}
                   accessible={true}
                   accessibilityIgnoresInvertColors
                 />
