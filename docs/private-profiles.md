@@ -43,6 +43,7 @@ These rules were distilled from the feature/private-profile-editor branch. **Fol
 
 - **Order**: 1) Migrate avatar/banner to ATProto (including when switching from private — use existing Speakeasy media keys / upload new blobs), 2) Write public record, 3) Wait for app view (`whenAppViewReady`), 4) Fetch fresh profile via `getProfile` (canonical CDN URLs), 5) Delete private (`deletePrivateProfile`). If step 5 fails, log but don’t rethrow; profile is already public.
 - **whenAppViewReady must check avatar/banner after migration**: `defaultCheckCommittedForPublicProfile` skips avatar/banner checks when `newUserAvatar`/`newUserBanner` are `undefined`. When migrating private media to ATProto (i.e., `avatarRes`/`bannerRes` from migration exist), pass a custom check that waits for the app view to index the new avatar/banner.
+- **`defaultCheckCommittedForPublicProfile` null/undefined invariant**: When checking if avatar/banner has changed, normalize `null` and `undefined` as equivalent ("no value"). Use `(res.data.avatar ?? null) === (profile.avatar ?? null)`. Strict equality fails when the ATProto app view returns `null` for an absent field while the client-side profile value is `undefined` (JS fields that were never set), causing `whenAppViewReady` to exit on the first poll before the new image is indexed.
 
 ## Media and types
 

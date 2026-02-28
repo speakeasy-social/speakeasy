@@ -11,6 +11,7 @@ import {QueryClient} from '@tanstack/react-query'
 import {
   decryptContent,
   decryptDEK,
+  decryptEncryptedBlob,
   encryptContent,
   encryptMediaStream,
 } from '#/lib/encryption'
@@ -456,10 +457,7 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
   atprotoProfile: T,
   privateData: PrivateProfileData | null | undefined,
 ): T {
-  if (
-    !privateData ||
-    atprotoProfile.displayName !== PRIVATE_PROFILE_DISPLAY_NAME
-  ) {
+  if (!privateData) {
     return atprotoProfile
   }
 
@@ -652,14 +650,16 @@ export type MigrateMediaToAtProtoResult = {
 export async function migrateMediaToAtProto(
   speakeasyKey: string,
   agent: BskyAgent,
+  dek: string,
 ): Promise<MigrateMediaToAtProtoResult> {
-  let blob: Blob
+  let encryptedBlob: Blob
   if (isWeb) {
-    blob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
+    encryptedBlob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
   } else {
     const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
-    blob = await pathToBlob(url)
+    encryptedBlob = await pathToBlob(url)
   }
+  const blob = await decryptEncryptedBlob(encryptedBlob, dek)
   const response = await uploadBlob(agent, blob, blob.type || 'image/jpeg')
   return {response}
 }

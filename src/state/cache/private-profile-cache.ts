@@ -95,7 +95,9 @@ export function markDidsChecked(dids: string[]): void {
 }
 
 export function evictDid(did: string): void {
-  if (cache.delete(did)) {
+  const changed = cache.delete(did)
+  dekCache.delete(did)
+  if (changed) {
     emitter.emit('change')
   }
 }
