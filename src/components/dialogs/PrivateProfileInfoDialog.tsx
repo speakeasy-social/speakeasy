@@ -11,6 +11,7 @@ import {Text} from '#/components/Typography'
 export interface PrivateProfileInfoDialogProps {
   control: Dialog.DialogControlProps
   onAck: () => void
+  onDialogClose?: () => void
   isPending?: boolean
   savingStage?: string
   handle?: string
@@ -19,6 +20,7 @@ export interface PrivateProfileInfoDialogProps {
 export function PrivateProfileInfoDialog({
   control,
   onAck,
+  onDialogClose,
   isPending,
   savingStage,
   handle,
@@ -31,7 +33,7 @@ export function PrivateProfileInfoDialog({
   }
 
   return (
-    <Dialog.Outer control={control}>
+    <Dialog.Outer control={control} onClose={onDialogClose}>
       <Dialog.Handle />
       <Dialog.ScrollableInner label={_(msg`Private Profile`)}>
         <View style={[a.gap_lg]}>

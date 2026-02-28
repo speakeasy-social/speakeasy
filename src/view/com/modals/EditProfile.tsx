@@ -1,4 +1,4 @@
-import {Fragment, useCallback, useState} from 'react'
+import {Fragment, useCallback, useRef, useState} from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -63,6 +63,8 @@ export function Component({
   const {_} = useLingui()
   const {closeModal} = useModalControls()
   const privateProfileInfoControl = Dialog.useDialogControl()
+  const privateInfoDialogOpenRef = useRef(false)
+  const pendingModalCloseRef = useRef(false)
   const updateMutation = useProfileUpdateMutation()
   const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState<string>('')
@@ -165,6 +167,7 @@ export function Component({
     setImageError('')
     const transitioningToPrivate = !privateProfileMeta?.isPrivate && isPrivate
     if (transitioningToPrivate) {
+      privateInfoDialogOpenRef.current = true
       privateProfileInfoControl.open()
     }
     try {
@@ -197,11 +200,15 @@ export function Component({
         })
       }
       Toast.show(_(msg`Profile updated`))
-      if (!transitioningToPrivate) {
+      if (!transitioningToPrivate || !privateInfoDialogOpenRef.current) {
         onUpdate?.()
         closeModal()
+      } else {
+        pendingModalCloseRef.current = true
       }
     } catch (e: any) {
+      privateInfoDialogOpenRef.current = false
+      pendingModalCloseRef.current = false
       if (transitioningToPrivate) {
         privateProfileInfoControl.close()
       }
@@ -232,8 +239,19 @@ export function Component({
   ])
 
   const handlePrivateProfileInfoAck = useCallback(() => {
+    privateInfoDialogOpenRef.current = false
+    pendingModalCloseRef.current = false
     closeModal()
     onUpdate?.()
+  }, [closeModal, onUpdate])
+
+  const handlePrivateDialogClose = useCallback(() => {
+    privateInfoDialogOpenRef.current = false
+    if (pendingModalCloseRef.current) {
+      pendingModalCloseRef.current = false
+      onUpdate?.()
+      closeModal()
+    }
   }, [closeModal, onUpdate])
 
   return (
@@ -247,12 +265,14 @@ export function Component({
             <UserBanner
               banner={userBanner}
               onSelectNewBanner={onSelectNewBanner}
+              dek={privateProfileMeta?.dek}
             />
             <View style={[styles.avi, {borderColor: pal.colors.background}]}>
               <EditableUserAvatar
                 size={80}
                 avatar={userAvatar}
                 onSelectNewAvatar={onSelectNewAvatar}
+                dek={privateProfileMeta?.dek}
               />
             </View>
           </View>
@@ -432,6 +452,7 @@ export function Component({
       <PrivateProfileInfoDialog
         control={privateProfileInfoControl}
         onAck={handlePrivateProfileInfoAck}
+        onDialogClose={handlePrivateDialogClose}
         isPending={updateMutation.isPending}
         savingStage={savingStage}
         handle={profile.handle}
