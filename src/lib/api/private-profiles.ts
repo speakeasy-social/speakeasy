@@ -764,6 +764,7 @@ export type ResolvePrivateProfileMediaParams = {
   existingAvatarUri?: string
   existingBannerUri?: string
   pronouns?: string | PronounSet[]
+  onStateChange?: (stage: string) => void
 }
 
 /**
@@ -787,8 +788,22 @@ export async function resolvePrivateProfileMedia(
     queryClient,
   )
 
-  const {newAvatar, newBanner, existingAvatarUri, existingBannerUri} =
-    profileData
+  const {
+    newAvatar,
+    newBanner,
+    existingAvatarUri,
+    existingBannerUri,
+    onStateChange,
+  } = profileData
+
+  const hasMediaWork =
+    newAvatar != null ||
+    newBanner != null ||
+    existingAvatarUri?.startsWith('http') ||
+    existingBannerUri?.startsWith('http')
+  if (hasMediaWork) {
+    onStateChange?.('Uploading media...')
+  }
 
   const resolveAvatar = async (): Promise<string | undefined> => {
     if (newAvatar === null) return undefined

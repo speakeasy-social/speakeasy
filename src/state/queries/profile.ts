@@ -577,9 +577,10 @@ export async function profileMutationFn(
           ? existingPrivateBannerUri ?? (profile.banner as string | undefined)
           : undefined,
       pronouns: privatePronouns,
+      onStateChange,
     }
 
-    onStateChange?.('Uploading media...')
+    onStateChange?.('Preparing...')
     const resolved = await resolvePrivateProfileMedia(
       agent,
       call,
