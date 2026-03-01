@@ -1,6 +1,7 @@
 import React from 'react'
 import {AtpSessionEvent, BskyAgent} from '@atproto/api'
 
+import {clearCachedPrivateKey} from '#/lib/api/user-keys'
 import {clearEncryptedImageCache} from '#/lib/media/encrypted-image-cache'
 import {logEvent} from '#/lib/statsig/statsig'
 import {isWeb} from '#/platform/detection'
@@ -104,6 +105,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       }
       clearPrivateProfileCache()
       clearEncryptedImageCache()
+      clearCachedPrivateKey()
       dispatch({
         type: 'switched-to-account',
         newAgent: agent,
@@ -123,6 +125,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       cancelPendingTask()
       clearPrivateProfileCache()
       clearEncryptedImageCache()
+      clearCachedPrivateKey()
       dispatch({
         type: 'logged-out-current-account',
       })
@@ -140,6 +143,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       cancelPendingTask()
       clearPrivateProfileCache()
       clearEncryptedImageCache()
+      clearCachedPrivateKey()
       dispatch({
         type: 'logged-out-every-account',
       })
@@ -167,6 +171,7 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       }
       clearPrivateProfileCache()
       clearEncryptedImageCache()
+      clearCachedPrivateKey()
       dispatch({
         type: 'switched-to-account',
         newAgent: agent,

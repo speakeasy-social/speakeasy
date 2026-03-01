@@ -421,7 +421,7 @@ export async function fetchPrivateProfiles(
         const content = await decryptContent(p.encryptedContent, dek)
         if (!content) return
         const data = JSON.parse(content) as PrivateProfileData
-        setCachedDek(p.did, dek)
+        setCachedDek(p.did, dek, userDid)
         result.set(p.did, resolvePrivateProfileUrls(data, baseUrl))
       } catch {
         // Skip profiles we can't decrypt

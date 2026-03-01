@@ -12,6 +12,28 @@ import {decryptMediaBlob} from '#/lib/encryption'
 const resolvedCache = new Map<string, string>()
 const inFlightCache = new Map<string, Promise<string>>()
 
+let ownerDid: string | undefined
+
+/**
+ * Sets the owner DID for this cache. If the DID changes, clears all cached data.
+ */
+export function setOwnerDid(did: string): void {
+  if (ownerDid && ownerDid !== did) {
+    clearEncryptedImageCache()
+  }
+  ownerDid = did
+}
+
+/**
+ * Guard: clears cache if viewerDid doesn't match ownerDid.
+ */
+function assertOwner(viewerDid: string): void {
+  if (ownerDid && ownerDid !== viewerDid) {
+    clearEncryptedImageCache()
+  }
+  ownerDid = viewerDid
+}
+
 export function getCachedBlobUrl(url: string): string | undefined {
   return resolvedCache.get(url)
 }
@@ -23,7 +45,9 @@ export function getCachedBlobUrl(url: string): string | undefined {
 export async function decryptAndCacheImage(
   url: string,
   dek: string,
+  viewerDid?: string,
 ): Promise<string> {
+  if (viewerDid) assertOwner(viewerDid)
   const cached = resolvedCache.get(url)
   if (cached) return cached
 
@@ -57,4 +81,5 @@ export function clearEncryptedImageCache(): void {
   }
   resolvedCache.clear()
   inFlightCache.clear()
+  ownerDid = undefined
 }
