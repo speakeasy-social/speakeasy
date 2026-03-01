@@ -38,10 +38,12 @@ import {Text} from '#/view/com/util/text/Text'
 import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
 import {UserBanner} from '#/view/com/util/UserBanner'
+import {atoms as a} from '#/alf'
 import {Admonition} from '#/components/Admonition'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {PrivateProfileInfoDialog} from '#/components/dialogs/PrivateProfileInfoDialog'
+import * as Toggle from '#/components/forms/Toggle'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {ErrorMessage} from '../util/error/ErrorMessage'
@@ -85,6 +87,12 @@ export function Component({
     if (!stored || stored === DEFAULT_PRIVATE_DESCRIPTION) return ''
     return stored
   })
+  const [customisePublicDescription, setCustomisePublicDescription] = useState(
+    () => {
+      const stored = profile._privateProfile?.publicDescription
+      return !!stored && stored !== DEFAULT_PRIVATE_DESCRIPTION
+    },
+  )
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -98,6 +106,14 @@ export function Component({
     RNImage | undefined | null
   >()
   const [savingStage, setSavingStage] = useState('')
+
+  const initialPublicDescriptionRef = useRef(
+    profile._privateProfile?.publicDescription,
+  )
+  const initialCustomisePublicDescriptionRef = useRef(
+    !!profile._privateProfile?.publicDescription &&
+      profile._privateProfile.publicDescription !== DEFAULT_PRIVATE_DESCRIPTION,
+  )
 
   // #region debug
   logger.info('[EditProfile] mount', {
@@ -170,6 +186,29 @@ export function Component({
       privateInfoDialogOpenRef.current = true
       privateProfileInfoControl.open()
     }
+
+    const initialStoredDescription = initialPublicDescriptionRef.current
+    const initialEffectiveValue =
+      !initialStoredDescription ||
+      initialStoredDescription === DEFAULT_PRIVATE_DESCRIPTION
+        ? ''
+        : initialStoredDescription
+    const publicDescriptionChanged =
+      publicDescription !== initialEffectiveValue ||
+      customisePublicDescription !==
+        initialCustomisePublicDescriptionRef.current
+
+    let resolvedPublicDescription: string | undefined
+    if (!isPrivate) {
+      resolvedPublicDescription = undefined
+    } else if (!transitioningToPrivate && !publicDescriptionChanged) {
+      resolvedPublicDescription = initialStoredDescription
+    } else if (customisePublicDescription) {
+      resolvedPublicDescription = publicDescription || undefined
+    } else {
+      resolvedPublicDescription = undefined
+    }
+
     try {
       await updateMutation.mutateAsync({
         profile,
@@ -183,9 +222,7 @@ export function Component({
         newUserAvatar,
         newUserBanner,
         isPrivate,
-        publicDescription: isPrivate
-          ? publicDescription || undefined
-          : undefined,
+        publicDescription: resolvedPublicDescription,
         existingPrivateAvatarUri: privateProfileMeta?.avatarUri,
         existingPrivateBannerUri: privateProfileMeta?.bannerUri,
         pronouns: {native: nativePronounsValue, sets: parsedSets},
@@ -228,6 +265,7 @@ export function Component({
     pronounsTooLong,
     isPrivate,
     publicDescription,
+    customisePublicDescription,
     privateProfileMeta?.isPrivate,
     privateProfileMeta?.avatarUri,
     privateProfileMeta?.bannerUri,
@@ -375,27 +413,43 @@ export function Component({
             </View>
 
             {isPrivate && (
-              <View style={s.pb10}>
-                <Text style={[styles.label, pal.text]}>
-                  <Trans>Public Description</Trans>
-                </Text>
-                <TextInput
-                  testID="editProfilePublicDescriptionInput"
-                  style={[styles.textArea, pal.border, pal.text]}
-                  placeholder={_(
-                    msg`This profile is private and only visible on @spkeasy.social`,
-                  )}
-                  placeholderTextColor={colors.gray4}
-                  keyboardAppearance={theme.colorScheme}
-                  multiline
-                  value={publicDescription}
-                  onChangeText={setPublicDescription}
-                  accessible={true}
-                  accessibilityLabel={_(msg`Public description`)}
-                  accessibilityHint={_(
-                    msg`A description of your profile visible to everyone`,
-                  )}
-                />
+              <View style={[s.pb10, {marginTop: 20}]}>
+                <Toggle.Item
+                  label={_(msg`Show custom profile description to the public`)}
+                  name="customise_public_description"
+                  value={customisePublicDescription}
+                  onChange={setCustomisePublicDescription}
+                  style={[a.flex_row, a.align_center, a.gap_sm]}>
+                  <Toggle.Checkbox />
+                  <Toggle.LabelText>
+                    <Trans>Show custom profile description to the public</Trans>
+                  </Toggle.LabelText>
+                </Toggle.Item>
+
+                {customisePublicDescription && (
+                  <TextInput
+                    testID="editProfilePublicDescriptionInput"
+                    style={[
+                      styles.textArea,
+                      pal.border,
+                      pal.text,
+                      {marginTop: 8},
+                    ]}
+                    placeholder={_(
+                      msg`This profile is private and only visible on @spkeasy.social`,
+                    )}
+                    placeholderTextColor={colors.gray4}
+                    keyboardAppearance={theme.colorScheme}
+                    multiline
+                    value={publicDescription}
+                    onChangeText={setPublicDescription}
+                    accessible={true}
+                    accessibilityLabel={_(msg`Public description`)}
+                    accessibilityHint={_(
+                      msg`A description of your profile visible to everyone`,
+                    )}
+                  />
+                )}
               </View>
             )}
             {updateMutation.isPending ? (

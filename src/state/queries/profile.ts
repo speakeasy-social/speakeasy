@@ -196,10 +196,12 @@ export async function profileQueryFn(
           baseUrl,
         )
         setCachedDek(did, decryptedResult.dek)
+        const atprotoDescription = result.description
         result = withPrivateProfileMeta(
           mergePrivateProfileData(result, decrypted),
           decrypted,
           decryptedResult.dek,
+          atprotoDescription,
         )
         upsertCachedPrivateProfiles(new Map([[did, decrypted]]))
         markDidsChecked([did])
