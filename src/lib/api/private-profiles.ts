@@ -53,7 +53,7 @@ import {
  * Constants for the @spkeasy.social mention in anonymized profiles
  */
 export const SPKEASY_MENTION = '@spkeasy.social'
-export const SPKEASY_DID = 'did:plc:spkeasy.social'
+export const SPKEASY_DID = 'did:plc:tz34ow54d5p5lsjdhkew3rvn'
 export const DEFAULT_PRIVATE_DESCRIPTION = `This is a private profile only visible to trusted followers on ${SPKEASY_MENTION}`
 
 /**

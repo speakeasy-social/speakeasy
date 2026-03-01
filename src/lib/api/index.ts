@@ -45,6 +45,7 @@ import {
 } from '#/view/com/composer/state/composer'
 import {createGIFDescription} from '../gif-alt-text'
 import {fetchEncryptedPosts} from './feed/private-posts'
+import {SPKEASY_DID} from './private-profiles'
 import {uploadMediaToSpeakeasy} from './speakeasy'
 import {uploadBlob} from './upload-blob'
 
@@ -654,7 +655,7 @@ export function createDefaultHiddenMessage(
           features: [
             {
               $type: 'app.bsky.richtext.facet#mention',
-              did: 'did:plc:spkeasy.social',
+              did: SPKEASY_DID,
             },
           ],
         },
