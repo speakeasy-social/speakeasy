@@ -618,7 +618,7 @@ export async function profileMutationFn(
 
     // Step 3a: Anonymize ATProto — only roll back if this fails
     try {
-      onStateChange?.('Updating public profile...')
+      onStateChange?.('Anonymizing public profile...')
       await agent.upsertProfile(existing =>
         anonymizeAtProtoProfile(
           publicDescription,
@@ -706,7 +706,7 @@ export async function profileMutationFn(
       newUserBannerPromise ?? Promise.resolve(undefined),
     ])
 
-    onStateChange?.('Saving public profile...')
+    onStateChange?.('Updating public profile...')
     await agent.upsertProfile(existing => {
       existing = existing || {}
       if (typeof updates === 'function') {
@@ -769,7 +769,7 @@ export async function profileMutationFn(
       onStateChange,
     )
 
-    onStateChange?.('Cleaning up...')
+    onStateChange?.('Removing private profile...')
     try {
       await deletePrivateProfile(call)
     } catch (error) {
