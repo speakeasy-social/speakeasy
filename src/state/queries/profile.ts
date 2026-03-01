@@ -505,6 +505,8 @@ export interface ProfileUpdateParams {
   privateDescription?: string
   // Progress callback for UI display during migration
   onStateChange?: (stage: string) => void
+  // Whether the pronouns field was edited (used to skip unnecessary writes)
+  pronounsChanged?: boolean
 }
 export type ProfileMutationResult =
   | {
@@ -561,6 +563,25 @@ export async function profileMutationFn(
       privateDescription ??
       (typeof updates === 'function' ? '' : updates.description || '')
 
+    // Dirty-check: skip writes that aren't needed for already-private profiles
+    const privateProfileMeta = (profile as any)._privateProfile as
+      | {isPrivate: boolean; publicDescription?: string}
+      | undefined
+
+    const transitioningToPrivate = !privateProfileMeta?.isPrivate
+
+    const atprotoSentinelDirty =
+      transitioningToPrivate ||
+      publicDescription !== privateProfileMeta?.publicDescription
+
+    const privateRecordDirty =
+      transitioningToPrivate ||
+      displayName !== profile.displayName ||
+      description !== profile.description ||
+      newUserAvatar !== undefined ||
+      newUserBanner !== undefined ||
+      (params.pronounsChanged ?? true) // default true = safe/conservative
+
     const mediaParams = {
       displayName,
       description,
@@ -582,87 +603,103 @@ export async function profileMutationFn(
       onStateChange,
     }
 
-    onStateChange?.('Preparing...')
-    const resolved = await resolvePrivateProfileMedia(
-      agent,
-      call,
-      queryClient,
-      mediaParams,
-    )
+    let resolved:
+      | Awaited<ReturnType<typeof resolvePrivateProfileMedia>>
+      | undefined
 
-    // Pre-warm decrypted image cache so UserAvatar doesn't flash a white circle
-    // while decrypting. Runs in parallel with subsequent network calls so is
-    // likely complete before re-render. Errors are non-critical (fallback is
-    // the current flash behaviour).
-    const prewarmBaseUrl = getBaseCdnUrl(agent)
-    if (resolved.avatarUri) {
-      decryptAndCacheImage(
-        `${prewarmBaseUrl}/${resolved.avatarUri}`,
-        resolved.sessionKey,
-      ).catch(() => {})
-    }
-    if (resolved.bannerUri) {
-      decryptAndCacheImage(
-        `${prewarmBaseUrl}/${resolved.bannerUri}`,
-        resolved.sessionKey,
-      ).catch(() => {})
-    }
+    if (privateRecordDirty) {
+      onStateChange?.('Preparing...')
+      resolved = await resolvePrivateProfileMedia(
+        agent,
+        call,
+        queryClient,
+        mediaParams,
+      )
 
-    onStateChange?.('Saving private profile...')
-    await writePrivateProfileRecord(call, {
-      sessionId: resolved.sessionId,
-      sessionKey: resolved.sessionKey,
-      displayName,
-      description,
-      avatarUri: resolved.avatarUri,
-      bannerUri: resolved.bannerUri,
-      pronouns: privatePronouns,
-    })
+      // Pre-warm decrypted image cache so UserAvatar doesn't flash a white circle
+      // while decrypting. Runs in parallel with subsequent network calls so is
+      // likely complete before re-render. Errors are non-critical (fallback is
+      // the current flash behaviour).
+      const prewarmBaseUrl = getBaseCdnUrl(agent)
+      if (resolved.avatarUri) {
+        decryptAndCacheImage(
+          `${prewarmBaseUrl}/${resolved.avatarUri}`,
+          resolved.sessionKey,
+        ).catch(() => {})
+      }
+      if (resolved.bannerUri) {
+        decryptAndCacheImage(
+          `${prewarmBaseUrl}/${resolved.bannerUri}`,
+          resolved.sessionKey,
+        ).catch(() => {})
+      }
+
+      onStateChange?.('Saving private profile...')
+      await writePrivateProfileRecord(call, {
+        sessionId: resolved.sessionId,
+        sessionKey: resolved.sessionKey,
+        displayName,
+        description,
+        avatarUri: resolved.avatarUri,
+        bannerUri: resolved.bannerUri,
+        pronouns: privatePronouns,
+      })
+    }
 
     // Step 3a: Anonymize ATProto — only roll back if this fails
     try {
-      onStateChange?.('Anonymizing public profile...')
-      await agent.upsertProfile(existing =>
-        anonymizeAtProtoProfile(
-          publicDescription,
-          existing ? {pinnedPost: existing.pinnedPost} : undefined,
-        ),
-      )
-      try {
-        await agent.api.com.atproto.repo.deleteRecord({
-          repo: profile.did,
-          collection: 'app.nearhorizon.actor.pronouns',
-          rkey: 'self',
-        })
-      } catch (e: any) {
-        if (!e.message?.includes('Could not locate record')) {
-          throw e
+      if (atprotoSentinelDirty) {
+        onStateChange?.('Anonymizing public profile...')
+        await agent.upsertProfile(existing =>
+          anonymizeAtProtoProfile(
+            publicDescription,
+            existing ? {pinnedPost: existing.pinnedPost} : undefined,
+          ),
+        )
+      }
+      if (transitioningToPrivate) {
+        try {
+          await agent.api.com.atproto.repo.deleteRecord({
+            repo: profile.did,
+            collection: 'app.nearhorizon.actor.pronouns',
+            rkey: 'self',
+          })
+        } catch (e: any) {
+          if (!e.message?.includes('Could not locate record')) {
+            throw e
+          }
         }
       }
     } catch (clearError) {
-      await deletePrivateProfile(call)
+      if (privateRecordDirty) await deletePrivateProfile(call)
       throw clearError
     }
 
     // Step 3b: Wait for PDS sync — non-fatal timeout, profile is already saved
-    try {
-      const expectedAnonymized = anonymizeAtProtoProfile(publicDescription)
-      await whenAppViewReady(agent, profile.did, res => {
-        return (
-          res.data.displayName === expectedAnonymized.displayName &&
-          res.data.description === expectedAnonymized.description
-        )
-      })
-    } catch {
-      // Timeout is non-fatal — ATProto upsert already succeeded
+    if (atprotoSentinelDirty) {
+      try {
+        const expectedAnonymized = anonymizeAtProtoProfile(publicDescription)
+        await whenAppViewReady(agent, profile.did, res => {
+          return (
+            res.data.displayName === expectedAnonymized.displayName &&
+            res.data.description === expectedAnonymized.description
+          )
+        })
+      } catch {
+        // Timeout is non-fatal — ATProto upsert already succeeded
+      }
     }
+
+    const avatarUri = resolved?.avatarUri ?? existingPrivateAvatarUri
+    const bannerUri = resolved?.bannerUri ?? existingPrivateBannerUri
+    const dek = resolved?.sessionKey ?? getCachedDek(profile.did) ?? ''
 
     // Build complete private profile data with raw keys
     const privateData: PrivateProfileData = {
       displayName,
       description,
-      avatarUri: resolved.avatarUri,
-      bannerUri: resolved.bannerUri,
+      avatarUri,
+      bannerUri,
       pronouns: privatePronouns,
     }
 
@@ -685,7 +722,7 @@ export async function profileMutationFn(
       type: 'private',
       privateData,
       optimisticProfile,
-      dek: resolved.sessionKey,
+      dek,
     }
   } else {
     // Becoming public or staying public. Order: 1) save avatar/banner, 2) write public record, 3) clear private.
