@@ -216,12 +216,20 @@ async function runMutationAndOnSuccess(params: ProfileUpdateParams) {
 // --- Tests ---
 
 describe('profileMutationFn + profileOnSuccess', () => {
+  let savedFetch: typeof global.fetch
+
   afterEach(() => {
     queryClient.clear()
+    global.fetch = savedFetch
   })
 
   beforeEach(() => {
     jest.clearAllMocks()
+    savedFetch = global.fetch
+    global.fetch = jest.fn<any>().mockResolvedValue({
+      ok: true,
+      headers: {get: () => 'image/jpeg'},
+    }) as any
     queryClient = new QueryClient({
       defaultOptions: {queries: {retry: false}},
     })
