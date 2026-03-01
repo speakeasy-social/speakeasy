@@ -1570,6 +1570,252 @@ describe('profileMutationFn + profileOnSuccess', () => {
       spy.mockRestore()
     })
   })
+
+  // ============================================================
+  // Dirty-check tests: skip unnecessary writes for already-private profiles
+  // ============================================================
+
+  describe('dirty-check: skip writes when nothing changed for already-private profile', () => {
+    // Helper: make a profile that already has _privateProfile.isPrivate = true
+    function makeAlreadyPrivateProfile(
+      overrides: {publicDescription?: string} = {},
+    ) {
+      return {
+        ...makeProfile({
+          displayName: 'Alice Private',
+          description: 'My private bio',
+          avatar: undefined,
+          banner: undefined,
+        }),
+        _privateProfile: {
+          isPrivate: true,
+          avatarUri: mockAvatarKey,
+          bannerUri: mockBannerKey,
+          dek: mockDek,
+          publicDescription:
+            overrides.publicDescription ?? 'This profile is private',
+        },
+      }
+    }
+
+    function makeAlreadyPrivateParams(
+      overrides: Partial<ProfileUpdateParams> = {},
+    ): ProfileUpdateParams {
+      const profile = makeAlreadyPrivateProfile()
+      return {
+        profile,
+        updates: (existing: any) => {
+          existing = existing || {}
+          existing.displayName = 'Alice Private'
+          existing.description = 'My private bio'
+          return existing
+        },
+        isPrivate: true,
+        privateDisplayName: 'Alice Private',
+        privateDescription: 'My private bio',
+        publicDescription: 'This profile is private',
+        existingPrivateAvatarUri: mockAvatarKey,
+        existingPrivateBannerUri: mockBannerKey,
+        pronouns: {native: 'she/her', sets: [{forms: ['she', 'her']}]},
+        pronounsChanged: false,
+        ...overrides,
+      }
+    }
+
+    it('no changes: skips both Speakeasy write and ATProto upsert', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams(),
+      )
+
+      expect(mockedResolveMedia).not.toHaveBeenCalled()
+      expect(mockedWriteRecord).not.toHaveBeenCalled()
+      expect(mockAgent.upsertProfile).not.toHaveBeenCalled()
+    })
+
+    it('no changes: skips pronouns deleteRecord', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams(),
+      )
+
+      expect(mockAgent.api.com.atproto.repo.deleteRecord).not.toHaveBeenCalled()
+    })
+
+    it('no changes: result uses existing media URIs', async () => {
+      const result = await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams(),
+      )
+
+      if (result.type !== 'private') throw new Error('expected private')
+      expect(result.privateData.avatarUri).toBe(mockAvatarKey)
+      expect(result.privateData.bannerUri).toBe(mockBannerKey)
+    })
+
+    it('no changes: result.dek is existing cached DEK', async () => {
+      const result = await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams(),
+      )
+
+      if (result.type !== 'private') throw new Error('expected private')
+      expect(result.dek).toBe(mockDek)
+    })
+
+    it('displayName changed: writes Speakeasy record, skips ATProto upsert', async () => {
+      const profile = {
+        ...makeAlreadyPrivateProfile(),
+      }
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          profile,
+          privateDisplayName: 'Alice Renamed',
+        }),
+      )
+
+      expect(mockedResolveMedia).toHaveBeenCalled()
+      expect(mockedWriteRecord).toHaveBeenCalled()
+      expect(mockAgent.upsertProfile).not.toHaveBeenCalled()
+    })
+
+    it('description changed: writes Speakeasy record, skips ATProto upsert', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          privateDescription: 'Updated private bio',
+        }),
+      )
+
+      expect(mockedResolveMedia).toHaveBeenCalled()
+      expect(mockedWriteRecord).toHaveBeenCalled()
+      expect(mockAgent.upsertProfile).not.toHaveBeenCalled()
+    })
+
+    it('publicDescription changed: writes ATProto upsert, skips Speakeasy write', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          publicDescription: 'Updated public description',
+        }),
+      )
+
+      expect(mockedResolveMedia).not.toHaveBeenCalled()
+      expect(mockedWriteRecord).not.toHaveBeenCalled()
+      expect(mockAgent.upsertProfile).toHaveBeenCalled()
+    })
+
+    it('publicDescription changed: skips pronouns deleteRecord (not transitioning)', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          publicDescription: 'Updated public description',
+        }),
+      )
+
+      expect(mockAgent.api.com.atproto.repo.deleteRecord).not.toHaveBeenCalled()
+    })
+
+    it('both displayName and publicDescription changed: both writes happen', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          privateDisplayName: 'Alice Renamed',
+          publicDescription: 'Updated public description',
+        }),
+      )
+
+      expect(mockedResolveMedia).toHaveBeenCalled()
+      expect(mockedWriteRecord).toHaveBeenCalled()
+      expect(mockAgent.upsertProfile).toHaveBeenCalled()
+    })
+
+    it('new avatar: writes Speakeasy record', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({
+          newUserAvatar: {
+            path: '/tmp/new-avatar.jpg',
+            mime: 'image/jpeg',
+          } as any,
+        }),
+      )
+
+      expect(mockedResolveMedia).toHaveBeenCalled()
+      expect(mockedWriteRecord).toHaveBeenCalled()
+    })
+
+    it('pronounsChanged=true: writes Speakeasy record', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({pronounsChanged: true}),
+      )
+
+      expect(mockedResolveMedia).toHaveBeenCalled()
+      expect(mockedWriteRecord).toHaveBeenCalled()
+    })
+
+    it('pronounsChanged=false, nothing else changed: skips Speakeasy write', async () => {
+      await profileMutationFn(
+        mockAgent,
+        queryClient,
+        makeAlreadyPrivateParams({pronounsChanged: false}),
+      )
+
+      expect(mockedResolveMedia).not.toHaveBeenCalled()
+      expect(mockedWriteRecord).not.toHaveBeenCalled()
+    })
+
+    it('ATProto upsert failure: does NOT call deletePrivateProfile when no Speakeasy write', async () => {
+      ;(mockAgent.upsertProfile as jest.Mock<any>).mockRejectedValue(
+        new Error('ATProto write failed'),
+      )
+
+      await expect(
+        profileMutationFn(
+          mockAgent,
+          queryClient,
+          makeAlreadyPrivateParams({
+            publicDescription: 'Updated public description',
+          }),
+        ),
+      ).rejects.toThrow('ATProto write failed')
+
+      // No Speakeasy record was written, so no rollback needed
+      expect(mockedDeletePrivate).not.toHaveBeenCalled()
+    })
+
+    it('ATProto upsert failure: calls deletePrivateProfile when Speakeasy was written', async () => {
+      ;(mockAgent.upsertProfile as jest.Mock<any>).mockRejectedValue(
+        new Error('ATProto write failed'),
+      )
+
+      await expect(
+        profileMutationFn(
+          mockAgent,
+          queryClient,
+          makeAlreadyPrivateParams({
+            privateDisplayName: 'Alice Renamed',
+            publicDescription: 'Updated public description',
+          }),
+        ),
+      ).rejects.toThrow('ATProto write failed')
+
+      expect(mockedDeletePrivate).toHaveBeenCalled()
+    })
+  })
 })
 
 describe('defaultCheckCommittedForPublicProfile', () => {

@@ -135,6 +135,7 @@ export function Component({
     parsedSets,
     nativePronounsValue,
     pronounsTooLong,
+    initialPronouns,
   } = useEditablePronouns(profile)
 
   const onPressCancel = () => {
@@ -226,6 +227,7 @@ export function Component({
         existingPrivateAvatarUri: privateProfileMeta?.avatarUri,
         existingPrivateBannerUri: privateProfileMeta?.bannerUri,
         pronouns: {native: nativePronounsValue, sets: parsedSets},
+        pronounsChanged: pronouns !== initialPronouns,
         privateDisplayName: displayName,
         privateDescription: description,
         onStateChange: setSavingStage,
@@ -263,6 +265,8 @@ export function Component({
     nativePronounsValue,
     parsedSets,
     pronounsTooLong,
+    pronouns,
+    initialPronouns,
     isPrivate,
     publicDescription,
     customisePublicDescription,

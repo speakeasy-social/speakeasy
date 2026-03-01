@@ -2,7 +2,7 @@ import {BskyAgent} from '@atproto/api'
 import {QueryClient} from '@tanstack/react-query'
 
 import {encryptDEK, generateDEK} from '#/lib/encryption'
-import {getTrustedUsers, RQKEY} from '#/state/queries/trusted'
+import {getTrustedUsers} from '#/state/queries/trusted'
 import {SpeakeasyApiCall} from './speakeasy'
 import {getPublicKeys} from './user-keys'
 
@@ -32,13 +32,9 @@ export async function encryptDekForTrustedUsers(
 ): Promise<{dek: string; encryptedDeks: EncryptedDekEntry[]}> {
   const dek = await generateDEK()
 
-  // Get cached trusted users data or fetch from API
-  let trustedUsers: {recipientDid: string}[] | undefined =
-    queryClient.getQueryData(RQKEY(agent.did!))
-
-  if (!trustedUsers) {
-    trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
-  }
+  // Always fetch fresh — correctness is critical here since this determines
+  // who gets access to encrypted session content.
+  const trustedUsers = await getTrustedUsers(agent.did!, call, queryClient)
 
   const recipientPublicKeys = await getPublicKeys(
     trustedUsers.map(user => user.recipientDid),
