@@ -18,7 +18,10 @@ import {makeProfileLink} from '#/lib/routes/links'
 import {colors} from '#/lib/styles'
 import {logger} from '#/logger'
 import {isAndroid, isNative, isWeb} from '#/platform/detection'
-import {getCachedDek} from '#/state/cache/private-profile-cache'
+import {
+  getCachedDek,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {precacheProfile} from '#/state/queries/profile'
 import {HighPriorityImage} from '#/view/com/util/images/Image'
 import {tokens, useTheme} from '#/alf'
@@ -442,6 +445,7 @@ let PreviewableUserAvatar = ({
 }: PreviewableUserAvatarProps): React.ReactNode => {
   const {_} = useLingui()
   const queryClient = useQueryClient()
+  usePrivateProfileCacheVersion() // re-render when DEK cache populates
 
   const onPress = React.useCallback(() => {
     onBeforePress?.()

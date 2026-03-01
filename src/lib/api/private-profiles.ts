@@ -336,10 +336,11 @@ export async function getPrivateProfile(
   call: SpeakeasyApiCall,
 ): Promise<EncryptedProfileResponse | null> {
   try {
-    return await call({
+    const response = await call({
       api: 'social.spkeasy.actor.getProfile',
       query: {did},
     })
+    return response.profile
   } catch (error) {
     if (getErrorCode(error) === 'NotFound') {
       return null
