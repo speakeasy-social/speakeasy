@@ -62,7 +62,10 @@ import {
   resetProfilePostsQueries,
   RQKEY_ROOT as FEED_RQKEY_ROOT,
 } from '#/state/queries/post-feed'
-import {type PronounSet} from '#/state/queries/pronouns'
+import {
+  type PronounSet,
+  RQKEY as PRONOUNS_RQKEY,
+} from '#/state/queries/pronouns'
 import * as userActionHistory from '#/state/userActionHistory'
 import {updateProfileShadow} from '../cache/profile-shadow'
 import {useAgent, useSession} from '../session'
@@ -810,6 +813,7 @@ export async function profileOnSuccess(
         variables.publicDescription ?? DEFAULT_PRIVATE_DESCRIPTION,
       ),
     )
+    queryClient.invalidateQueries({queryKey: PRONOUNS_RQKEY(did)})
   } else {
     evictDid(did)
     markDidsChecked([did])
@@ -817,6 +821,7 @@ export async function profileOnSuccess(
       RQKEY(did),
       withPrivateProfileMeta(data.optimisticProfile, null),
     )
+    queryClient.invalidateQueries({queryKey: PRONOUNS_RQKEY(did)})
     // Feed caches embed stale ATProto profile data (sentinel displayName, no avatar).
     // Invalidate so the next render of any feed containing this user refetches fresh data.
     queryClient.invalidateQueries({queryKey: [FEED_RQKEY_ROOT]})

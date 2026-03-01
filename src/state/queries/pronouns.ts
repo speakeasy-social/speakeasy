@@ -58,7 +58,7 @@ async function getAtProtoPronounsRecord({
 }: {
   agent: BskyAgent
   did: string
-}): Promise<AtProtoPronounsRecord | undefined> {
+}): Promise<AtProtoPronounsRecord | null | undefined> {
   try {
     const {data} = await retry(
       2,
@@ -75,10 +75,10 @@ async function getAtProtoPronounsRecord({
     if (value && Array.isArray(value.sets) && value.sets.length > 0) {
       return value
     }
-    return undefined
+    return null // record exists but is empty — presence is meaningful
   } catch (e: any) {
     if (e.message.includes('Could not locate record:')) {
-      return undefined
+      return undefined // record does not exist — caller may fall back to native
     }
     throw e
   }
@@ -129,9 +129,8 @@ export function parsePronounsInput(input: string): PronounSet[] {
   if (!laterPartsHaveSlashes) {
     // Treat entire input as single freeform entry.
     // e.g. "she/her any" → 1 set with forms ["she", "her", "any"].
-    // Because sets.length < 2, this is written only to the native profile
-    // field (not the atproto record). Users wanting separate sets should
-    // use comma separation ("she/her, any").
+    // This is written to both the atproto record and the native profile field.
+    // Users wanting separate sets should use comma separation ("she/her, any").
     if (trimmed.includes('/')) {
       return [{forms: parts.flatMap(p => p.split('/'))}]
     }
@@ -168,10 +167,13 @@ export function usePronounsQuery({
     enabled: !!did && enabled,
     async queryFn() {
       const record = await getAtProtoPronounsRecord({agent, did: did!})
-      if (record) {
-        return formatPronounSets(record)
+      if (record === undefined) {
+        return nativePronouns ?? '' // not found — fall back to native
       }
-      return nativePronouns ?? ''
+      if (record === null) {
+        return '' // found but empty — ignore native
+      }
+      return formatPronounSets(record)
     },
   })
 }
@@ -198,18 +200,21 @@ export function useEditablePronounsQuery({
     enabled: !!did,
     async queryFn() {
       const record = await getAtProtoPronounsRecord({agent, did: did!})
-      if (record && record.sets?.length > 0) {
-        return formatPronounSetsForEditing(record)
+      if (record === undefined) {
+        return nativePronouns ?? '' // not found — fall back to native
       }
-      return nativePronouns ?? ''
+      if (record === null || record.sets.length === 0) {
+        return '' // found but empty — ignore native
+      }
+      return formatPronounSetsForEditing(record)
     },
   })
 }
 
 /**
  * Mutation to save pronoun sets to the atproto pronouns record.
- * If sets.length >= 2: putRecord with the sets
- * If sets.length < 2: deleteRecord (swallows "Could not locate record" errors)
+ * If sets.length >= 1: putRecord with the sets
+ * If sets.length === 0: deleteRecord (swallows "Could not locate record" errors)
  */
 export function useSavePronounsMutation() {
   const agent = useAgent()
@@ -217,7 +222,7 @@ export function useSavePronounsMutation() {
 
   return useMutation({
     async mutationFn({did, sets}: {did: string; sets: PronounSet[]}) {
-      if (sets.length >= 2) {
+      if (sets.length >= 1) {
         await agent.api.com.atproto.repo.putRecord({
           repo: did,
           collection: PRONOUNS_COLLECTION,
@@ -242,11 +247,9 @@ export function useSavePronounsMutation() {
       }
     },
     onSuccess(_data, {did, sets}) {
-      const nativeValue = getNativePronouns(sets)
-      const displayValue =
-        sets.length >= 2 ? formatPronounSets({sets}) : nativeValue
+      const displayValue = sets.length > 0 ? formatPronounSets({sets}) : ''
       const editableValue =
-        sets.length >= 2 ? formatPronounSetsForEditing({sets}) : nativeValue
+        sets.length > 0 ? formatPronounSetsForEditing({sets}) : ''
 
       queryClient.setQueriesData({queryKey: RQKEY(did)}, () => displayValue)
       queryClient.setQueriesData(
