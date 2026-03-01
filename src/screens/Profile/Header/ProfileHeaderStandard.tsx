@@ -117,6 +117,14 @@ let ProfileHeaderStandard = ({
     [currentAccount, profile],
   )
 
+  const [timerExpired, setTimerExpired] = React.useState(false)
+  React.useEffect(() => {
+    const timer = setTimeout(() => setTimerExpired(true), 5000)
+    return () => clearTimeout(timer)
+  }, [])
+  const privateProfileKnown = profileUnshadowed._privateProfile !== undefined
+  const editDisabled = !timerExpired && !privateProfileKnown
+
   return (
     <ProfileHeaderShell
       profile={profile}
@@ -146,7 +154,7 @@ let ProfileHeaderStandard = ({
                 color="secondary"
                 variant="solid"
                 onPress={onPressEditProfile}
-                disabled={profileUnshadowed._privateProfile?.loadError === true}
+                disabled={editDisabled}
                 label={_(msg`Edit profile`)}
                 style={[a.rounded_full]}>
                 <ButtonText>

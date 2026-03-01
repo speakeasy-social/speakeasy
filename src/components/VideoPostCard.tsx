@@ -13,6 +13,7 @@ import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
 import {sanitizeHandle} from '#/lib/strings/handles'
+import {getCachedDek} from '#/state/cache/private-profile-cache'
 import {formatCount} from '#/view/com/util/numeric/format'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {VideoFeedSourceContext} from '#/screens/VideoFeed/types'
@@ -93,7 +94,12 @@ export function VideoPostCard({
       )}
       <View style={[a.flex_row, a.gap_xs, a.align_center]}>
         <View style={[a.relative, a.rounded_full, {width: 20, height: 20}]}>
-          <UserAvatar type="user" size={20} avatar={post.author.avatar} />
+          <UserAvatar
+            type="user"
+            size={20}
+            avatar={post.author.avatar}
+            dek={getCachedDek(post.author.did)}
+          />
           <MediaInsetBorder />
         </View>
         <Text

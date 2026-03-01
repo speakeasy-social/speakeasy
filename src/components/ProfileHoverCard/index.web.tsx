@@ -10,6 +10,7 @@ import {getModerationCauseKey} from '#/lib/moderation'
 import {makeProfileLink} from '#/lib/routes/links'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {sanitizeHandle} from '#/lib/strings/handles'
+import {getCachedDek} from '#/state/cache/private-profile-cache'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {usePrefetchProfileQuery, useProfileQuery} from '#/state/queries/profile'
@@ -423,6 +424,7 @@ function Inner({
           <UserAvatar
             size={64}
             avatar={profile.avatar}
+            dek={getCachedDek(profile.did)}
             type={isLabeler ? 'labeler' : 'user'}
             moderation={moderation.ui('avatar')}
           />

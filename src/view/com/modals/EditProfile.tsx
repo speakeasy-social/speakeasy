@@ -1,4 +1,4 @@
-import {Fragment, useCallback, useState} from 'react'
+import {Fragment, useCallback, useRef, useState} from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -38,10 +38,12 @@ import {Text} from '#/view/com/util/text/Text'
 import * as Toast from '#/view/com/util/Toast'
 import {EditableUserAvatar} from '#/view/com/util/UserAvatar'
 import {UserBanner} from '#/view/com/util/UserBanner'
+import {atoms as a} from '#/alf'
 import {Admonition} from '#/components/Admonition'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {PrivateProfileInfoDialog} from '#/components/dialogs/PrivateProfileInfoDialog'
+import * as Toggle from '#/components/forms/Toggle'
 import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {ErrorMessage} from '../util/error/ErrorMessage'
@@ -63,6 +65,8 @@ export function Component({
   const {_} = useLingui()
   const {closeModal} = useModalControls()
   const privateProfileInfoControl = Dialog.useDialogControl()
+  const privateInfoDialogOpenRef = useRef(false)
+  const pendingModalCloseRef = useRef(false)
   const updateMutation = useProfileUpdateMutation()
   const savePronounsMutation = useSavePronounsMutation()
   const [imageError, setImageError] = useState<string>('')
@@ -83,6 +87,12 @@ export function Component({
     if (!stored || stored === DEFAULT_PRIVATE_DESCRIPTION) return ''
     return stored
   })
+  const [customisePublicDescription, setCustomisePublicDescription] = useState(
+    () => {
+      const stored = profile._privateProfile?.publicDescription
+      return !!stored && stored !== DEFAULT_PRIVATE_DESCRIPTION
+    },
+  )
   const [userBanner, setUserBanner] = useState<string | undefined | null>(
     profile.banner,
   )
@@ -96,6 +106,14 @@ export function Component({
     RNImage | undefined | null
   >()
   const [savingStage, setSavingStage] = useState('')
+
+  const initialPublicDescriptionRef = useRef(
+    profile._privateProfile?.publicDescription,
+  )
+  const initialCustomisePublicDescriptionRef = useRef(
+    !!profile._privateProfile?.publicDescription &&
+      profile._privateProfile.publicDescription !== DEFAULT_PRIVATE_DESCRIPTION,
+  )
 
   // #region debug
   logger.info('[EditProfile] mount', {
@@ -165,8 +183,32 @@ export function Component({
     setImageError('')
     const transitioningToPrivate = !privateProfileMeta?.isPrivate && isPrivate
     if (transitioningToPrivate) {
+      privateInfoDialogOpenRef.current = true
       privateProfileInfoControl.open()
     }
+
+    const initialStoredDescription = initialPublicDescriptionRef.current
+    const initialEffectiveValue =
+      !initialStoredDescription ||
+      initialStoredDescription === DEFAULT_PRIVATE_DESCRIPTION
+        ? ''
+        : initialStoredDescription
+    const publicDescriptionChanged =
+      publicDescription !== initialEffectiveValue ||
+      customisePublicDescription !==
+        initialCustomisePublicDescriptionRef.current
+
+    let resolvedPublicDescription: string | undefined
+    if (!isPrivate) {
+      resolvedPublicDescription = undefined
+    } else if (!transitioningToPrivate && !publicDescriptionChanged) {
+      resolvedPublicDescription = initialStoredDescription
+    } else if (customisePublicDescription) {
+      resolvedPublicDescription = publicDescription || undefined
+    } else {
+      resolvedPublicDescription = undefined
+    }
+
     try {
       await updateMutation.mutateAsync({
         profile,
@@ -180,9 +222,7 @@ export function Component({
         newUserAvatar,
         newUserBanner,
         isPrivate,
-        publicDescription: isPrivate
-          ? publicDescription || undefined
-          : undefined,
+        publicDescription: resolvedPublicDescription,
         existingPrivateAvatarUri: privateProfileMeta?.avatarUri,
         existingPrivateBannerUri: privateProfileMeta?.bannerUri,
         pronouns: {native: nativePronounsValue, sets: parsedSets},
@@ -197,11 +237,15 @@ export function Component({
         })
       }
       Toast.show(_(msg`Profile updated`))
-      if (!transitioningToPrivate) {
+      if (!transitioningToPrivate || !privateInfoDialogOpenRef.current) {
         onUpdate?.()
         closeModal()
+      } else {
+        pendingModalCloseRef.current = true
       }
     } catch (e: any) {
+      privateInfoDialogOpenRef.current = false
+      pendingModalCloseRef.current = false
       if (transitioningToPrivate) {
         privateProfileInfoControl.close()
       }
@@ -221,6 +265,7 @@ export function Component({
     pronounsTooLong,
     isPrivate,
     publicDescription,
+    customisePublicDescription,
     privateProfileMeta?.isPrivate,
     privateProfileMeta?.avatarUri,
     privateProfileMeta?.bannerUri,
@@ -232,8 +277,19 @@ export function Component({
   ])
 
   const handlePrivateProfileInfoAck = useCallback(() => {
+    privateInfoDialogOpenRef.current = false
+    pendingModalCloseRef.current = false
     closeModal()
     onUpdate?.()
+  }, [closeModal, onUpdate])
+
+  const handlePrivateDialogClose = useCallback(() => {
+    privateInfoDialogOpenRef.current = false
+    if (pendingModalCloseRef.current) {
+      pendingModalCloseRef.current = false
+      onUpdate?.()
+      closeModal()
+    }
   }, [closeModal, onUpdate])
 
   return (
@@ -247,12 +303,14 @@ export function Component({
             <UserBanner
               banner={userBanner}
               onSelectNewBanner={onSelectNewBanner}
+              dek={privateProfileMeta?.dek}
             />
             <View style={[styles.avi, {borderColor: pal.colors.background}]}>
               <EditableUserAvatar
                 size={80}
                 avatar={userAvatar}
                 onSelectNewAvatar={onSelectNewAvatar}
+                dek={privateProfileMeta?.dek}
               />
             </View>
           </View>
@@ -267,40 +325,38 @@ export function Component({
             </View>
           )}
           <View style={styles.form}>
-            {__DEV__ && (
-              <View style={[s.pb10]}>
-                <View style={[styles.toggleContainer]}>
-                  <Text style={[styles.label, pal.text]}>
-                    <Trans>Profile Visibility</Trans>
-                  </Text>
-                  <Button
-                    variant="solid"
-                    color="secondary"
-                    onPress={() => setIsPrivate(!isPrivate)}
-                    style={[
-                      styles.visibilityButton,
-                      isPrivate ? styles.private : styles.public,
-                    ]}
-                    accessibilityHint={_(
-                      msg`Choose to make your profile visible publicly, or only to people you trust`,
-                    )}
-                    accessibilityLabel={isPrivate ? _('Private') : _('Public')}
-                    label={isPrivate ? _('Private') : _('Public')}>
-                    <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
-                    <ButtonText style={styles.visibilityButtonText}>
-                      {isPrivate ? _('Private') : _('Public')}
-                    </ButtonText>
-                  </Button>
-                </View>
-                <Admonition type="info">
-                  {isPrivate
-                    ? _(
-                        "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
-                      )
-                    : _('Your profile is visible to everyone')}
-                </Admonition>
+            <View style={[s.pb10]}>
+              <View style={[styles.toggleContainer]}>
+                <Text style={[styles.label, pal.text]}>
+                  <Trans>Profile Visibility</Trans>
+                </Text>
+                <Button
+                  variant="solid"
+                  color="secondary"
+                  onPress={() => setIsPrivate(!isPrivate)}
+                  style={[
+                    styles.visibilityButton,
+                    isPrivate ? styles.private : styles.public,
+                  ]}
+                  accessibilityHint={_(
+                    msg`Choose to make your profile visible publicly, or only to people you trust`,
+                  )}
+                  accessibilityLabel={isPrivate ? _('Private') : _('Public')}
+                  label={isPrivate ? _('Private') : _('Public')}>
+                  <ButtonIcon icon={isPrivate ? Lock : Globe} size="sm" />
+                  <ButtonText style={styles.visibilityButtonText}>
+                    {isPrivate ? _('Private') : _('Public')}
+                  </ButtonText>
+                </Button>
               </View>
-            )}
+              <Admonition type="info">
+                {isPrivate
+                  ? _(
+                      "Only those you trust can see your name, description, avatar and banner\nAny public posts you've made and who you follow remain public",
+                    )
+                  : _('Your profile is visible to everyone')}
+              </Admonition>
+            </View>
             <View>
               <Text style={[styles.label, pal.text]}>
                 <Trans>Display Name</Trans>
@@ -357,27 +413,43 @@ export function Component({
             </View>
 
             {isPrivate && (
-              <View style={s.pb10}>
-                <Text style={[styles.label, pal.text]}>
-                  <Trans>Public Description</Trans>
-                </Text>
-                <TextInput
-                  testID="editProfilePublicDescriptionInput"
-                  style={[styles.textArea, pal.border, pal.text]}
-                  placeholder={_(
-                    msg`This profile is private and only visible on @spkeasy.social`,
-                  )}
-                  placeholderTextColor={colors.gray4}
-                  keyboardAppearance={theme.colorScheme}
-                  multiline
-                  value={publicDescription}
-                  onChangeText={setPublicDescription}
-                  accessible={true}
-                  accessibilityLabel={_(msg`Public description`)}
-                  accessibilityHint={_(
-                    msg`A description of your profile visible to everyone`,
-                  )}
-                />
+              <View style={[s.pb10, {marginTop: 20}]}>
+                <Toggle.Item
+                  label={_(msg`Show custom profile description to the public`)}
+                  name="customise_public_description"
+                  value={customisePublicDescription}
+                  onChange={setCustomisePublicDescription}
+                  style={[a.flex_row, a.align_center, a.gap_sm]}>
+                  <Toggle.Checkbox />
+                  <Toggle.LabelText>
+                    <Trans>Show custom profile description to the public</Trans>
+                  </Toggle.LabelText>
+                </Toggle.Item>
+
+                {customisePublicDescription && (
+                  <TextInput
+                    testID="editProfilePublicDescriptionInput"
+                    style={[
+                      styles.textArea,
+                      pal.border,
+                      pal.text,
+                      {marginTop: 8},
+                    ]}
+                    placeholder={_(
+                      msg`This profile is private and only visible on @spkeasy.social`,
+                    )}
+                    placeholderTextColor={colors.gray4}
+                    keyboardAppearance={theme.colorScheme}
+                    multiline
+                    value={publicDescription}
+                    onChangeText={setPublicDescription}
+                    accessible={true}
+                    accessibilityLabel={_(msg`Public description`)}
+                    accessibilityHint={_(
+                      msg`A description of your profile visible to everyone`,
+                    )}
+                  />
+                )}
               </View>
             )}
             {updateMutation.isPending ? (
@@ -432,6 +504,7 @@ export function Component({
       <PrivateProfileInfoDialog
         control={privateProfileInfoControl}
         onAck={handlePrivateProfileInfoAck}
+        onDialogClose={handlePrivateDialogClose}
         isPending={updateMutation.isPending}
         savingStage={savingStage}
         handle={profile.handle}

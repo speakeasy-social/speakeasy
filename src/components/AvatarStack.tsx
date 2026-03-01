@@ -1,6 +1,7 @@
 import {View} from 'react-native'
 import {moderateProfile} from '@atproto/api'
 
+import {getCachedDek} from '#/state/cache/private-profile-cache'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useProfilesQuery} from '#/state/queries/profile'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
@@ -65,6 +66,7 @@ export function AvatarStack({
             <UserAvatar
               size={size - 2}
               avatar={item.profile.avatar}
+              dek={getCachedDek(item.profile.did)}
               type={item.profile.associated?.labeler ? 'labeler' : 'user'}
               moderation={item.moderation.ui('avatar')}
             />

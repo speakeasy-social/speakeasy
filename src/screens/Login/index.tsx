@@ -4,7 +4,7 @@ import {LayoutAnimationConfig} from 'react-native-reanimated'
 import {msg} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
-import {DEFAULT_SERVICE} from '#/lib/constants'
+import {DEFAULT_SERVICE, LOCAL_DEV_SERVICE} from '#/lib/constants'
 import {logger} from '#/logger'
 import {useServiceQuery} from '#/state/queries/service'
 import {SessionAccount, useSession} from '#/state/session'
@@ -36,8 +36,9 @@ export const Login = ({onPressBack}: {onPressBack: () => void}) => {
   )
 
   const [error, setError] = React.useState<string>('')
+  const devDefault = __DEV__ ? LOCAL_DEV_SERVICE : DEFAULT_SERVICE
   const [serviceUrl, setServiceUrl] = React.useState<string>(
-    requestedAccount?.service || DEFAULT_SERVICE,
+    requestedAccount?.service || devDefault,
   )
   const [initialHandle, setInitialHandle] = React.useState<string>(
     requestedAccount?.handle || '',

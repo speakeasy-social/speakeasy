@@ -11,9 +11,11 @@ import {QueryClient} from '@tanstack/react-query'
 import {
   decryptContent,
   decryptDEK,
+  decryptEncryptedBlob,
   encryptContent,
   encryptMediaStream,
 } from '#/lib/encryption'
+import {compressBlobIfNeeded} from '#/lib/media/manip'
 import {isWeb} from '#/platform/detection'
 import {setCachedDek} from '#/state/cache/private-profile-cache'
 import {type PronounSet} from '#/state/queries/pronouns'
@@ -51,7 +53,7 @@ import {
  * Constants for the @spkeasy.social mention in anonymized profiles
  */
 export const SPKEASY_MENTION = '@spkeasy.social'
-export const SPKEASY_DID = 'did:plc:spkeasy.social'
+export const SPKEASY_DID = 'did:plc:tz34ow54d5p5lsjdhkew3rvn'
 export const DEFAULT_PRIVATE_DESCRIPTION = `This is a private profile only visible to trusted followers on ${SPKEASY_MENTION}`
 
 /**
@@ -335,10 +337,11 @@ export async function getPrivateProfile(
   call: SpeakeasyApiCall,
 ): Promise<EncryptedProfileResponse | null> {
   try {
-    return await call({
+    const response = await call({
       api: 'social.spkeasy.actor.getProfile',
       query: {did},
     })
+    return response.profile
   } catch (error) {
     if (getErrorCode(error) === 'NotFound') {
       return null
@@ -456,10 +459,7 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
   atprotoProfile: T,
   privateData: PrivateProfileData | null | undefined,
 ): T {
-  if (
-    !privateData ||
-    atprotoProfile.displayName !== PRIVATE_PROFILE_DISPLAY_NAME
-  ) {
+  if (!privateData) {
     return atprotoProfile
   }
 
@@ -479,7 +479,7 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
     description: privateData.description,
     avatar: privateData.avatarUri ?? atprotoProfile.avatar,
     banner: privateData.bannerUri ?? atprotoProfile.banner,
-    ...(nativePronouns !== undefined ? {pronouns: nativePronouns} : {}),
+    pronouns: nativePronouns,
     _privateProfile: {isPrivate: true},
   } as T & ProfileWithPrivateMeta
 }
@@ -555,6 +555,43 @@ export async function getOrCreateProfileSession(
     })()
   }
   return sessionCreationPromise
+}
+
+/**
+ * Parses cdn.bsky.app CDN URLs to extract DID and CID.
+ * Input: https://cdn.bsky.app/img/avatar/plain/did:plc:xxx/bafkrei...@jpeg
+ * Output: {did: 'did:plc:xxx', cid: 'bafkrei...'} or null if not a CDN URL
+ */
+function parseBskyCdnUrl(url: string): {did: string; cid: string} | null {
+  const match = url.match(/cdn\.bsky\.app\/img\/[^/]+\/plain\/([^/]+)\/([^@]+)/)
+  if (!match) return null
+  return {did: match[1], cid: match[2]}
+}
+
+/**
+ * Fetches a blob from a cdn.bsky.app URL via the PDS XRPC endpoint.
+ * Avoids CORS issues on web by using the authenticated XRPC endpoint.
+ * @param agent - The BskyAgent containing XRPC client
+ * @param url - The cdn.bsky.app URL to fetch
+ * @returns Blob with appropriate content type
+ */
+async function fetchAtprotoBlobViaPds(
+  agent: BskyAgent,
+  url: string,
+): Promise<Blob> {
+  const parsed = parseBskyCdnUrl(url)
+  if (!parsed) {
+    throw new Error(`Not a cdn.bsky.app URL: ${url}`)
+  }
+
+  const res = await agent.com.atproto.sync.getBlob({
+    did: parsed.did,
+    cid: parsed.cid,
+  })
+
+  const contentType =
+    (res.headers && res.headers['content-type']) || 'image/jpeg'
+  return new Blob([res.data], {type: contentType})
 }
 
 /**
@@ -652,21 +689,29 @@ export type MigrateMediaToAtProtoResult = {
 export async function migrateMediaToAtProto(
   speakeasyKey: string,
   agent: BskyAgent,
+  dek: string,
 ): Promise<MigrateMediaToAtProtoResult> {
-  let blob: Blob
+  let encryptedBlob: Blob
   if (isWeb) {
-    blob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
+    encryptedBlob = await fetchSpeakeasyMediaBlob(agent, speakeasyKey)
   } else {
     const url = getSpeakeasyMediaUrl(speakeasyKey, agent)
-    blob = await pathToBlob(url)
+    encryptedBlob = await pathToBlob(url)
   }
-  const response = await uploadBlob(agent, blob, blob.type || 'image/jpeg')
+  const blob = await decryptEncryptedBlob(encryptedBlob, dek)
+  const compressedBlob = await compressBlobIfNeeded(blob, 1_000_000)
+  const response = await uploadBlob(
+    agent,
+    compressedBlob,
+    compressedBlob.type || 'image/jpeg',
+  )
   return {response}
 }
 
 /**
  * Migrates media from ATProto to Speakeasy storage.
  * Used when switching from public to private profile.
+ * On web, fetches cdn.bsky.app URLs via the PDS XRPC endpoint to avoid CORS.
  * @param atprotoUrl - The ATProto CDN URL (e.g., https://cdn.bsky.app/...)
  * @param agent - The BskyAgent for authentication
  * @param sessionId - The Speakeasy session ID for upload
@@ -678,7 +723,14 @@ export async function migrateMediaToSpeakeasy(
   sessionId: string,
   sessionKey: string,
 ): Promise<string> {
-  const blob = await pathToBlob(atprotoUrl)
+  let blob: Blob
+  if (isWeb && parseBskyCdnUrl(atprotoUrl)) {
+    blob = await fetchAtprotoBlobViaPds(agent, atprotoUrl)
+  } else {
+    blob = await pathToBlob(atprotoUrl)
+  }
+
+  blob = await compressBlobIfNeeded(blob, 1_900_000)
   const mimeType = blob.type || 'image/jpeg'
   const encryptedStream = await encryptMediaStream(
     blob.stream(),
@@ -712,6 +764,7 @@ export type ResolvePrivateProfileMediaParams = {
   existingAvatarUri?: string
   existingBannerUri?: string
   pronouns?: string | PronounSet[]
+  onStateChange?: (stage: string) => void
 }
 
 /**
@@ -735,8 +788,22 @@ export async function resolvePrivateProfileMedia(
     queryClient,
   )
 
-  const {newAvatar, newBanner, existingAvatarUri, existingBannerUri} =
-    profileData
+  const {
+    newAvatar,
+    newBanner,
+    existingAvatarUri,
+    existingBannerUri,
+    onStateChange,
+  } = profileData
+
+  const hasMediaWork =
+    newAvatar != null ||
+    newBanner != null ||
+    existingAvatarUri?.startsWith('http') ||
+    existingBannerUri?.startsWith('http')
+  if (hasMediaWork) {
+    onStateChange?.('Uploading media...')
+  }
 
   const resolveAvatar = async (): Promise<string | undefined> => {
     if (newAvatar === null) return undefined

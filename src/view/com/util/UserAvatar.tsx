@@ -18,6 +18,10 @@ import {makeProfileLink} from '#/lib/routes/links'
 import {colors} from '#/lib/styles'
 import {logger} from '#/logger'
 import {isAndroid, isNative, isWeb} from '#/platform/detection'
+import {
+  getCachedDek,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
 import {precacheProfile} from '#/state/queries/profile'
 import {HighPriorityImage} from '#/view/com/util/images/Image'
 import {tokens, useTheme} from '#/alf'
@@ -53,6 +57,7 @@ interface UserAvatarProps extends BaseUserAvatarProps {
 
 interface EditableUserAvatarProps extends BaseUserAvatarProps {
   onSelectNewAvatar: (img: RNImage | null) => void
+  dek?: string
 }
 
 interface PreviewableUserAvatarProps extends BaseUserAvatarProps {
@@ -233,7 +238,7 @@ let UserAvatar = ({
           source={{
             uri: dek
               ? resolvedAvatar
-              : hackModifyThumbnailPath(resolvedAvatar, size < 90),
+              : hackModifyThumbnailPath(resolvedAvatar, size < 90 && !__DEV__),
           }}
           blurRadius={moderation?.blur ? BLUR_AMOUNT : 0}
           onLoad={onLoad}
@@ -246,7 +251,7 @@ let UserAvatar = ({
           source={{
             uri: dek
               ? resolvedAvatar
-              : hackModifyThumbnailPath(resolvedAvatar, size < 90),
+              : hackModifyThumbnailPath(resolvedAvatar, size < 90 && !__DEV__),
           }}
           blurRadius={moderation?.blur ? BLUR_AMOUNT : 0}
           onLoad={onLoad}
@@ -276,9 +281,16 @@ let EditableUserAvatar = ({
   size,
   avatar,
   onSelectNewAvatar,
+  dek,
 }: EditableUserAvatarProps): React.ReactNode => {
   const t = useTheme()
   const pal = usePalette('default')
+  const isHttpAvatar = avatar?.startsWith('http')
+  const decryptedUri = useDecryptedImageUrl(
+    isHttpAvatar ? avatar || undefined : undefined,
+    dek,
+  )
+  const displayAvatar = dek && isHttpAvatar ? decryptedUri ?? null : avatar
   const {_} = useLingui()
   const {requestCameraAccessIfNeeded} = useCameraPermission()
   const {requestPhotoAccessIfNeeded} = usePhotoLibraryPermission()
@@ -357,11 +369,11 @@ let EditableUserAvatar = ({
       <Menu.Trigger label={_(msg`Edit avatar`)}>
         {({props}) => (
           <Pressable {...props} testID="changeAvatarBtn">
-            {avatar ? (
+            {displayAvatar ? (
               <HighPriorityImage
                 testID="userAvatarImage"
                 style={aviStyle}
-                source={{uri: avatar}}
+                source={{uri: displayAvatar}}
                 accessibilityRole="image"
               />
             ) : (
@@ -433,11 +445,14 @@ let PreviewableUserAvatar = ({
 }: PreviewableUserAvatarProps): React.ReactNode => {
   const {_} = useLingui()
   const queryClient = useQueryClient()
+  usePrivateProfileCacheVersion() // re-render when DEK cache populates
 
   const onPress = React.useCallback(() => {
     onBeforePress?.()
     precacheProfile(queryClient, profile)
   }, [profile, queryClient, onBeforePress])
+
+  const dek = getCachedDek(profile.did)
 
   return (
     <ProfileHoverCard did={profile.did} disable={disableHoverCard}>
@@ -453,6 +468,7 @@ let PreviewableUserAvatar = ({
           avatar={profile.avatar}
           moderation={moderation}
           type={profile.associated?.labeler ? 'labeler' : 'user'}
+          dek={dek}
           {...rest}
         />
       </Link>

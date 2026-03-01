@@ -692,6 +692,64 @@ export async function encryptMediaStream(
 }
 
 /**
+ * Decrypts an already-fetched encrypted media blob.
+ * Use when you already have the encrypted bytes (e.g. fetched via authenticated API to avoid CORS).
+ * Returns the original blob unchanged if not encrypted (content type check).
+ * Uses arrayBuffer() for cross-platform compatibility (no ReadableStream required).
+ *
+ * @param encryptedBlob - Blob from Speakeasy storage
+ * @param dek - Data Encryption Key in SafeText format
+ */
+export async function decryptEncryptedBlob(
+  encryptedBlob: Blob,
+  dek: string,
+): Promise<Blob> {
+  if (!encryptedBlob.type.includes('application/x-spkeasy-encrypted-media')) {
+    return encryptedBlob
+  }
+
+  const dekBytes = safeAtob(dek)
+  const buffer = new Uint8Array(await encryptedBlob.arrayBuffer())
+
+  const counter = buffer.slice(0, 16)
+  const encrypted = buffer.slice(16)
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    dekBytes,
+    {name: 'AES-CTR', length: 256},
+    false,
+    ['decrypt'],
+  )
+
+  const decryptedBuffer = new Uint8Array(
+    await crypto.subtle.decrypt(
+      {name: 'AES-CTR', counter, length: 64},
+      key,
+      encrypted,
+    ),
+  )
+
+  secureWipe(dekBytes)
+
+  if (decryptedBuffer.length < 1) {
+    throw new Error('Decrypted content too short')
+  }
+
+  const mimeTypeLength = decryptedBuffer[0]
+  if (decryptedBuffer.length < 1 + mimeTypeLength) {
+    throw new Error('Decrypted content too short for MIME type header')
+  }
+
+  const mimeType = new TextDecoder().decode(
+    decryptedBuffer.slice(1, 1 + mimeTypeLength),
+  )
+  const imageData = decryptedBuffer.slice(1 + mimeTypeLength)
+
+  return new Blob([imageData], {type: mimeType})
+}
+
+/**
  * Fetches a media URL and decrypts it if encrypted.
  * Detects encryption via Content-Type: application/x-spkeasy-encrypted-media.
  * Returns a Blob with the original MIME type.

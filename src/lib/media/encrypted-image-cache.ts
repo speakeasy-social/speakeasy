@@ -32,6 +32,7 @@ export async function decryptAndCacheImage(
 
   const promise = decryptMediaBlob(url, dek)
     .then(blob => {
+      console.debug('[encrypted-image-cache] decrypted image', url)
       const blobUrl = URL.createObjectURL(blob)
       resolvedCache.set(url, blobUrl)
       inFlightCache.delete(url)

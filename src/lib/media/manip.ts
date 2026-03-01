@@ -332,6 +332,41 @@ async function withTempFile<T>(
   }
 }
 
+export async function compressBlobIfNeeded(
+  blob: Blob,
+  maxSize: number,
+): Promise<Blob> {
+  if (blob.size <= maxSize) return blob
+  const arrayBuffer = await blob.arrayBuffer()
+  const base64 = Buffer.from(arrayBuffer).toString('base64')
+  const tempUri = `${cacheDirectory}migrate_${Date.now()}.jpg`
+  await writeAsStringAsync(tempUri, base64, {encoding: EncodingType.Base64})
+  let compressedPath: string | undefined
+  try {
+    const compressed = await doResize(tempUri, {
+      width: 0,
+      height: 0,
+      mode: 'stretch',
+      maxSize,
+    })
+    compressedPath = compressed.path
+    const fileUri = compressed.path.startsWith('file:')
+      ? compressed.path
+      : `file://${compressed.path}`
+    return await new Promise<Blob>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.onload = () => resolve(xhr.response)
+      xhr.onerror = () => reject(new Error('Failed to read compressed image'))
+      xhr.responseType = 'blob'
+      xhr.open('GET', fileUri, true)
+      xhr.send(null)
+    })
+  } finally {
+    safeDeleteAsync(tempUri)
+    if (compressedPath) safeDeleteAsync(compressedPath)
+  }
+}
+
 export function getResizedDimensions(originalDims: {
   width: number
   height: number

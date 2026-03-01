@@ -11,6 +11,9 @@ import * as userKeys from '../user-keys'
 jest.mock('../speakeasy')
 jest.mock('../user-keys')
 jest.mock('#/lib/encryption')
+jest.mock('../feed/utils', () => ({
+  getBaseCdnUrl: jest.fn(() => 'https://cdn.speakeasy.test/user-content'),
+}))
 
 const mockedSpeakeasy = speakeasy as jest.Mocked<typeof speakeasy>
 const mockedUserKeys = userKeys as jest.Mocked<typeof userKeys>
@@ -291,6 +294,59 @@ describe('savePrivateProfile', () => {
             api: 'social.spkeasy.actor.putProfile',
             body: expect.objectContaining({
               avatarUri: mockExistingAvatarUri,
+            }),
+          }),
+        )
+      })
+
+      it('Speakeasy CDN URL as existingAvatarUri → key reused, no upload', async () => {
+        await savePrivateProfile(mockAgent, mockCall, mockQueryClient, {
+          displayName: 'Test User',
+          description: 'Test description',
+          isPublic: false,
+          existingAvatarUri:
+            'https://cdn.speakeasy.test/user-content/media/abc123',
+        })
+
+        expect(mockedSpeakeasy.uploadMediaToSpeakeasy).not.toHaveBeenCalled()
+        expect(mockCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            api: 'social.spkeasy.actor.putProfile',
+            body: expect.objectContaining({
+              avatarUri: 'media/abc123',
+            }),
+          }),
+        )
+      })
+
+      it('ATProto CDN URL as existingAvatarUri → migrates to Speakeasy', async () => {
+        const fakeBlob = new Blob(['fake-image'], {type: 'image/jpeg'})
+        ;(global as any).fetch = jest.fn<any>().mockResolvedValue({
+          blob: () => Promise.resolve(fakeBlob),
+        })
+
+        mockedEncryption.encryptMediaStream.mockImplementation(
+          async () =>
+            new ReadableStream({
+              start(controller) {
+                controller.close()
+              },
+            }),
+        )
+
+        await savePrivateProfile(mockAgent, mockCall, mockQueryClient, {
+          displayName: 'Test User',
+          description: 'Test description',
+          isPublic: false,
+          existingAvatarUri: 'https://cdn.bsky.app/img/avatar/old.jpg',
+        })
+
+        expect(mockedSpeakeasy.uploadMediaToSpeakeasy).toHaveBeenCalled()
+        expect(mockCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            api: 'social.spkeasy.actor.putProfile',
+            body: expect.objectContaining({
+              avatarUri: mockMediaKey,
             }),
           }),
         )

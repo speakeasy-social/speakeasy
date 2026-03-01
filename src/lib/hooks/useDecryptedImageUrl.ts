@@ -25,7 +25,16 @@ export function useDecryptedImageUrl(
   )
 
   useEffect(() => {
-    if (!url || !dek || blobUrl) return
+    if (!url || !dek) {
+      setBlobUrl(undefined)
+      return
+    }
+    const cached = getCachedBlobUrl(url)
+    if (cached) {
+      setBlobUrl(cached)
+      return
+    }
+    setBlobUrl(undefined) // clear stale blob while new URL decrypts
     let cancelled = false
     decryptAndCacheImage(url, dek)
       .then(result => {
@@ -37,7 +46,7 @@ export function useDecryptedImageUrl(
     return () => {
       cancelled = true
     }
-  }, [url, dek, blobUrl])
+  }, [url, dek]) // blobUrl intentionally excluded from deps
 
   return blobUrl
 }

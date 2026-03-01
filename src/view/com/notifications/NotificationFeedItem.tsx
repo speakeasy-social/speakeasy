@@ -40,6 +40,7 @@ import {postUriToRelativePath} from '#/lib/strings/url-helpers'
 import {colors, s} from '#/lib/styles'
 import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
+import {getCachedDek} from '#/state/cache/private-profile-cache'
 import {DM_SERVICE_HEADERS} from '#/state/queries/messages/const'
 import {FeedNotification} from '#/state/queries/notifications/feed'
 import {precacheProfile} from '#/state/queries/profile'
@@ -693,6 +694,7 @@ function ExpandedAuthorsList({
                 <UserAvatar
                   size={35}
                   avatar={author.profile.avatar}
+                  dek={getCachedDek(author.profile.did)}
                   moderation={author.moderation.ui('avatar')}
                   type={author.profile.associated?.labeler ? 'labeler' : 'user'}
                 />

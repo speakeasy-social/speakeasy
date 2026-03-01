@@ -6,6 +6,7 @@ import {useLingui} from '@lingui/react'
 
 import {makeProfileLink} from '#/lib/routes/links'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
+import {getCachedDek} from '#/state/cache/private-profile-cache'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {atoms as a, useTheme} from '#/alf'
 import {Link, LinkProps} from '#/components/Link'
@@ -162,6 +163,7 @@ function KnownFollowersInner({
                 <UserAvatar
                   size={SIZE}
                   avatar={prof.avatar}
+                  dek={getCachedDek(prof.did)}
                   moderation={moderation.ui('avatar')}
                   type={prof.associated?.labeler ? 'labeler' : 'user'}
                 />
