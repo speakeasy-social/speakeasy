@@ -195,7 +195,7 @@ export async function profileQueryFn(
           decryptedResult.data,
           baseUrl,
         )
-        setCachedDek(did, decryptedResult.dek)
+        setCachedDek(did, decryptedResult.dek, currentAccountDid)
         const atprotoDescription = result.description
         result = withPrivateProfileMeta(
           mergePrivateProfileData(result, decrypted),
@@ -203,16 +203,19 @@ export async function profileQueryFn(
           decryptedResult.dek,
           atprotoDescription,
         )
-        upsertCachedPrivateProfiles(new Map([[did, decrypted]]))
-        markDidsChecked([did])
+        upsertCachedPrivateProfiles(
+          new Map([[did, decrypted]]),
+          currentAccountDid,
+        )
+        markDidsChecked([did], currentAccountDid)
       } else {
-        markDidsChecked([did])
+        markDidsChecked([did], currentAccountDid)
         result = withPrivateProfileMeta(result, null)
       }
     } else {
       if (result.displayName !== PRIVATE_PROFILE_DISPLAY_NAME) {
         evictDid(did)
-        markDidsChecked([did])
+        markDidsChecked([did], currentAccountDid)
       }
       result = withPrivateProfileMeta(result, null)
     }
@@ -320,12 +323,12 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
             getBaseCdnUrl(agent),
           )
           if (freshDataMap.size > 0) {
-            upsertCachedPrivateProfiles(freshDataMap)
+            upsertCachedPrivateProfiles(freshDataMap, currentAccount?.did)
           }
         } catch {
           // Silent fallback - show ATProto data only
         }
-        markDidsChecked(uncheckedDids)
+        markDidsChecked(uncheckedDids, currentAccount?.did)
       }
 
       // Merge private data into profiles — use fresh data if available,
@@ -625,12 +628,14 @@ export async function profileMutationFn(
         decryptAndCacheImage(
           `${prewarmBaseUrl}/${resolved.avatarUri}`,
           resolved.sessionKey,
+          agent.did,
         ).catch(() => {})
       }
       if (resolved.bannerUri) {
         decryptAndCacheImage(
           `${prewarmBaseUrl}/${resolved.bannerUri}`,
           resolved.sessionKey,
+          agent.did,
         ).catch(() => {})
       }
 
@@ -833,6 +838,7 @@ export async function profileOnSuccess(
   agent: BskyAgent,
   data: ProfileMutationResult,
   variables: ProfileUpdateParams,
+  viewerDid?: string,
 ): Promise<void> {
   const did = variables.profile.did
   // Cancel any in-flight queries so stale refetches don't overwrite optimistic data
@@ -841,9 +847,9 @@ export async function profileOnSuccess(
   if (data.type === 'private') {
     const baseUrl = getBaseCdnUrl(agent)
     const resolved = resolvePrivateProfileUrls(data.privateData, baseUrl)
-    setCachedDek(did, data.dek)
-    upsertCachedPrivateProfiles(new Map([[did, resolved]]))
-    markDidsChecked([did])
+    setCachedDek(did, data.dek, viewerDid)
+    upsertCachedPrivateProfiles(new Map([[did, resolved]]), viewerDid)
+    markDidsChecked([did], viewerDid)
     queryClient.setQueryData(
       RQKEY(did),
       withPrivateProfileMeta(
@@ -856,7 +862,7 @@ export async function profileOnSuccess(
     queryClient.invalidateQueries({queryKey: PRONOUNS_RQKEY(did)})
   } else {
     evictDid(did)
-    markDidsChecked([did])
+    markDidsChecked([did], viewerDid)
     queryClient.setQueryData(
       RQKEY(did),
       withPrivateProfileMeta(data.optimisticProfile, null),
@@ -871,10 +877,17 @@ export async function profileOnSuccess(
 export function useProfileUpdateMutation() {
   const queryClient = useQueryClient()
   const agent = useAgent()
+  const {currentAccount} = useSession()
   return useMutation<ProfileMutationResult, Error, ProfileUpdateParams>({
     mutationFn: params => profileMutationFn(agent, queryClient, params),
     async onSuccess(data, variables) {
-      await profileOnSuccess(queryClient, agent, data, variables)
+      await profileOnSuccess(
+        queryClient,
+        agent,
+        data,
+        variables,
+        currentAccount?.did,
+      )
     },
     onError(_error, variables) {
       queryClient.invalidateQueries({queryKey: RQKEY(variables.profile.did)})

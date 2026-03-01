@@ -34,6 +34,29 @@ const dekCache = new Map<string, string>()
 const inflightDids = new Set<string>()
 const emitter = new EventEmitter()
 
+let ownerDid: string | undefined
+
+/**
+ * Sets the owner DID for this cache. If the DID changes, clears all cached data.
+ */
+export function setOwnerDid(did: string): void {
+  if (ownerDid && ownerDid !== did) {
+    clearAll()
+  }
+  ownerDid = did
+}
+
+/**
+ * Guard: if a viewerDid is provided and doesn't match ownerDid, clears everything.
+ * Prevents wrong-account data from entering the cache.
+ */
+function assertOwner(viewerDid: string): void {
+  if (ownerDid && ownerDid !== viewerDid) {
+    clearAll()
+  }
+  ownerDid = viewerDid
+}
+
 // --- Read API ---
 
 export function getCachedPrivateProfile(
@@ -50,7 +73,12 @@ export function getCachedDek(did: string): string | undefined {
   return dekCache.get(did)
 }
 
-export function setCachedDek(did: string, dek: string): void {
+export function setCachedDek(
+  did: string,
+  dek: string,
+  viewerDid?: string,
+): void {
+  if (viewerDid) assertOwner(viewerDid)
   dekCache.set(did, dek)
 }
 
@@ -58,7 +86,9 @@ export function setCachedDek(did: string, dek: string): void {
 
 export function upsertCachedPrivateProfiles(
   profiles: Map<string, PrivateProfileData>,
+  viewerDid?: string,
 ): void {
+  if (viewerDid) assertOwner(viewerDid)
   let changed = false
   for (const [did, data] of profiles) {
     const existing = cache.get(did)
@@ -81,7 +111,8 @@ export function upsertCachedPrivateProfiles(
   }
 }
 
-export function markDidsChecked(dids: string[]): void {
+export function markDidsChecked(dids: string[], viewerDid?: string): void {
+  if (viewerDid) assertOwner(viewerDid)
   let changed = false
   for (const did of dids) {
     if (!cache.has(did)) {
@@ -134,6 +165,7 @@ export function clearAll(): void {
   cache.clear()
   dekCache.clear()
   inflightDids.clear()
+  ownerDid = undefined
   emitter.emit('change')
 }
 

@@ -78,18 +78,18 @@ export function usePrivateProfileFetcher<TPage>({
 
       // Store results in the module-level cache
       if (privateProfiles.size > 0) {
-        upsertCachedPrivateProfiles(privateProfiles)
+        upsertCachedPrivateProfiles(privateProfiles, currentAccount.did)
       }
 
       // Mark all claimed DIDs as checked (null sentinel for those without data)
-      markDidsChecked(claimedDids)
+      markDidsChecked(claimedDids, currentAccount.did)
     } catch (error) {
       logger.error(`${logPrefix}: failed to fetch`, {error})
       if (isServiceError(error)) {
         showServiceErrorToast()
       }
       // Mark as checked to avoid retry loops
-      markDidsChecked(claimedDids)
+      markDidsChecked(claimedDids, currentAccount.did)
     } finally {
       releaseDids(claimedDids)
       isFetchingRef.current = false
