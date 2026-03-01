@@ -163,3 +163,19 @@ async function downloadUrl(href: string, filename: string) {
 export async function safeDeleteAsync() {
   // no-op
 }
+
+export async function compressBlobIfNeeded(
+  blob: Blob,
+  maxSize: number,
+): Promise<Blob> {
+  if (blob.size <= maxSize) return blob
+  const dataUri = await blobToDataUri(blob)
+  const dims = await getImageDim(dataUri)
+  const compressed = await doResize(dataUri, {
+    width: dims.width,
+    height: dims.height,
+    mode: 'stretch',
+    maxSize,
+  })
+  return fetch(compressed.path).then(r => r.blob())
+}

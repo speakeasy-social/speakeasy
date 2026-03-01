@@ -15,6 +15,7 @@ import {
   encryptContent,
   encryptMediaStream,
 } from '#/lib/encryption'
+import {compressBlobIfNeeded} from '#/lib/media/manip'
 import {isWeb} from '#/platform/detection'
 import {setCachedDek} from '#/state/cache/private-profile-cache'
 import {type PronounSet} from '#/state/queries/pronouns'
@@ -661,7 +662,12 @@ export async function migrateMediaToAtProto(
     encryptedBlob = await pathToBlob(url)
   }
   const blob = await decryptEncryptedBlob(encryptedBlob, dek)
-  const response = await uploadBlob(agent, blob, blob.type || 'image/jpeg')
+  const compressedBlob = await compressBlobIfNeeded(blob, 1_000_000)
+  const response = await uploadBlob(
+    agent,
+    compressedBlob,
+    compressedBlob.type || 'image/jpeg',
+  )
   return {response}
 }
 
