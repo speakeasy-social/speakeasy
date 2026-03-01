@@ -30,22 +30,25 @@ export async function getTrustedUsers(
   did: string,
   speakeasyApi: any,
   queryClient: QueryClient,
-  limit?: number,
 ): Promise<TrustedUser[]> {
-  const data = await speakeasyApi({
-    api: 'social.spkeasy.graph.getTrusted',
-    query: {
-      limit,
-      authorDid: did,
-    },
-  })
+  const allTrusted: TrustedUser[] = []
+  let cursor: string | undefined
+
+  do {
+    const data = await speakeasyApi({
+      api: 'social.spkeasy.graph.getTrusted',
+      query: {limit: 100, authorDid: did, cursor},
+    })
+    allTrusted.push(...data.trusted)
+    cursor = data.cursor
+  } while (cursor)
 
   // Update trust status cache for each trusted user
-  data.trusted.forEach(({recipientDid}: {recipientDid: string}) => {
+  allTrusted.forEach(({recipientDid}: {recipientDid: string}) => {
     queryClient.setQueryData(TRUST_STATUS_RQKEY(recipientDid), true)
   })
 
-  return data.trusted
+  return allTrusted
 }
 
 export async function getTrustedUserCount(speakeasyApi: any): Promise<number> {
