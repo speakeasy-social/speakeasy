@@ -1,4 +1,5 @@
 import {decryptMediaBlob} from '#/lib/encryption'
+import {logger} from '#/logger'
 
 /**
  * Module-level cache for decrypted private media blob URLs.
@@ -56,7 +57,6 @@ export async function decryptAndCacheImage(
 
   const promise = decryptMediaBlob(url, dek)
     .then(blob => {
-      console.debug('[encrypted-image-cache] decrypted image', url)
       const blobUrl = URL.createObjectURL(blob)
       resolvedCache.set(url, blobUrl)
       inFlightCache.delete(url)
@@ -64,6 +64,7 @@ export async function decryptAndCacheImage(
     })
     .catch(err => {
       inFlightCache.delete(url)
+      logger.error('encrypted-image-cache: decryption failed', {url, err})
       throw err
     })
 
