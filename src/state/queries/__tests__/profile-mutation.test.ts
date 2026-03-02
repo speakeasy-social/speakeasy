@@ -66,7 +66,12 @@ jest.mock('#/lib/async/until', () => ({
 }))
 
 jest.mock('#/logger', () => ({
-  logger: {error: jest.fn(), info: jest.fn(), warn: jest.fn()},
+  logger: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+  },
 }))
 
 // Import mocked modules for setup
@@ -458,6 +463,17 @@ describe('profileMutationFn + profileOnSuccess', () => {
     it('markDidsChecked so batch fetcher skips this DID', async () => {
       const {isChecked} = await runMutationAndOnSuccess(makePrivateParams())
       expect(isChecked).toBe(true)
+    })
+
+    it('invalidates feed queries so stale pre-sentinel author profiles are not shown', async () => {
+      const spy = jest.spyOn(queryClient, 'invalidateQueries')
+
+      await runMutationAndOnSuccess(makePrivateParams())
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({queryKey: ['post-feed']}),
+      )
+      spy.mockRestore()
     })
   })
 

@@ -316,14 +316,15 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
 
       if (uncheckedDids.length > 0) {
         try {
-          freshDataMap = await fetchPrivateProfiles(
+          const {profiles: fresh, deks} = await fetchPrivateProfiles(
             uncheckedDids,
             currentAccount?.did ?? '',
             call,
             getBaseCdnUrl(agent),
           )
+          freshDataMap = fresh
           if (freshDataMap.size > 0) {
-            upsertCachedPrivateProfiles(freshDataMap, currentAccount?.did)
+            upsertCachedPrivateProfiles(freshDataMap, currentAccount?.did, deks)
           }
         } catch {
           // Silent fallback - show ATProto data only
@@ -860,6 +861,10 @@ export async function profileOnSuccess(
       ),
     )
     queryClient.invalidateQueries({queryKey: PRONOUNS_RQKEY(did)})
+    // Feed items embed stale ATProto author profiles (old displayName, no sentinel).
+    // After going private, the sentinel is only visible in newly-fetched feed data,
+    // so shouldCheckPrivateProfile() won't gate the merge until feeds refetch.
+    queryClient.invalidateQueries({queryKey: [FEED_RQKEY_ROOT]})
   } else {
     evictDid(did)
     markDidsChecked([did], viewerDid)
