@@ -3,12 +3,14 @@ import {chunk, throttle} from 'lodash'
 
 import {generateKeyPair} from '#/lib/encryption'
 import {logger} from '#/logger'
+import * as persisted from '#/state/persisted'
 import * as Toast from '#/view/com/util/Toast'
 import {getErrorCode, SpeakeasyApiCall} from './speakeasy'
 import {isServiceError} from './speakeasy-health'
 
 // Throttled toast for non-service private key errors (e.g. 4xx) - only show once per 30 seconds
 const showPrivateKeyErrorToast = throttle(() => {
+  if (!persisted.get('speakeasyHealthMonitoring')) return
   Toast.show('Unable to load private data', 'xmark')
 }, 30_000)
 
@@ -129,7 +131,8 @@ export async function getPrivateKeyOrWarn(
   } catch (error) {
     logger.error('getPrivateKeyOrWarn: failed to get private key', {error})
     // Service errors (network/5xx): central layer shows opt-in-gated toast; do not show here.
-    if (!isServiceError(error)) {
+    // NotFound (404) is expected for users who haven't used private features yet.
+    if (!isServiceError(error) && getErrorCode(error) !== 'NotFound') {
       showPrivateKeyErrorToast()
     }
     return null
