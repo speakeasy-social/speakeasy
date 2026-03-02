@@ -57,6 +57,7 @@ import {useQueryClient} from '@tanstack/react-query'
 
 import {createDefaultHiddenMessage} from '#/lib/api'
 import * as apilib from '#/lib/api/index'
+import {isPrivateProfile} from '#/lib/api/private-profiles'
 import {usePrivateSession} from '#/lib/api/private-sessions'
 import {EmbeddingDisabledError} from '#/lib/api/resolve'
 import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
@@ -191,6 +192,7 @@ export const ComposePost = ({
   const canPostPrivate = features.some(
     f => f.key === 'private-posts' && f.value === 'true',
   )
+  const {data: currentProfile} = useProfileQuery({did: currentDid})
   const {data: trustedCount} = useTrustedUserCount(currentAccount?.did)
   const hasTrusted = !!trustedCount && trustedCount > 0
 
@@ -208,7 +210,10 @@ export const ComposePost = ({
   const isPrivateReply = replyTo?.uri?.includes(
     '/social.spkeasy.feed.privatePost/',
   )
-  const effectiveAudience = isPrivateReply ? 'trusted' : initAudience
+  const currentUserIsPrivate = isPrivateProfile(currentProfile)
+  const effectiveAudience = isPrivateReply
+    ? 'trusted'
+    : initAudience ?? (currentUserIsPrivate ? 'trusted' : undefined)
 
   // Check if user trusts the author when replying to a private post
   const replyAuthorDid = replyTo?.author?.did
@@ -257,6 +262,30 @@ export const ComposePost = ({
     },
     [activePost.id],
   )
+
+  // If profile loads after mount and user is private, flip audience from public to trusted
+  useEffect(() => {
+    if (
+      currentProfile &&
+      isPrivateProfile(currentProfile) &&
+      !isPrivateReply &&
+      !initAudience &&
+      activePost.audience === 'public'
+    ) {
+      composerDispatch({
+        type: 'update_post',
+        postId: activePost.id,
+        postAction: {type: 'update_audience', audience: 'trusted'},
+      })
+    }
+  }, [
+    currentProfile,
+    isPrivateReply,
+    initAudience,
+    activePost.id,
+    activePost.audience,
+    composerDispatch,
+  ])
 
   const selectVideo = React.useCallback(
     (postId: string, asset: ImagePickerAsset) => {
