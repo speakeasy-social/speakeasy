@@ -61,48 +61,78 @@ export function mergeFeedItemWithPrivateProfiles(
     did: string,
   ) => AppBskyActorDefs.ProfileViewBasic | undefined,
 ): AppBskyFeedDefs.FeedViewPost {
-  const postAuthorDid = item.post.author.did
-  const publicSourcePost = getPublicProfile?.(postAuthorDid) ?? item.post.author
-  const displayPostAuthor = mergePrivateProfileData(
-    publicSourcePost,
-    getPrivateProfile(postAuthorDid),
-  )
-  let newPost = {...item.post, author: displayPostAuthor}
+  let modified = false
+  let newPost = item.post
   let newReply = item.reply
   let newReason = item.reason
 
+  // Post author
+  const postAuthorDid = item.post.author.did
+  const postPrivate = getPrivateProfile(postAuthorDid)
+  const postPublic = getPublicProfile?.(postAuthorDid)
+  if (postPrivate || postPublic) {
+    const publicSource = postPublic ?? item.post.author
+    newPost = {
+      ...item.post,
+      author: mergePrivateProfileData(publicSource, postPrivate),
+    }
+    modified = true
+  }
+
+  // Reply parent author
   if (item.reply?.parent && AppBskyFeedDefs.isPostView(item.reply.parent)) {
     const did = item.reply.parent.author.did
-    const publicSource = getPublicProfile?.(did) ?? item.reply.parent.author
-    newReply = {
-      ...item.reply,
-      parent: {
-        ...item.reply.parent,
-        author: mergePrivateProfileData(publicSource, getPrivateProfile(did)),
-      },
+    const parentPrivate = getPrivateProfile(did)
+    const parentPublic = getPublicProfile?.(did)
+    if (parentPrivate || parentPublic) {
+      const publicSource = parentPublic ?? item.reply.parent.author
+      newReply = {
+        ...item.reply,
+        parent: {
+          ...item.reply.parent,
+          author: mergePrivateProfileData(publicSource, parentPrivate),
+        },
+      }
+      modified = true
     }
   }
 
+  // Reply root author
   if (item.reply?.root && AppBskyFeedDefs.isPostView(item.reply.root)) {
     const did = item.reply.root.author.did
-    const publicSource = getPublicProfile?.(did) ?? item.reply.root.author
-    const baseReply = newReply ?? item.reply
-    newReply = {
-      ...baseReply,
-      root: {
-        ...item.reply.root,
-        author: mergePrivateProfileData(publicSource, getPrivateProfile(did)),
-      },
+    const rootPrivate = getPrivateProfile(did)
+    const rootPublic = getPublicProfile?.(did)
+    if (rootPrivate || rootPublic) {
+      const publicSource = rootPublic ?? item.reply.root.author
+      const baseReply = newReply ?? item.reply
+      newReply = {
+        ...baseReply,
+        root: {
+          ...item.reply.root,
+          author: mergePrivateProfileData(publicSource, rootPrivate),
+        },
+      }
+      modified = true
     }
   }
 
+  // Repost author
   if (AppBskyFeedDefs.isReasonRepost(item.reason)) {
     const did = item.reason.by.did
-    const publicSource = getPublicProfile?.(did) ?? item.reason.by
-    newReason = {
-      ...item.reason,
-      by: mergePrivateProfileData(publicSource, getPrivateProfile(did)),
+    const repostPrivate = getPrivateProfile(did)
+    const repostPublic = getPublicProfile?.(did)
+    if (repostPrivate || repostPublic) {
+      const publicSource = repostPublic ?? item.reason.by
+      newReason = {
+        ...item.reason,
+        by: mergePrivateProfileData(publicSource, repostPrivate),
+      }
+      modified = true
     }
+  }
+
+  if (!modified) {
+    return item
   }
 
   return {
