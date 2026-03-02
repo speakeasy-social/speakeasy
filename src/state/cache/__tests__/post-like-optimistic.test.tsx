@@ -79,21 +79,102 @@ function makePost(did: string): AppBskyFeedDefs.PostView {
   } as AppBskyFeedDefs.PostView
 }
 
+function setupFeedAndRender(mergedItem: AppBskyFeedDefs.FeedViewPost) {
+  const feedQueryKey = RQKEY('following')
+  const queryClient = new QueryClient({
+    defaultOptions: {queries: {retry: false}},
+  })
+  const feedPage: FeedPageUnselected = {
+    api: {} as any,
+    cursor: undefined,
+    feed: [mergedItem],
+    fetchedAt: Date.now(),
+  }
+  queryClient.setQueryData(feedQueryKey, {pages: [feedPage], pageParams: []})
+
+  const result = renderWithProviders(
+    <PostLikeDisplay post={mergedItem.post} queryClient={queryClient} />,
+    {queryClient},
+  )
+  return result
+}
+
 describe('post like optimistic update', () => {
-  it('reflects like in UI after post passes through mergeFeedItemWithPrivateProfiles', () => {
-    const rawPost = makePost('did:plc:testuser')
-    const feedItem: AppBskyFeedDefs.FeedViewPost = {post: rawPost}
+  it('repost with private profile reason author: post like works', () => {
+    const postAuthorDid = 'did:plc:postauthor'
+    const repostAuthorDid = 'did:plc:repostauthor'
+    const rawPost = makePost(postAuthorDid)
+    const feedItem: AppBskyFeedDefs.FeedViewPost = {
+      post: rawPost,
+      reason: {
+        $type: 'app.bsky.feed.defs#reasonRepost',
+        by: {
+          did: repostAuthorDid,
+          handle: 'reposter.bsky.social',
+          displayName: 'Reposter',
+        },
+        indexedAt: new Date().toISOString(),
+      },
+    }
 
-    // Run through the merge function as the real select() pipeline does
-    const merged = mergeFeedItemWithPrivateProfiles(
-      feedItem,
-      () => undefined, // no private profile data
-    )
+    // Only the repost reason author has private data; post author does not
+    const merged = mergeFeedItemWithPrivateProfiles(feedItem, did => {
+      if (did === repostAuthorDid) {
+        return {displayName: 'Private Reposter'} as any
+      }
+      return undefined
+    })
 
-    // The merged item should preserve object identity (the fix)
+    // Post object identity is preserved (no private data on post author)
     expect(merged.post).toBe(rawPost)
 
-    // Seed the query client with a feed page containing this post
+    const {getByTestId} = setupFeedAndRender(merged)
+
+    expect(getByTestId('like-state').props.children).toBe('not liked')
+    fireEvent.press(getByTestId('like-button'))
+    expect(getByTestId('like-state').props.children).toBe('liked')
+  })
+
+  it('post author has private profile: like works via URI fallback', () => {
+    const rawPost = makePost('did:plc:privateauthor')
+    const feedItem: AppBskyFeedDefs.FeedViewPost = {post: rawPost}
+
+    // Post author has private data — merge creates a new post object
+    const merged = mergeFeedItemWithPrivateProfiles(feedItem, did => {
+      if (did === 'did:plc:privateauthor') {
+        return {displayName: 'Secret Name'} as any
+      }
+      return undefined
+    })
+
+    // Confirm a new post object was created
+    expect(merged.post).not.toBe(rawPost)
+    expect(merged.post.author.displayName).toBe('Secret Name')
+
+    const {getByTestId} = setupFeedAndRender(merged)
+
+    // Shadow should still work via shadowsByUri fallback
+    expect(getByTestId('like-state').props.children).toBe('not liked')
+    fireEvent.press(getByTestId('like-button'))
+    expect(getByTestId('like-state').props.children).toBe('liked')
+  })
+
+  it('like survives select re-run (new merged objects from same raw post)', () => {
+    const rawPost = makePost('did:plc:reselect-author')
+    const feedItem: AppBskyFeedDefs.FeedViewPost = {post: rawPost}
+    const getPrivateProfile = (did: string) => {
+      if (did === 'did:plc:reselect-author') {
+        return {displayName: 'Secret Name'} as any
+      }
+      return undefined
+    }
+
+    // First merge — simulates initial select
+    const merged1 = mergeFeedItemWithPrivateProfiles(
+      feedItem,
+      getPrivateProfile,
+    )
+
     const feedQueryKey = RQKEY('following')
     const queryClient = new QueryClient({
       defaultOptions: {queries: {retry: false}},
@@ -101,39 +182,34 @@ describe('post like optimistic update', () => {
     const feedPage: FeedPageUnselected = {
       api: {} as any,
       cursor: undefined,
-      feed: [merged],
+      feed: [feedItem],
       fetchedAt: Date.now(),
     }
     queryClient.setQueryData(feedQueryKey, {pages: [feedPage], pageParams: []})
 
-    const {getByTestId} = renderWithProviders(
-      <PostLikeDisplay post={merged.post} queryClient={queryClient} />,
+    const {getByTestId, rerender} = renderWithProviders(
+      <PostLikeDisplay post={merged1.post} queryClient={queryClient} />,
       {queryClient},
     )
 
-    // Initial state — not liked
+    // Like the post
     expect(getByTestId('like-state').props.children).toBe('not liked')
-
-    // Simulate optimistic like
     fireEvent.press(getByTestId('like-button'))
-
-    // Shadow should now reflect the like
     expect(getByTestId('like-state').props.children).toBe('liked')
-  })
 
-  it('still merges private profile data when available', () => {
-    const rawPost = makePost('did:plc:privateuser')
-    const feedItem: AppBskyFeedDefs.FeedViewPost = {post: rawPost}
+    // Simulate select re-run: create entirely new merged objects
+    const merged2 = mergeFeedItemWithPrivateProfiles(
+      feedItem,
+      getPrivateProfile,
+    )
 
-    const merged = mergeFeedItemWithPrivateProfiles(feedItem, did => {
-      if (did === 'did:plc:privateuser') {
-        return {displayName: 'Secret Name'} as any
-      }
-      return undefined
-    })
+    // Confirm these are different object references
+    expect(merged2.post).not.toBe(merged1.post)
 
-    // When private data exists, a new object IS created
-    expect(merged.post).not.toBe(rawPost)
-    expect(merged.post.author.displayName).toBe('Secret Name')
+    // Re-render with the new merged post (simulating what React Query select does)
+    rerender(<PostLikeDisplay post={merged2.post} queryClient={queryClient} />)
+
+    // Like shadow should survive via shadowsByUri
+    expect(getByTestId('like-state').props.children).toBe('liked')
   })
 })

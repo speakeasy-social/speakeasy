@@ -3,6 +3,7 @@ import {beforeEach, describe, expect, it, jest} from '@jest/globals'
 import {QueryClient} from '@tanstack/react-query'
 
 import * as encryption from '#/lib/encryption'
+import {clearAll as clearPrivateProfileCache} from '#/state/cache/private-profile-cache'
 import {fetchPrivateProfiles, savePrivateProfile} from '../private-profiles'
 import * as speakeasy from '../speakeasy'
 import * as userKeys from '../user-keys'
@@ -493,6 +494,7 @@ describe('fetchPrivateProfiles', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    clearPrivateProfileCache()
 
     mockCall = jest.fn()
 
@@ -571,14 +573,14 @@ describe('fetchPrivateProfiles', () => {
   it('returns empty Map for empty dids array', async () => {
     mockCall.mockResolvedValue({profiles: []})
 
-    const result = await fetchPrivateProfiles(
+    const {profiles} = await fetchPrivateProfiles(
       [],
       mockUserDid,
       mockCall,
       'https://cdn.test',
     )
 
-    expect(result.size).toBe(0)
+    expect(profiles.size).toBe(0)
     // Should not call the API for empty input
     expect(mockCall).not.toHaveBeenCalled()
   })
@@ -598,22 +600,22 @@ describe('fetchPrivateProfiles', () => {
       },
     ])
 
-    const result = await fetchPrivateProfiles(
+    const {profiles} = await fetchPrivateProfiles(
       ['did:plc:alice', 'did:plc:bob'],
       mockUserDid,
       mockCall,
       'https://cdn.test',
     )
 
-    expect(result.size).toBe(2)
-    expect(result.get('did:plc:alice')).toEqual({
+    expect(profiles.size).toBe(2)
+    expect(profiles.get('did:plc:alice')).toEqual({
       displayName: 'Alice',
       description: 'Hello from Alice',
       avatarUri: 'https://cdn.test/alice-avatar-key',
       rawAvatarUri: 'alice-avatar-key',
       rawBannerUri: undefined,
     })
-    expect(result.get('did:plc:bob')).toEqual({
+    expect(profiles.get('did:plc:bob')).toEqual({
       displayName: 'Bob',
       description: 'Hello from Bob',
       rawAvatarUri: undefined,
@@ -645,16 +647,16 @@ describe('fetchPrivateProfiles', () => {
       },
     )
 
-    const result = await fetchPrivateProfiles(
+    const {profiles} = await fetchPrivateProfiles(
       ['did:plc:alice', 'did:plc:bob'],
       mockUserDid,
       mockCall,
       'https://cdn.test',
     )
 
-    expect(result.size).toBe(1)
-    expect(result.has('did:plc:alice')).toBe(true)
-    expect(result.has('did:plc:bob')).toBe(false)
+    expect(profiles.size).toBe(1)
+    expect(profiles.has('did:plc:alice')).toBe(true)
+    expect(profiles.has('did:plc:bob')).toBe(false)
   })
 
   it('propagates API errors from getPrivateProfiles', async () => {
@@ -683,13 +685,37 @@ describe('fetchPrivateProfiles', () => {
     // No private key available
     mockedUserKeys.getPrivateKeyOrWarn.mockResolvedValue(null)
 
-    const result = await fetchPrivateProfiles(
+    const {profiles} = await fetchPrivateProfiles(
       ['did:plc:alice'],
       mockUserDid,
       mockCall,
       'https://cdn.test',
     )
 
-    expect(result.size).toBe(0)
+    expect(profiles.size).toBe(0)
+  })
+
+  it('returns DEK in the deks map so callers can store it without circular import', async () => {
+    // Regression: circular import between private-profile-cache.ts and private-profiles.ts
+    // caused setCachedDek (called inside fetchPrivateProfiles) to write to a different
+    // module instance's dekCache than getCachedDek reads from, silently dropping avatars.
+    // Fix: fetchPrivateProfiles returns deks map; caller passes to upsertCachedPrivateProfiles.
+    mockGetProfilesResponse([
+      {
+        did: 'did:plc:alice',
+        displayName: 'Alice',
+        description: 'Hello from Alice',
+        avatarUri: 'alice-avatar-key',
+      },
+    ])
+
+    const {deks} = await fetchPrivateProfiles(
+      ['did:plc:alice'],
+      mockUserDid,
+      mockCall,
+      'https://cdn.test',
+    )
+
+    expect(deks.get('did:plc:alice')).toBe(mockDek)
   })
 })

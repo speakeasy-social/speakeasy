@@ -139,6 +139,14 @@ export async function getPrivateKeyOrWarn(
   }
 }
 
+/**
+ * Clears the cached private key. Defense-in-depth — call on account switch/logout.
+ */
+export function clearCachedPrivateKey(): void {
+  cachedPrivateKeyPromise = undefined
+  cachedPrivateKeyUserDid = undefined
+}
+
 export async function cachePrivateKey(
   userDid: string,
   privateKey: SpeakeasyPrivateKey,
@@ -160,7 +168,6 @@ export async function getPrivateKey(
     api: 'social.spkeasy.key.getPrivateKey',
   })
 
-  console.log('private key fetched', data)
   return data
 }
 

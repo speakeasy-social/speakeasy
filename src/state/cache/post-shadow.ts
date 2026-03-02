@@ -31,20 +31,25 @@ const shadows: WeakMap<
   AppBskyFeedDefs.PostView,
   Partial<PostShadow>
 > = new WeakMap()
+const shadowsByUri = new Map<string, Partial<PostShadow>>()
+
+function getShadow(post: AppBskyFeedDefs.PostView) {
+  return shadows.get(post) ?? shadowsByUri.get(post.uri)
+}
 
 export function usePostShadow(
   post: AppBskyFeedDefs.PostView,
 ): Shadow<AppBskyFeedDefs.PostView> | typeof POST_TOMBSTONE {
-  const [shadow, setShadow] = useState(() => shadows.get(post))
+  const [shadow, setShadow] = useState(() => getShadow(post))
   const [prevPost, setPrevPost] = useState(post)
   if (post !== prevPost) {
     setPrevPost(post)
-    setShadow(shadows.get(post))
+    setShadow(getShadow(post))
   }
 
   useEffect(() => {
     function onUpdate() {
-      setShadow(shadows.get(post))
+      setShadow(getShadow(post))
     }
     emitter.addListener(post.uri, onUpdate)
     return () => {
@@ -128,6 +133,7 @@ export function updatePostShadow(
   for (let post of cachedPosts) {
     shadows.set(post, {...shadows.get(post), ...value})
   }
+  shadowsByUri.set(uri, {...shadowsByUri.get(uri), ...value})
   batchedUpdates(() => {
     emitter.emit(uri)
   })

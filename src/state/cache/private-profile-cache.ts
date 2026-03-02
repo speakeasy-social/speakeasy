@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react'
 import EventEmitter from 'eventemitter3'
 
-import {PrivateProfileData} from '#/lib/api/private-profiles'
+import type {PrivateProfileData} from '#/lib/api/private-profiles'
+import {logger} from '#/logger'
 
 /**
  * Module-level singleton cache for decrypted private profile data.
@@ -34,6 +35,34 @@ const dekCache = new Map<string, string>()
 const inflightDids = new Set<string>()
 const emitter = new EventEmitter()
 
+let ownerDid: string | undefined
+
+/**
+ * Sets the owner DID for this cache. If the DID changes, clears all cached data.
+ */
+export function setOwnerDid(did: string): void {
+  logger.debug('private-profile-cache: setOwnerDid', {did, prevOwner: ownerDid})
+  if (ownerDid && ownerDid !== did) {
+    clearAll()
+  }
+  ownerDid = did
+}
+
+/**
+ * Guard: if a viewerDid is provided and doesn't match ownerDid, clears everything.
+ * Prevents wrong-account data from entering the cache.
+ */
+function assertOwner(viewerDid: string): void {
+  if (ownerDid && ownerDid !== viewerDid) {
+    logger.debug('private-profile-cache: assertOwner mismatch — clearing', {
+      ownerDid,
+      viewerDid,
+    })
+    clearAll()
+  }
+  ownerDid = viewerDid
+}
+
 // --- Read API ---
 
 export function getCachedPrivateProfile(
@@ -50,15 +79,28 @@ export function getCachedDek(did: string): string | undefined {
   return dekCache.get(did)
 }
 
-export function setCachedDek(did: string, dek: string): void {
+export function setCachedDek(
+  did: string,
+  dek: string,
+  viewerDid?: string,
+): void {
+  if (viewerDid) assertOwner(viewerDid)
   dekCache.set(did, dek)
+  logger.debug('private-profile-cache: setCachedDek', {
+    did,
+    ownerDid,
+    dekCacheSize: dekCache.size,
+  })
 }
 
 // --- Write API ---
 
 export function upsertCachedPrivateProfiles(
   profiles: Map<string, PrivateProfileData>,
+  viewerDid?: string,
+  deks?: Map<string, string>,
 ): void {
+  if (viewerDid) assertOwner(viewerDid)
   let changed = false
   for (const [did, data] of profiles) {
     const existing = cache.get(did)
@@ -76,12 +118,28 @@ export function upsertCachedPrivateProfiles(
       changed = true
     }
   }
+  if (deks) {
+    for (const [did, dek] of deks) {
+      if (dekCache.get(did) !== dek) {
+        dekCache.set(did, dek)
+        changed = true
+      }
+    }
+  }
   if (changed) {
+    logger.debug('private-profile-cache: upsert changed', {
+      dids: Array.from(profiles.keys()),
+      avatarUris: Array.from(profiles.entries()).map(([did, d]) => ({
+        did,
+        avatarUri: d.avatarUri?.slice(0, 60),
+      })),
+    })
     emitter.emit('change')
   }
 }
 
-export function markDidsChecked(dids: string[]): void {
+export function markDidsChecked(dids: string[], viewerDid?: string): void {
+  if (viewerDid) assertOwner(viewerDid)
   let changed = false
   for (const did of dids) {
     if (!cache.has(did)) {
@@ -131,10 +189,28 @@ export function releaseDids(dids: string[]): void {
  * Clears everything — call on account switch.
  */
 export function clearAll(): void {
+  const stack = new Error().stack?.split('\n').slice(1, 4).join(' | ') ?? ''
+  logger.debug('private-profile-cache: clearAll called', {
+    ownerDid,
+    dekCacheSize: dekCache.size,
+    stack,
+  })
   cache.clear()
   dekCache.clear()
   inflightDids.clear()
+  ownerDid = undefined
   emitter.emit('change')
+}
+
+// --- Debug exposure (dev only) ---
+if (typeof window !== 'undefined') {
+  ;(window as any).__ppDebug = {
+    getDekCacheSize: () => dekCache.size,
+    getDekCacheDids: () => Array.from(dekCache.keys()),
+    getDek: (did: string) => dekCache.get(did),
+    getCacheSize: () => cache.size,
+    getCacheDids: () => Array.from(cache.keys()),
+  }
 }
 
 // --- React hook ---

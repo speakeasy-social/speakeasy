@@ -62,7 +62,12 @@ jest.mock('#/lib/statsig/statsig', () => ({
 }))
 
 jest.mock('#/logger', () => ({
-  logger: {error: jest.fn(), warn: jest.fn(), info: jest.fn()},
+  logger: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
 }))
 
 // Import mocked modules for assertions

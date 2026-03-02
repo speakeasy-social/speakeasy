@@ -4,6 +4,7 @@ import {
   decryptAndCacheImage,
   getCachedBlobUrl,
 } from '#/lib/media/encrypted-image-cache'
+import {logger} from '#/logger'
 
 /**
  * Lazily decrypts a private media URL and returns the decrypted blob URL.
@@ -40,8 +41,8 @@ export function useDecryptedImageUrl(
       .then(result => {
         if (!cancelled) setBlobUrl(result)
       })
-      .catch(() => {
-        // Silent fail — image stays hidden while loading
+      .catch(err => {
+        logger.error('useDecryptedImageUrl: decryption failed', {url, err})
       })
     return () => {
       cancelled = true

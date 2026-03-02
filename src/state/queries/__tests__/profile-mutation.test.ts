@@ -66,7 +66,12 @@ jest.mock('#/lib/async/until', () => ({
 }))
 
 jest.mock('#/logger', () => ({
-  logger: {error: jest.fn(), info: jest.fn(), warn: jest.fn()},
+  logger: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+  },
 }))
 
 // Import mocked modules for setup
@@ -216,12 +221,20 @@ async function runMutationAndOnSuccess(params: ProfileUpdateParams) {
 // --- Tests ---
 
 describe('profileMutationFn + profileOnSuccess', () => {
+  let savedFetch: typeof global.fetch
+
   afterEach(() => {
     queryClient.clear()
+    global.fetch = savedFetch
   })
 
   beforeEach(() => {
     jest.clearAllMocks()
+    savedFetch = global.fetch
+    global.fetch = jest.fn<any>().mockResolvedValue({
+      ok: true,
+      headers: {get: () => 'image/jpeg'},
+    }) as any
     queryClient = new QueryClient({
       defaultOptions: {queries: {retry: false}},
     })
@@ -450,6 +463,17 @@ describe('profileMutationFn + profileOnSuccess', () => {
     it('markDidsChecked so batch fetcher skips this DID', async () => {
       const {isChecked} = await runMutationAndOnSuccess(makePrivateParams())
       expect(isChecked).toBe(true)
+    })
+
+    it('invalidates feed queries so stale pre-sentinel author profiles are not shown', async () => {
+      const spy = jest.spyOn(queryClient, 'invalidateQueries')
+
+      await runMutationAndOnSuccess(makePrivateParams())
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({queryKey: ['post-feed']}),
+      )
+      spy.mockRestore()
     })
   })
 

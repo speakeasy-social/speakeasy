@@ -1,4 +1,5 @@
 import {decryptMediaBlob} from '#/lib/encryption'
+import {logger} from '#/logger'
 
 /**
  * Module-level cache for decrypted private media blob URLs.
@@ -12,6 +13,28 @@ import {decryptMediaBlob} from '#/lib/encryption'
 const resolvedCache = new Map<string, string>()
 const inFlightCache = new Map<string, Promise<string>>()
 
+let ownerDid: string | undefined
+
+/**
+ * Sets the owner DID for this cache. If the DID changes, clears all cached data.
+ */
+export function setOwnerDid(did: string): void {
+  if (ownerDid && ownerDid !== did) {
+    clearEncryptedImageCache()
+  }
+  ownerDid = did
+}
+
+/**
+ * Guard: clears cache if viewerDid doesn't match ownerDid.
+ */
+function assertOwner(viewerDid: string): void {
+  if (ownerDid && ownerDid !== viewerDid) {
+    clearEncryptedImageCache()
+  }
+  ownerDid = viewerDid
+}
+
 export function getCachedBlobUrl(url: string): string | undefined {
   return resolvedCache.get(url)
 }
@@ -23,7 +46,9 @@ export function getCachedBlobUrl(url: string): string | undefined {
 export async function decryptAndCacheImage(
   url: string,
   dek: string,
+  viewerDid?: string,
 ): Promise<string> {
+  if (viewerDid) assertOwner(viewerDid)
   const cached = resolvedCache.get(url)
   if (cached) return cached
 
@@ -32,7 +57,6 @@ export async function decryptAndCacheImage(
 
   const promise = decryptMediaBlob(url, dek)
     .then(blob => {
-      console.debug('[encrypted-image-cache] decrypted image', url)
       const blobUrl = URL.createObjectURL(blob)
       resolvedCache.set(url, blobUrl)
       inFlightCache.delete(url)
@@ -40,6 +64,7 @@ export async function decryptAndCacheImage(
     })
     .catch(err => {
       inFlightCache.delete(url)
+      logger.error('encrypted-image-cache: decryption failed', {url, err})
       throw err
     })
 
@@ -57,4 +82,5 @@ export function clearEncryptedImageCache(): void {
   }
   resolvedCache.clear()
   inFlightCache.clear()
+  ownerDid = undefined
 }

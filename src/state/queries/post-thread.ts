@@ -110,7 +110,7 @@ export type ThreadUnknown = {
  * cache, and marks DIDs checked. Returns a single Map of all available private
  * data for the requested DIDs.
  */
-async function getPrivateProfilesForDids(
+export async function getPrivateProfilesForDids(
   dids: string[],
   userDid: string | undefined,
   call: SpeakeasyApiCall,
@@ -124,14 +124,15 @@ async function getPrivateProfilesForDids(
   const uncachedDids = dids.filter(did => !result.has(did))
   if (uncachedDids.length === 0 || !userDid) return result
   try {
-    const privateProfiles = await fetchPrivateProfiles(
+    const {profiles: privateProfiles, deks} = await fetchPrivateProfiles(
       uncachedDids,
       userDid,
       call,
       baseUrl,
     )
     for (const [did, data] of privateProfiles) result.set(did, data)
-    if (privateProfiles.size > 0) upsertCachedPrivateProfiles(privateProfiles)
+    if (privateProfiles.size > 0)
+      upsertCachedPrivateProfiles(privateProfiles, userDid, deks)
   } catch {
     // Leave result with cache-only data
   } finally {
