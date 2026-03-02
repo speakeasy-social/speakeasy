@@ -16,8 +16,8 @@ import {
   encryptMediaStream,
 } from '#/lib/encryption'
 import {compressBlobIfNeeded} from '#/lib/media/manip'
+import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
-import {setCachedDek} from '#/state/cache/private-profile-cache'
 import {type PronounSet} from '#/state/queries/pronouns'
 import {getBaseCdnUrl} from './feed/utils'
 import {encryptDekForTrustedUsers} from './session-utils'
@@ -148,7 +148,7 @@ const CHECK_ALL_PROFILES = false
  * Used by feed/thread/notification authors; full PrivateProfileMetadata lives in profile.ts.
  */
 export type ProfileWithPrivateMeta = {
-  _privateProfile?: {isPrivate: boolean}
+  _privateProfile?: {isPrivate: boolean; dek?: string}
 }
 
 /**
@@ -406,14 +406,23 @@ export async function fetchPrivateProfiles(
   userDid: string,
   call: SpeakeasyApiCall,
   baseUrl: string,
-): Promise<Map<string, PrivateProfileData>> {
+): Promise<{
+  profiles: Map<string, PrivateProfileData>
+  deks: Map<string, string>
+}> {
   const encrypted = await getPrivateProfiles(dids, call)
-  if (encrypted.length === 0) return new Map()
+  if (encrypted.length === 0) return {profiles: new Map(), deks: new Map()}
 
   const privateKey = await getPrivateKeyOrWarn(userDid, call)
-  if (!privateKey) return new Map()
+  if (!privateKey) {
+    logger.debug(
+      'fetchPrivateProfiles: no private key available, returning empty',
+    )
+    return {profiles: new Map(), deks: new Map()}
+  }
 
   const result = new Map<string, PrivateProfileData>()
+  const deks = new Map<string, string>()
   await Promise.all(
     encrypted.map(async p => {
       try {
@@ -421,14 +430,18 @@ export async function fetchPrivateProfiles(
         const content = await decryptContent(p.encryptedContent, dek)
         if (!content) return
         const data = JSON.parse(content) as PrivateProfileData
-        setCachedDek(p.did, dek, userDid)
+        deks.set(p.did, dek)
+        logger.debug('fetchPrivateProfiles: decrypted profile', {did: p.did})
         result.set(p.did, resolvePrivateProfileUrls(data, baseUrl))
-      } catch {
-        // Skip profiles we can't decrypt
+      } catch (err) {
+        logger.debug('fetchPrivateProfiles: skipped profile (decrypt error)', {
+          did: p.did,
+          error: err,
+        })
       }
     }),
   )
-  return result
+  return {profiles: result, deks}
 }
 
 /**

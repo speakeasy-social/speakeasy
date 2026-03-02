@@ -69,7 +69,7 @@ export function usePrivateProfileFetcher<TPage>({
       const call = (opts: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
         callSpeakeasyApiWithAgent(agent, opts)
 
-      const privateProfiles = await fetchPrivateProfiles(
+      const {profiles: privateProfiles, deks} = await fetchPrivateProfiles(
         claimedDids,
         currentAccount.did,
         call,
@@ -78,7 +78,7 @@ export function usePrivateProfileFetcher<TPage>({
 
       // Store results in the module-level cache
       if (privateProfiles.size > 0) {
-        upsertCachedPrivateProfiles(privateProfiles, currentAccount.did)
+        upsertCachedPrivateProfiles(privateProfiles, currentAccount.did, deks)
       }
 
       // Mark all claimed DIDs as checked (null sentinel for those without data)
