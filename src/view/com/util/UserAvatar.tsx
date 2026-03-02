@@ -8,6 +8,7 @@ import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 import {useQueryClient} from '@tanstack/react-query'
 
+import {type ProfileWithPrivateMeta} from '#/lib/api/private-profiles'
 import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {
@@ -452,7 +453,12 @@ let PreviewableUserAvatar = ({
     precacheProfile(queryClient, profile)
   }, [profile, queryClient, onBeforePress])
 
-  const dek = getCachedDek(profile.did)
+  const dek =
+    getCachedDek(profile.did) ||
+    (profile as ProfileWithPrivateMeta)._privateProfile?.dek
+  const isPrivate = !!(profile as ProfileWithPrivateMeta)._privateProfile
+    ?.isPrivate
+  const avatarForDisplay = isPrivate && !dek ? undefined : profile.avatar
 
   return (
     <ProfileHoverCard did={profile.did} disable={disableHoverCard}>
@@ -465,7 +471,7 @@ let PreviewableUserAvatar = ({
         })}
         onPress={onPress}>
         <UserAvatar
-          avatar={profile.avatar}
+          avatar={avatarForDisplay}
           moderation={moderation}
           type={profile.associated?.labeler ? 'labeler' : 'user'}
           dek={dek}
