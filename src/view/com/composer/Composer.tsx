@@ -90,7 +90,10 @@ import {
   useLanguagePrefsApi,
 } from '#/state/preferences/languages'
 import {useFeaturesQuery} from '#/state/queries/features'
-import {useProfileQuery} from '#/state/queries/profile'
+import {
+  ProfileViewDetailedWithPrivate,
+  useProfileQuery,
+} from '#/state/queries/profile'
 import {Gif} from '#/state/queries/tenor'
 import {useTrustMutationQueue} from '#/state/queries/trust'
 import {useTrustStatusQuery} from '#/state/queries/trust-status'
@@ -1111,6 +1114,10 @@ let ComposerPost = React.memo(function ComposerPost({
           avatar={currentProfile?.avatar}
           size={50}
           type={currentProfile?.associated?.labeler ? 'labeler' : 'user'}
+          dek={
+            (currentProfile as ProfileViewDetailedWithPrivate)?._privateProfile
+              ?.dek
+          }
         />
         <TextInput
           ref={textInput}
