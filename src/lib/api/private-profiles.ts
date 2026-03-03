@@ -118,7 +118,7 @@ export type PrivateProfileData = {
   bannerUri?: string // resolved CDN URL (for display)
   rawAvatarUri?: string // original Speakeasy media key (for _privateProfile metadata)
   rawBannerUri?: string // original Speakeasy media key (for _privateProfile metadata)
-  pronouns?: string | PronounSet[] // < 2 sets = string, >= 2 sets = PronounSet[]
+  pronouns?: string | PronounSet[] // PronounSet[] (string for backward compat with old records)
 }
 
 /**

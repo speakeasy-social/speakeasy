@@ -477,16 +477,6 @@ export function defaultCheckCommittedForPublicProfile(
   }
 }
 
-/**
- * Resolves pronouns for private profile storage: 2+ sets → array, else native string.
- */
-function resolvePrivatePronouns(pronouns: {
-  native: string
-  sets: PronounSet[]
-}): string | PronounSet[] {
-  return pronouns.sets.length >= 2 ? pronouns.sets : pronouns.native
-}
-
 export interface ProfileUpdateParams {
   profile: AppBskyActorDefs.ProfileView
   updates:
@@ -556,9 +546,7 @@ export async function profileMutationFn(
   if (isPrivate) {
     // Becoming private or staying private. Order: 1) save avatar/banner, 2) write private record, 3) clear public.
     // If step 3 fails, roll back by deleting the private record so profile is considered still public.
-    const privatePronouns = pronouns
-      ? resolvePrivatePronouns(pronouns)
-      : undefined
+    const privatePronouns = pronouns?.sets.length ? pronouns.sets : undefined
 
     const displayName =
       privateDisplayName ??
