@@ -281,7 +281,7 @@ describe('profileMutationFn + profileOnSuccess', () => {
         description: 'My private bio',
         avatarUri: mockAvatarKey,
         bannerUri: mockBannerKey,
-        pronouns: 'she/her',
+        pronouns: [{forms: ['she', 'her']}],
       })
     })
 
@@ -814,7 +814,7 @@ describe('profileMutationFn + profileOnSuccess', () => {
         makePrivateParams(),
       )
       if (result.type !== 'private') throw new Error('expected private')
-      expect(result.privateData.pronouns).toBe('she/her')
+      expect(result.privateData.pronouns).toEqual([{forms: ['she', 'her']}])
     })
   })
 
@@ -868,7 +868,7 @@ describe('profileMutationFn + profileOnSuccess', () => {
         makePrivateParams(),
       )
       if (result.type !== 'private') throw new Error('expected private')
-      expect(result.privateData.pronouns).toBe('she/her')
+      expect(result.privateData.pronouns).toEqual([{forms: ['she', 'her']}])
     })
   })
 
@@ -1372,7 +1372,7 @@ describe('profileMutationFn + profileOnSuccess', () => {
         makePrivateParams({profile: makeProfile({avatar: mockCdnAvatar})}),
       )
       if (result.type !== 'private') throw new Error('expected private')
-      expect(result.privateData.pronouns).toBe('she/her')
+      expect(result.privateData.pronouns).toEqual([{forms: ['she', 'her']}])
     })
   })
 
