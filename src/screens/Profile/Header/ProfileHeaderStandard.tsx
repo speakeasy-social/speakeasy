@@ -96,7 +96,7 @@ let ProfileHeaderStandard = ({
     if (shouldShowDialog) {
       promptControl.open()
     } else {
-      onPressFollow()
+      follow()
     }
   }
 
