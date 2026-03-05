@@ -211,6 +211,23 @@ describe('profileQueryFn', () => {
     })
   })
 
+  describe('Path 2b: DID checked with stale cache, profile transitioned to public', () => {
+    it('evicts stale private data and returns isPrivate false', async () => {
+      // Pre-populate cache as if profile was previously private
+      const privateData = makePrivateProfileData()
+      upsertCachedPrivateProfiles(new Map([[mockDid, privateData]]))
+
+      // Agent now returns a non-sentinel (public) profile
+      const agent = makePublicAgent()
+      const result = await profileQueryFn(agent, mockDid, mockCurrentDid)
+
+      expect(result._privateProfile?.isPrivate).toBe(false)
+      expect(result.displayName).toBe('Alice Public')
+      expect(getCachedPrivateProfile(mockDid)).toBeUndefined()
+      expect(mockedGetPrivateProfile).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Path 3: ATProto profile is not a sentinel (public profile)', () => {
     it('returns public ATProto profile without calling Speakeasy', async () => {
       const agent = makePublicAgent()
@@ -289,13 +306,13 @@ describe('profileQueryFn', () => {
       expect(result._privateProfile?.isPrivate).toBe(false)
     })
 
-    it('does NOT mark DID as checked (sentinel may sync later)', async () => {
+    it('marks DID as checked (prevents infinite re-fetch)', async () => {
       mockedGetPrivateProfile.mockResolvedValue(null as any)
 
       const agent = makeAgent()
       await profileQueryFn(agent, mockDid, mockCurrentDid)
 
-      expect(isDidChecked(mockDid)).toBe(false)
+      expect(isDidChecked(mockDid)).toBe(true)
     })
   })
 
