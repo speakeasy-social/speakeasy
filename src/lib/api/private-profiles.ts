@@ -524,6 +524,7 @@ export function anonymizeAtProtoProfile(
  * In-flight promise so concurrent callers share one session creation.
  * Cleared in finally so the next caller gets a fresh creation; do not leave set across retries.
  */
+let sessionCreationDid: string | undefined
 let sessionCreationPromise: Promise<{
   sessionId: string
   sessionKey: string
@@ -554,7 +555,8 @@ export async function getOrCreateProfileSession(
     }
   }
 
-  if (!sessionCreationPromise) {
+  if (!(agent.did === sessionCreationDid && sessionCreationPromise)) {
+    sessionCreationDid = agent.did
     sessionCreationPromise = (async () => {
       try {
         const {publicKey, privateKey, userKeyPairId} =
@@ -570,6 +572,7 @@ export async function getOrCreateProfileSession(
         return {sessionId, sessionKey}
       } finally {
         sessionCreationPromise = null
+        sessionCreationDid = undefined
       }
     })()
   }
