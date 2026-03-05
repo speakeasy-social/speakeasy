@@ -494,8 +494,8 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
 
   return {
     ...atprotoProfile,
-    displayName: privateData.displayName,
-    description: privateData.description,
+    displayName: privateData.displayName ?? atprotoProfile.displayName,
+    description: privateData.description ?? atprotoProfile.description,
     avatar: privateData.avatarUri ?? atprotoProfile.avatar,
     banner: privateData.bannerUri ?? atprotoProfile.banner,
     pronouns: nativePronouns,
