@@ -259,13 +259,19 @@ export async function decryptProfileIfAccessible(
     return null
   }
 
-  const dek = await decryptDEK(
-    encryptedResponse.encryptedDek,
-    privateKey.privateKey,
-  )
-  const content = await decryptContent(encryptedResponse.encryptedContent, dek)
-  if (!content) return null
-  return {data: JSON.parse(content) as PrivateProfileData, dek}
+  try {
+    const dek = await decryptDEK(
+      encryptedResponse.encryptedDek,
+      privateKey.privateKey,
+    )
+    const content = await decryptContent(
+      encryptedResponse.encryptedContent,
+      dek,
+    )
+    return {data: JSON.parse(content) as PrivateProfileData, dek}
+  } catch {
+    return null
+  }
 }
 
 /**
