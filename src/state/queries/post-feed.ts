@@ -57,6 +57,8 @@ export type AuthorFilter =
   | 'posts_no_replies'
   | 'posts_and_author_threads'
   | 'posts_with_media'
+export type PrivatePostFilter = 'discover' | 'likedByTrusted'
+export type PrivatePostMergeMethod = 'followers' | 'trusted' | 'follower-likes'
 type FeedUri = string
 type ListUri = string
 
@@ -523,7 +525,11 @@ function createApi({
 }) {
   let api: FeedAPI
 
-  const privatePostSettings = [
+  const privatePostSettings: {
+    feedDesc: string
+    mergeMethod: PrivatePostMergeMethod
+    filter?: PrivatePostFilter
+  }[] = [
     {
       feedDesc: 'following',
       mergeMethod: 'followers',
@@ -531,10 +537,12 @@ function createApi({
     {
       feedDesc: DISCOVER_FEED_URI,
       mergeMethod: 'trusted',
+      filter: 'discover',
     },
     {
       feedDesc: '/app.bsky.feed.generator/with-friends',
       mergeMethod: 'follower-likes',
+      filter: 'likedByTrusted',
     },
   ]
 
@@ -594,6 +602,7 @@ function createApi({
       wrappedFeed: api,
       agent,
       mergeMethod: privatePostConfig.mergeMethod,
+      filter: privatePostConfig.filter,
     })
   }
 

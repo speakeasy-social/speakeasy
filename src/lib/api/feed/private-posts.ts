@@ -19,7 +19,10 @@ import {
 } from '#/lib/api/user-keys'
 import {decryptContent, decryptDEK} from '#/lib/encryption'
 import {getCachedFollowerDids} from '#/state/followers-cache'
-import {transformPrivateEmbed} from '#/state/queries/post-feed'
+import {
+  PrivatePostFilter,
+  transformPrivateEmbed,
+} from '#/state/queries/post-feed'
 import {FeedAPI, FeedAPIResponse} from './types'
 
 /**
@@ -61,6 +64,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
    * @param cursor - Optional cursor for pagination
    * @param audience - Optional audience filter ('following' to only show posts from followed users)
    * @param author - Optional author DID to filter private posts by
+   * @param filter - Optional server-side filter ('discover' or 'likedByTrusted')
    * @param limit - Optional limit for number of posts to fetch
    * @returns Promise resolving to a FeedAPIResponse containing the posts and next cursor
    */
@@ -68,11 +72,13 @@ export class PrivatePostsFeedAPI implements FeedAPI {
     cursor,
     audience,
     author,
+    filter,
     limit,
   }: {
     cursor: string | undefined
     audience?: string
     author?: string
+    filter?: PrivatePostFilter
     limit?: number
   }): Promise<FeedAPIResponse> {
     try {
@@ -85,6 +91,7 @@ export class PrivatePostsFeedAPI implements FeedAPI {
         limit,
         filterFollowers: audience === 'following',
         author: author || this.author,
+        filter,
       })
 
       const dekMap = await getDEKMap(this.agent, encryptedSessionKeys)
@@ -246,6 +253,10 @@ export async function fetchMixedPosts(
 
   const bskyPostsPromise = fetchPosts(agent, bskyUris)
 
+  if (speakeasyUris.length === 0) {
+    return bskyPostsPromise
+  }
+
   const {encryptedPosts, encryptedSessionKeys} = await fetchEncryptedPosts(
     agent,
     {
@@ -343,6 +354,7 @@ export async function fetchEncryptedPosts(
  * @param cursor - Optional cursor for pagination
  * @param limit - Number of posts to fetch
  * @param filterFollowers - If true, the returned posts will be filtered by the users followers
+ * @param filter - Optional server-side filter ('discover' or 'likedByTrusted')
  * @returns Promise resolving to encrypted posts, session keys, and cursor
  */
 export async function fetchAndFilterEncryptedPosts(
@@ -352,11 +364,13 @@ export async function fetchAndFilterEncryptedPosts(
     limit = 50,
     filterFollowers,
     author,
+    filter,
   }: {
     cursor?: string
     limit?: number
     filterFollowers?: boolean
     author?: string
+    filter?: PrivatePostFilter
   },
 ): Promise<{
   cursor: string
@@ -377,6 +391,7 @@ export async function fetchAndFilterEncryptedPosts(
   }
   if (cursor) query.cursor = cursor
   if (author) query.authors = [author]
+  if (filter) query.filter = filter
 
   // Fetch posts, private key, and follower dids (if needed)
   const promises = [

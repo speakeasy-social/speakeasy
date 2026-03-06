@@ -1,6 +1,10 @@
 import {AppBskyFeedDefs, BskyAgent} from '@atproto/api'
 
 import {mergeCursors, parseCursor} from '#/lib/api/cursor'
+import {
+  PrivatePostFilter,
+  PrivatePostMergeMethod,
+} from '#/state/queries/post-feed'
 import {PrivatePostsFeedAPI} from './private-posts'
 import {FeedAPI, FeedAPIResponse} from './types'
 
@@ -11,7 +15,8 @@ import {FeedAPI, FeedAPIResponse} from './types'
 export class PrivatePostsWrapper implements FeedAPI {
   private wrappedFeed: FeedAPI
   private privatePosts: PrivatePostsFeedAPI
-  private mergeMethod: string
+  private mergeMethod: PrivatePostMergeMethod
+  private filter?: PrivatePostFilter
   private author?: string
 
   private postSortIndex: (post: AppBskyFeedDefs.FeedViewPost) => number
@@ -29,22 +34,29 @@ export class PrivatePostsWrapper implements FeedAPI {
    * @param {FeedAPI} params.wrappedFeed - The feed implementation to wrap
    * @param {BskyAgent} params.agent - The Bluesky agent instance
    * @param {string} params.mergeMethod - The method to use for merging feeds ('trusted' or other)
+   * @param {string} params.filter - Optional server-side filter for private posts ('discover' or 'likedByTrusted'). Defaults to 'discover' for non-followers merge methods to prevent unfiltered content.
    * @param {string} params.author - Optional author DID to filter private posts by
    */
   constructor({
     wrappedFeed,
     agent,
     mergeMethod,
+    filter,
     author,
   }: {
     wrappedFeed: FeedAPI
     agent: BskyAgent
-    mergeMethod: string
+    mergeMethod: PrivatePostMergeMethod
+    filter?: PrivatePostFilter
     author?: string
   }) {
     this.wrappedFeed = wrappedFeed
     this.privatePosts = new PrivatePostsFeedAPI({agent, author})
     this.mergeMethod = mergeMethod
+    // Default to 'discover' filter for non-followers feeds to prevent
+    // unfiltered private posts from appearing on unknown feeds
+    this.filter =
+      filter ?? (mergeMethod !== 'followers' ? 'discover' : undefined)
     this.author = author
 
     this.postSortIndex = postDate
@@ -97,6 +109,7 @@ export class PrivatePostsWrapper implements FeedAPI {
               audience:
                 this.mergeMethod === 'trusted' ? 'trusted' : 'following',
               author: this.author,
+              filter: this.filter,
 
               // Fetching private posts and then any quotes / replies
               // is slow. So fetch just enough to fill the page on
