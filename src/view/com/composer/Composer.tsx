@@ -89,7 +89,7 @@ import {
   useLanguagePrefs,
   useLanguagePrefsApi,
 } from '#/state/preferences/languages'
-import {useFeaturesQuery} from '#/state/queries/features'
+import {useCanPostPrivate} from '#/state/queries/features'
 import {
   ProfileViewDetailedWithPrivate,
   useProfileQuery,
@@ -191,10 +191,7 @@ export const ComposePost = ({
   const {closeAllDialogs} = useDialogStateControlContext()
   const {closeAllModals} = useModalControls()
   const privatePostsDialogControl = useDialogControl()
-  const {data: features = [], isPending: isFeaturesPending} = useFeaturesQuery()
-  const canPostPrivate = features.some(
-    f => f.key === 'private-posts' && f.value === 'true',
-  )
+  const {canPostPrivate, isFeaturesPending} = useCanPostPrivate()
   const {data: currentProfile} = useProfileQuery({did: currentDid})
   const {data: trustedCount} = useTrustedUserCount(currentAccount?.did)
   const hasTrusted = !!trustedCount && trustedCount > 0
@@ -2047,10 +2044,7 @@ function AudienceBar({
   const t = useTheme()
   const privateQuoteDialogControl = useDialogControl()
   const privateReplyDialogControl = useDialogControl()
-  const {data: features = []} = useFeaturesQuery()
-  const canPostPrivate = features.some(
-    f => f.key === 'private-posts' && f.value === 'true',
-  )
+  const {canPostPrivate} = useCanPostPrivate()
 
   const hasPrivateQuote =
     post.embed.quote?.uri && post.embed.quote?.uri.includes('/private-post')
