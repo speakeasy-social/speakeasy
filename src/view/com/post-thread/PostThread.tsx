@@ -7,6 +7,7 @@ import {AppBskyFeedDefs, AppBskyFeedThreadgate} from '@atproto/api'
 import {msg, Trans} from '@lingui/macro'
 import {useLingui} from '@lingui/react'
 
+import {shouldShowReply} from '#/lib/api/feed/reply-filter'
 import {HITSLOP_10} from '#/lib/constants'
 import {useInitialNumToRender} from '#/lib/hooks/useInitialNumToRender'
 import {useMinimalShellFabTransform} from '#/lib/hooks/useMinimalShellTransform'
@@ -31,6 +32,7 @@ import {
 } from '#/state/queries/post-thread'
 import {useSetThreadViewPreferencesMutation} from '#/state/queries/preferences'
 import {usePreferencesQuery} from '#/state/queries/preferences'
+import {useTrustedQuery} from '#/state/queries/trusted'
 import {useSession} from '#/state/session'
 import {useComposerControls} from '#/state/shell'
 import {useMergedThreadgateHiddenReplies} from '#/state/threadgate-hidden-replies'
@@ -97,6 +99,11 @@ export function PostThread({uri}: {uri: string | undefined}) {
   const {isMobile} = useWebMediaQueries()
   const initialNumToRender = useInitialNumToRender()
   const {height: windowHeight} = useWindowDimensions()
+  const {data: trustedUsers} = useTrustedQuery(currentAccount?.did)
+  const trustedDids = React.useMemo(
+    () => new Set(trustedUsers?.map(u => u.recipientDid) ?? []),
+    [trustedUsers],
+  )
   const [hiddenRepliesState, setHiddenRepliesState] = React.useState(
     HiddenRepliesState.Hide,
   )
@@ -238,6 +245,7 @@ export function PostThread({uri}: {uri: string | undefined}) {
       threadModerationCache,
       hiddenRepliesState !== HiddenRepliesState.Hide,
       threadgateHiddenReplies,
+      trustedDids,
     )
   }, [
     thread,
@@ -250,6 +258,7 @@ export function PostThread({uri}: {uri: string | undefined}) {
     hiddenRepliesState,
     justPostedUris,
     threadgateHiddenReplies,
+    trustedDids,
     fetchedAtCache,
     fetchedAt,
     randomCache,
@@ -741,6 +750,7 @@ function createThreadSkeleton(
   modCache: ThreadModerationCache,
   showHiddenReplies: boolean,
   threadgateRecordHiddenReplies: Set<string>,
+  trustedDids: Set<string>,
 ): ThreadSkeletonParts | null {
   if (!node) return null
 
@@ -755,6 +765,7 @@ function createThreadSkeleton(
         modCache,
         showHiddenReplies,
         threadgateRecordHiddenReplies,
+        trustedDids,
       ),
     ),
   }
@@ -792,6 +803,7 @@ function* flattenThreadReplies(
   modCache: ThreadModerationCache,
   showHiddenReplies: boolean,
   threadgateRecordHiddenReplies: Set<string>,
+  trustedDids: Set<string>,
 ): Generator<YieldedItem, HiddenReplyType> {
   if (node.type === 'post') {
     // dont show pwi-opted-out posts to logged out users
@@ -820,6 +832,21 @@ function* flattenThreadReplies(
           return HiddenReplyType.Hidden
         }
       }
+
+      // Filter replies from non-followed/non-trusted users with < 2 likes
+      if (
+        currentDid &&
+        !showHiddenReplies &&
+        !shouldShowReply({
+          likeCount: node.post.likeCount ?? 0,
+          authorDid: node.post.author.did,
+          authorIsFollowed: Boolean(node.post.author.viewer?.following),
+          userDid: currentDid,
+          trustedDids,
+        })
+      ) {
+        return HiddenReplyType.Hidden
+      }
     }
 
     if (!node.ctx.isHighlightedPost) {
@@ -836,6 +863,7 @@ function* flattenThreadReplies(
           modCache,
           showHiddenReplies,
           threadgateRecordHiddenReplies,
+          trustedDids,
         )
         if (hiddenReply > hiddenReplies) {
           hiddenReplies = hiddenReply

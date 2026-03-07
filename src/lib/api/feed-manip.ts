@@ -8,6 +8,7 @@ import {
   AppBskyFeedPost,
 } from '@atproto/api'
 
+import {shouldShowReply} from '#/lib/api/feed/reply-filter'
 import {isAnyPostView} from '#/lib/api/speakeasy'
 import {isPostInLanguage} from '../../locale/helpers'
 import {FALLBACK_MARKER_POST} from './feed/home'
@@ -389,6 +390,43 @@ export class FeedTuner {
         ) {
           slices.splice(i, 1)
           i--
+        }
+      }
+      return slices
+    }
+  }
+
+  static safeRepliesOnly({
+    userDid,
+    trustedDids,
+  }: {
+    userDid: string
+    trustedDids: Set<string>
+  }) {
+    return (
+      tuner: FeedTuner,
+      slices: FeedViewPostsSlice[],
+      _dryRun: boolean,
+    ): FeedViewPostsSlice[] => {
+      for (let i = 0; i < slices.length; i++) {
+        const slice = slices[i]
+        if (slice.isReply && !slice.isRepost) {
+          const authors = slice.getAuthors()
+          if (areSameAuthor(authors)) {
+            continue
+          }
+          if (
+            !shouldShowReply({
+              likeCount: slice.likeCount,
+              authorDid: authors.author.did,
+              authorIsFollowed: Boolean(authors.author.viewer?.following),
+              userDid,
+              trustedDids,
+            })
+          ) {
+            slices.splice(i, 1)
+            i--
+          }
         }
       }
       return slices
