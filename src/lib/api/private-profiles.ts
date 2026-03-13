@@ -259,13 +259,19 @@ export async function decryptProfileIfAccessible(
     return null
   }
 
-  const dek = await decryptDEK(
-    encryptedResponse.encryptedDek,
-    privateKey.privateKey,
-  )
-  const content = await decryptContent(encryptedResponse.encryptedContent, dek)
-  if (!content) return null
-  return {data: JSON.parse(content) as PrivateProfileData, dek}
+  try {
+    const dek = await decryptDEK(
+      encryptedResponse.encryptedDek,
+      privateKey.privateKey,
+    )
+    const content = await decryptContent(
+      encryptedResponse.encryptedContent,
+      dek,
+    )
+    return {data: JSON.parse(content) as PrivateProfileData, dek}
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -488,8 +494,8 @@ export function mergePrivateProfileData<T extends MergeableProfile>(
 
   return {
     ...atprotoProfile,
-    displayName: privateData.displayName,
-    description: privateData.description,
+    displayName: privateData.displayName ?? atprotoProfile.displayName,
+    description: privateData.description ?? atprotoProfile.description,
     avatar: privateData.avatarUri ?? atprotoProfile.avatar,
     banner: privateData.bannerUri ?? atprotoProfile.banner,
     pronouns: nativePronouns,
@@ -518,6 +524,7 @@ export function anonymizeAtProtoProfile(
  * In-flight promise so concurrent callers share one session creation.
  * Cleared in finally so the next caller gets a fresh creation; do not leave set across retries.
  */
+let sessionCreationDid: string | undefined
 let sessionCreationPromise: Promise<{
   sessionId: string
   sessionKey: string
@@ -548,7 +555,8 @@ export async function getOrCreateProfileSession(
     }
   }
 
-  if (!sessionCreationPromise) {
+  if (!(agent.did === sessionCreationDid && sessionCreationPromise)) {
+    sessionCreationDid = agent.did
     sessionCreationPromise = (async () => {
       try {
         const {publicKey, privateKey, userKeyPairId} =
@@ -564,6 +572,7 @@ export async function getOrCreateProfileSession(
         return {sessionId, sessionKey}
       } finally {
         sessionCreationPromise = null
+        sessionCreationDid = undefined
       }
     })()
   }

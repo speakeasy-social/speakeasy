@@ -71,4 +71,45 @@ describe('mergePrivateProfileData', () => {
     expect(result.displayName).toBe('Alice')
     expect(result.avatar).toBe('https://cdn.test/media/abc')
   })
+
+  it('undefined displayName/description in private data falls back to ATProto values', () => {
+    const sentinelProfile = {
+      ...baseProfile,
+      displayName: PRIVATE_PROFILE_DISPLAY_NAME,
+      description: 'ATProto description',
+    }
+
+    const malformedPrivateData: PrivateProfileData = {
+      displayName: undefined as unknown as string,
+      description: undefined as unknown as string,
+      avatarUri: 'https://cdn.test/media/abc',
+    }
+
+    const result = mergePrivateProfileData(
+      sentinelProfile,
+      malformedPrivateData,
+    )
+
+    expect(result.displayName).toBe(PRIVATE_PROFILE_DISPLAY_NAME)
+    expect(result.description).toBe('ATProto description')
+    expect(result.avatar).toBe('https://cdn.test/media/abc')
+  })
+
+  it('empty string displayName is preserved (not treated as undefined)', () => {
+    const sentinelProfile = {
+      ...baseProfile,
+      displayName: PRIVATE_PROFILE_DISPLAY_NAME,
+      description: 'ATProto description',
+    }
+
+    const emptyNameData: PrivateProfileData = {
+      displayName: '',
+      description: '',
+    }
+
+    const result = mergePrivateProfileData(sentinelProfile, emptyNameData)
+
+    expect(result.displayName).toBe('')
+    expect(result.description).toBe('')
+  })
 })

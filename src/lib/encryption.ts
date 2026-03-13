@@ -66,13 +66,20 @@ function secureGetRandomValues<T extends ArrayBufferView>(array: T): T {
  * @param {Uint8Array} buf - The input byte array.
  * @returns {string} The SafeText (URL-safe Base64) representation of the input.
  */
-const safeBtoa = (buf: Uint8Array): string =>
-  btoa(String.fromCharCode(...buf))
-    // Replace / & + with _ & -
-    .replace(/\//g, '_')
-    .replace(/\+/g, '-')
-    // Remove trailing '=' padding
-    .replace(/[=]+$/, '')
+const safeBtoa = (buf: Uint8Array): string => {
+  let binary = ''
+  for (let i = 0; i < buf.length; i++) {
+    binary += String.fromCharCode(buf[i])
+  }
+  return (
+    btoa(binary)
+      // Replace / & + with _ & -
+      .replace(/\//g, '_')
+      .replace(/\+/g, '-')
+      // Remove trailing '=' padding
+      .replace(/[=]+$/, '')
+  )
+}
 
 /**
  * Converts SafeText (URL-safe Base64) to a Uint8Array.

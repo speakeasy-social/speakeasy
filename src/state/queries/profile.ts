@@ -156,6 +156,12 @@ export async function profileQueryFn(
 
   // Check cache before calling Speakeasy API (avoid re-fetching when we already know the answer)
   if (isDidChecked(did)) {
+    if (!shouldCheckPrivateProfile(result)) {
+      // Profile transitioned to public — evict stale private data
+      evictDid(did)
+      result._privateProfile = {isPrivate: false}
+      return result
+    }
     const cached = getCachedPrivateProfile(did)
     return withPrivateProfileMeta(
       cached ? mergePrivateProfileData(result, cached) : result,
@@ -215,8 +221,8 @@ export async function profileQueryFn(
     } else {
       if (result.displayName !== PRIVATE_PROFILE_DISPLAY_NAME) {
         evictDid(did)
-        markDidsChecked([did], currentAccountDid)
       }
+      markDidsChecked([did], currentAccountDid)
       result = withPrivateProfileMeta(result, null)
     }
   } catch (err) {
@@ -335,6 +341,9 @@ export function useProfilesQuery({handles}: {handles: string[]}) {
       // Merge private data into profiles — use fresh data if available,
       // otherwise fall back to existing cache
       const mergedProfiles = res.data.profiles.map(profile => {
+        if (!shouldCheckPrivateProfile(profile)) {
+          return withPrivateProfileMeta(profile, null)
+        }
         const privateData =
           freshDataMap.get(profile.did) ?? getCachedPrivateProfile(profile.did)
         const dek = getCachedDek(profile.did)
