@@ -124,6 +124,10 @@ function mergeShadow(
   })
 }
 
+export function clearAllShadows() {
+  shadowsByUri.clear()
+}
+
 export function updatePostShadow(
   queryClient: QueryClient,
   uri: string,
