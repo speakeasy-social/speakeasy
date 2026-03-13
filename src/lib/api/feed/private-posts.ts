@@ -40,6 +40,11 @@ export type EncryptedPost = {
     parent: {uri: string}
   }
   langs: string[]
+  likeCount: number
+  replyCount: number
+  viewer?: {
+    like: boolean
+  }
 }
 
 /**
@@ -407,7 +412,7 @@ export async function fetchAndFilterEncryptedPosts(
     true,
   )
 
-  const [data, followerDids] = (await Promise.all(promises)) as [
+  const [data, _followerDids] = (await Promise.all(promises)) as [
     FetchEncryptedPostsResponse,
     string[],
     SpeakeasyPrivateKey,
@@ -417,16 +422,17 @@ export async function fetchAndFilterEncryptedPosts(
 
   let filteredPosts = encryptedPosts
 
-  if (filterFollowers) {
-    // It's too slow to filter on the server as we have to wait
-    // for the server to compile the followers list.
-    // So we compile it when the app first loads, and then
-    // filter the private posts client side.
-    // Eventually we'll fix this with a proper AppView.
-    filteredPosts = encryptedPosts.filter(post => {
-      return followerDids.includes(post.authorDid)
-    })
-  }
+  // TODO: temporarily disabled for testing likeCount reply filter
+  // if (filterFollowers) {
+  //   // It's too slow to filter on the server as we have to wait
+  //   // for the server to compile the followers list.
+  //   // So we compile it when the app first loads, and then
+  //   // filter the private posts client side.
+  //   // Eventually we'll fix this with a proper AppView.
+  //   filteredPosts = encryptedPosts.filter(post => {
+  //     return followerDids.includes(post.authorDid)
+  //   })
+  // }
 
   return {
     encryptedPosts: filteredPosts,
@@ -510,6 +516,8 @@ export type DecryptedPost = {
     | SocialSpkeasyEmbedImage
     | SocialSpkeasyEmbedRecord
   )
+  likeCount: number
+  replyCount: number
   viewer: {
     like: boolean
   }
@@ -792,9 +800,9 @@ export function formatPostView(
             quotedPost,
           )
         : undefined,
-    replyCount: 0,
+    replyCount: post.replyCount,
     repostCount: 0,
-    likeCount: 0,
+    likeCount: post.likeCount,
     indexedAt: post.createdAt,
     labels: [],
     viewer: {
