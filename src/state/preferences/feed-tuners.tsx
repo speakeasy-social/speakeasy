@@ -3,6 +3,7 @@ import {useMemo} from 'react'
 import {FeedTuner} from '#/lib/api/feed-manip'
 import {FeedDescriptor} from '../queries/post-feed'
 import {usePreferencesQuery} from '../queries/preferences'
+import {useTrustedQuery} from '../queries/trusted'
 import {useSession} from '../session'
 import {useLanguagePrefs} from './languages'
 
@@ -10,8 +11,12 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
   const langPrefs = useLanguagePrefs()
   const {data: preferences} = usePreferencesQuery()
   const {currentAccount} = useSession()
+  const {data: trustedUsers} = useTrustedQuery(currentAccount?.did)
 
   return useMemo(() => {
+    const userDid = currentAccount?.did || ''
+    const trustedDids = new Set(trustedUsers?.map(t => t.recipientDid) ?? [])
+
     if (feedDesc.startsWith('author')) {
       if (feedDesc.endsWith('|posts_with_replies')) {
         // TODO: Do this on the server instead.
@@ -19,7 +24,10 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
       }
     }
     if (feedDesc.startsWith('feedgen')) {
-      return [FeedTuner.preferredLangOnly(langPrefs.contentLanguages)]
+      return [
+        FeedTuner.safeRepliesOnly({userDid, trustedDids}),
+        FeedTuner.preferredLangOnly(langPrefs.contentLanguages),
+      ]
     }
     if (
       feedDesc === 'following' ||
@@ -36,7 +44,7 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
       } else {
         feedTuners.push(
           FeedTuner.followedRepliesOnly({
-            userDid: currentAccount?.did || '',
+            userDid,
           }),
         )
       }
@@ -52,5 +60,5 @@ export function useFeedTuners(feedDesc: FeedDescriptor) {
       return feedTuners
     }
     return []
-  }, [feedDesc, currentAccount, preferences, langPrefs])
+  }, [feedDesc, currentAccount, preferences, langPrefs, trustedUsers])
 }
