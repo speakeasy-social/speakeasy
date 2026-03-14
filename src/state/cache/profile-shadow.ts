@@ -45,6 +45,10 @@ export function useProfileShadow<
   }, [profile, shadow])
 }
 
+export function clearAllShadows() {
+  shadows.clear()
+}
+
 export function updateProfileShadow(
   _queryClient: unknown,
   did: string,

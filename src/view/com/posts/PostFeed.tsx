@@ -243,7 +243,6 @@ let PostFeed = ({
   const areVideoFeedsEnabled = isNative
   // Track which end-of-feed markers have been clicked
   const [pauseSectionCount, setPauseSectionCount] = React.useState(1)
-  const [pauseSectionsRendered, setPauseSectionsRendered] = React.useState(0)
   const [postsPerInterrupt, setPostsPerInterrupt] = useState(
     DEFAULT_POSTS_PER_INTERRUPT,
   )
@@ -375,7 +374,10 @@ let PostFeed = ({
     setPauseSectionCount(pauseSectionCount + 1)
   }, [pauseSectionCount])
 
-  const feedItems: FeedRow[] = React.useMemo(() => {
+  const {feedItems, pauseSectionsRendered} = React.useMemo<{
+    feedItems: FeedRow[]
+    pauseSectionsRendered: number
+  }>(() => {
     const effectivePostsPerInterrupt =
       __DEV__ && DEBUG_FEED_PAUSE ? 7 : postsPerInterrupt
     let pauseSections = 0
@@ -544,8 +546,10 @@ let PostFeed = ({
                   )
 
                   if (pauseSections >= pauseSectionCount) {
-                    setPauseSectionsRendered(pauseSections)
-                    return arr
+                    return {
+                      feedItems: arr,
+                      pauseSectionsRendered: pauseSections,
+                    }
                   }
                 }
 
@@ -625,9 +629,7 @@ let PostFeed = ({
       }
     }
 
-    setPauseSectionsRendered(pauseSections)
-
-    return arr
+    return {feedItems: arr, pauseSectionsRendered: pauseSections}
   }, [
     isFetched,
     isError,

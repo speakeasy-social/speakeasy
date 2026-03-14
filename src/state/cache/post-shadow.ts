@@ -13,29 +13,20 @@ import {findAllPostsInQueryData as findAllPostsInFeedQueryData} from '../queries
 import {findAllPostsInQueryData as findAllPostsInQuoteQueryData} from '../queries/post-quotes'
 import {findAllPostsInQueryData as findAllPostsInThreadQueryData} from '../queries/post-thread'
 import {findAllPostsInQueryData as findAllPostsInSearchQueryData} from '../queries/search-posts'
+import {
+  clearAllShadows,
+  getShadow,
+  POST_TOMBSTONE,
+  type PostShadow,
+  shadows,
+  shadowsByUri,
+} from './post-shadow-state'
 import {castAsShadow, Shadow} from './types'
 export type {Shadow} from './types'
-
-export interface PostShadow {
-  likeUri: string | undefined
-  repostUri: string | undefined
-  isDeleted: boolean
-  embed: AppBskyEmbedRecord.View | AppBskyEmbedRecordWithMedia.View | undefined
-  pinned: boolean
-}
-
-export const POST_TOMBSTONE = Symbol('PostTombstone')
+export {clearAllShadows, POST_TOMBSTONE}
+export type {PostShadow}
 
 const emitter = new EventEmitter()
-const shadows: WeakMap<
-  AppBskyFeedDefs.PostView,
-  Partial<PostShadow>
-> = new WeakMap()
-const shadowsByUri = new Map<string, Partial<PostShadow>>()
-
-function getShadow(post: AppBskyFeedDefs.PostView) {
-  return shadows.get(post) ?? shadowsByUri.get(post.uri)
-}
 
 export function usePostShadow(
   post: AppBskyFeedDefs.PostView,

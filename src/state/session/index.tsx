@@ -5,7 +5,9 @@ import {clearCachedPrivateKey} from '#/lib/api/user-keys'
 import {clearEncryptedImageCache} from '#/lib/media/encrypted-image-cache'
 import {logEvent} from '#/lib/statsig/statsig'
 import {isWeb} from '#/platform/detection'
+import {clearAllShadows as clearPostShadows} from '#/state/cache/post-shadow-state'
 import {clearAll as clearPrivateProfileCache} from '#/state/cache/private-profile-cache'
+import {clearAllShadows as clearProfileShadows} from '#/state/cache/profile-shadow'
 import * as persisted from '#/state/persisted'
 import {useCloseAllActiveElements} from '#/state/util'
 import {useGlobalDialogsControlContext} from '#/components/dialogs/Context'
@@ -104,6 +106,8 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
         return
       }
       clearPrivateProfileCache()
+      clearPostShadows()
+      clearProfileShadows()
       clearEncryptedImageCache()
       clearCachedPrivateKey()
       dispatch({
@@ -124,6 +128,8 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       addSessionDebugLog({type: 'method:start', method: 'logout'})
       cancelPendingTask()
       clearPrivateProfileCache()
+      clearPostShadows()
+      clearProfileShadows()
       clearEncryptedImageCache()
       clearCachedPrivateKey()
       dispatch({
@@ -142,6 +148,8 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
       addSessionDebugLog({type: 'method:start', method: 'logout'})
       cancelPendingTask()
       clearPrivateProfileCache()
+      clearPostShadows()
+      clearProfileShadows()
       clearEncryptedImageCache()
       clearCachedPrivateKey()
       dispatch({
@@ -170,6 +178,8 @@ export function Provider({children}: React.PropsWithChildren<{}>) {
         return
       }
       clearPrivateProfileCache()
+      clearPostShadows()
+      clearProfileShadows()
       clearEncryptedImageCache()
       clearCachedPrivateKey()
       dispatch({

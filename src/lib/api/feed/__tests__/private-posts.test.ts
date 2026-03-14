@@ -30,6 +30,9 @@ function makeEncryptedPost(
     createdAt: '2026-01-15T12:00:00Z',
     sessionId: 'session-1',
     langs: ['en'],
+    likeCount: 0,
+    replyCount: 0,
+    viewer: {like: false},
     ...overrides,
   }
 }
