@@ -12,7 +12,6 @@ import {Button, ButtonText} from '#/components/Button'
 import * as Layout from '#/components/Layout'
 import {ListMaybePlaceholder} from '#/components/Lists'
 import {Text} from '#/components/Typography'
-import {FEED_PAUSE_CTAS} from '#/constants/pause-feed-cta'
 import {TestimonialItem} from '../com/supporters/TestimonialItem'
 import {Testimonial} from '../com/supporters/types'
 import {List} from '../com/util/List'
@@ -25,8 +24,7 @@ export function SupportersScreen(_props: Props) {
   const {currentAccount} = useSession()
   const {onPress: onDonatePress} = useLinkProps({to: '/donate'})
   const openLink = useOpenLink()
-  const discordUrl =
-    FEED_PAUSE_CTAS.find(cta => cta.id === 'discord')?.url ?? ''
+  const volunteerUrl = 'https://about.spkeasy.social/volunteer'
 
   const {
     data: testimonials,
@@ -72,13 +70,13 @@ export function SupportersScreen(_props: Props) {
             variant="outline"
             color="primary"
             label="Volunteer"
-            onPress={() => openLink(discordUrl)}>
+            onPress={() => openLink(volunteerUrl)}>
             <ButtonText>Volunteer</ButtonText>
           </Button>
         </View>
       </View>
     ),
-    [t.atoms.border_contrast_low, onDonatePress, openLink, discordUrl],
+    [t.atoms.border_contrast_low, onDonatePress, openLink, volunteerUrl],
   )
 
   const onRefresh = React.useCallback(async () => {
