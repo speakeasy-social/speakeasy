@@ -24,6 +24,7 @@ export interface TestimonialAuthor {
   handle: string
   displayName?: string
   avatar?: string
+  dek?: string
 }
 
 export interface Testimonial {

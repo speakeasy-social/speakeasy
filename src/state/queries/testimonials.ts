@@ -1,9 +1,25 @@
+import {useMemo} from 'react'
 import {AppBskyActorDefs} from '@atproto/api'
 import {useQuery, useQueryClient} from '@tanstack/react-query'
 import chunk from 'lodash.chunk'
 
-import {useSpeakeasyApi} from '#/lib/api/speakeasy'
-import {useAgent} from '#/state/session'
+import {getBaseCdnUrl} from '#/lib/api/feed/utils'
+import {
+  fetchPrivateProfiles,
+  mergePrivateProfileData,
+  type PrivateProfileData,
+  shouldCheckPrivateProfile,
+} from '#/lib/api/private-profiles'
+import {callSpeakeasyApiWithAgent, useSpeakeasyApi} from '#/lib/api/speakeasy'
+import {
+  getCachedDek,
+  getCachedPrivateProfile,
+  isDidChecked,
+  markDidsChecked,
+  upsertCachedPrivateProfiles,
+  usePrivateProfileCacheVersion,
+} from '#/state/cache/private-profile-cache'
+import {useAgent, useSession} from '#/state/session'
 import {
   RelationshipPriority,
   Testimonial,
@@ -146,16 +162,23 @@ export function useTestimonialsQuery() {
 }
 
 /**
- * Hook to fetch profiles for testimonial authors
+ * Hook to fetch profiles for testimonial authors.
+ * Detects sentinel (private) profiles, fetches/decrypts private data,
+ * and merges via mergePrivateProfileData (single merge point).
+ * Follows useProfilesQuery pattern (profile.ts:297-362).
  */
 export function useTestimonialProfiles(testimonials: ApiTestimonial[]) {
   const agent = useAgent()
+  const {currentAccount} = useSession()
 
   return useQuery({
     enabled: testimonials.length > 0,
     staleTime: STALE.MINUTES.FIVE,
     queryKey: [...RQKEY_PROFILES(), testimonials.map(t => t.did).join(',')],
     queryFn: async () => {
+      const call = (options: Parameters<typeof callSpeakeasyApiWithAgent>[1]) =>
+        callSpeakeasyApiWithAgent(agent, options)
+
       const dids = testimonials.map(t => t.did)
       const batches = chunk(dids, 25)
       const profilePromises = batches.map(batch =>
@@ -164,10 +187,49 @@ export function useTestimonialProfiles(testimonials: ApiTestimonial[]) {
       const profileResults = await Promise.all(profilePromises)
       const profiles = profileResults.flatMap(result => result.data.profiles)
 
-      // Create a map keyed by DID for easy lookup
+      // Build lookup for sentinel check
+      const profileByDid = new Map(profiles.map(p => [p.did, p]))
+
+      // Only fetch unchecked DIDs that have the sentinel displayName
+      const uncheckedDids = dids.filter(d => {
+        if (isDidChecked(d)) return false
+        return shouldCheckPrivateProfile(profileByDid.get(d))
+      })
+
+      let freshDataMap = new Map<string, PrivateProfileData>()
+
+      if (uncheckedDids.length > 0) {
+        try {
+          const {profiles: fresh, deks} = await fetchPrivateProfiles(
+            uncheckedDids,
+            currentAccount?.did ?? '',
+            call,
+            getBaseCdnUrl(agent),
+          )
+          freshDataMap = fresh
+          if (freshDataMap.size > 0) {
+            upsertCachedPrivateProfiles(freshDataMap, currentAccount?.did, deks)
+          }
+        } catch {
+          // Silent fallback — show ATProto data only
+        }
+        // Always mark as checked to prevent retry loops
+        markDidsChecked(uncheckedDids, currentAccount?.did)
+      }
+
+      // Merge private data into profiles using the single merge point
       const profileMap = new Map<string, AppBskyActorDefs.ProfileViewDetailed>()
       for (const profile of profiles) {
-        profileMap.set(profile.did, profile)
+        if (!shouldCheckPrivateProfile(profile)) {
+          profileMap.set(profile.did, profile)
+          continue
+        }
+        const privateData =
+          freshDataMap.get(profile.did) ?? getCachedPrivateProfile(profile.did)
+        profileMap.set(
+          profile.did,
+          mergePrivateProfileData(profile, privateData),
+        )
       }
       return profileMap
     },
@@ -239,6 +301,8 @@ export function useTrustsMeQueries(
 export function useTestimonialsWithProfiles(
   currentUserDid: string | undefined,
 ) {
+  const privateProfileCacheVersion = usePrivateProfileCacheVersion()
+
   // Fetch raw testimonials
   const {
     data: apiTestimonials,
@@ -272,11 +336,20 @@ export function useTestimonialsWithProfiles(
     currentUserDid,
   )
 
-  // Transform API data to UI Testimonial type
-  const testimonials: Testimonial[] = (apiTestimonials ?? []).map(
-    apiTestimonial => {
-      const profile = profileMap?.get(apiTestimonial.did)
+  // Transform API data to UI Testimonial type, re-merging from cache when
+  // privateProfileCacheVersion changes (e.g. another screen fetched private data).
+  // No sentinel re-check needed here — cache is only populated for verified DIDs.
+  // Follows useProfileQuery useMemo pattern (profile.ts:280-292).
+  const testimonials = useMemo(() => {
+    const items: Testimonial[] = (apiTestimonials ?? []).map(apiTestimonial => {
+      let profile = profileMap?.get(apiTestimonial.did)
       const trustsMe = trustsMeMap?.get(apiTestimonial.did)
+
+      // Re-merge from cache when cache version changes
+      const cached = getCachedPrivateProfile(apiTestimonial.did)
+      if (profile && cached) {
+        profile = mergePrivateProfileData(profile, cached)
+      }
 
       return {
         id: apiTestimonial.id,
@@ -285,6 +358,7 @@ export function useTestimonialsWithProfiles(
           handle: profile?.handle ?? apiTestimonial.did,
           displayName: profile?.displayName,
           avatar: profile?.avatar,
+          dek: getCachedDek(apiTestimonial.did),
         },
         message: apiTestimonial.content.text,
         contributions: apiTestimonial.contributions.map(
@@ -301,14 +375,20 @@ export function useTestimonialsWithProfiles(
           trustsMe,
         ),
       }
-    },
-  )
-
-  // Sort by relationship
-  const sortedTestimonials = sortTestimonialsByRelationship(testimonials)
+    })
+    return sortTestimonialsByRelationship(items)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- privateProfileCacheVersion forces re-merge when cache updates
+  }, [
+    apiTestimonials,
+    profileMap,
+    trustsMeMap,
+    currentUserDid,
+    iTrustDids,
+    privateProfileCacheVersion,
+  ])
 
   return {
-    data: sortedTestimonials,
+    data: testimonials,
     isLoading: isLoadingTestimonials,
     isLoadingProfiles:
       isLoadingProfiles || isLoadingITrust || isLoadingTrustsMe,

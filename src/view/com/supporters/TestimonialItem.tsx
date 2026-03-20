@@ -60,7 +60,12 @@ export const TestimonialItem = memo(function TestimonialItem({
               label={`${displayName}'s avatar`}
               accessibilityHint="Opens this profile"
               to={profileLink}>
-              <UserAvatar size={42} avatar={author.avatar} type="user" />
+              <UserAvatar
+                size={42}
+                avatar={author.avatar}
+                dek={author.dek}
+                type="user"
+              />
             </Link>
           </ProfileHoverCard>
         </View>
