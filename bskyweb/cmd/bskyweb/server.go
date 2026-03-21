@@ -245,7 +245,8 @@ func serve(cctx *cli.Context) error {
 	e.GET("/search", server.WebGeneric)
 	e.GET("/feeds", server.WebGeneric)
 	e.GET("/donate", server.WebGeneric)
-	e.GET("/supporters/add", server.WebGeneric)
+	e.GET("/supporters", server.WebSupporters)
+	e.GET("/supporters/add", server.WebSupporters)
 	e.GET("/notifications", server.WebGeneric)
 	e.GET("/notifications/settings", server.WebGeneric)
 	e.GET("/lists", server.WebGeneric)
@@ -425,6 +426,11 @@ func (srv *Server) LinkProxyMiddleware(url *url.URL) echo.MiddlewareFunc {
 func (srv *Server) WebGeneric(c echo.Context) error {
 	data := srv.NewTemplateContext()
 	return c.Render(http.StatusOK, "base.html", data)
+}
+
+func (srv *Server) WebSupporters(c echo.Context) error {
+	data := srv.NewTemplateContext()
+	return c.Render(http.StatusOK, "supporters.html", data)
 }
 
 func (srv *Server) WebHome(c echo.Context) error {

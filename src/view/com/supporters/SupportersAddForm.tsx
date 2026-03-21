@@ -22,8 +22,9 @@ import {useLoggedOutViewControls} from '#/state/shell/logged-out'
 import {useCloseAllActiveElements} from '#/state/util'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
+import {Divider} from '#/components/Divider'
 import * as Toggle from '#/components/forms/Toggle'
-// import {Globe_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
+import {Earth_Stroke2_Corner0_Rounded as Globe} from '#/components/icons/Globe'
 // import {Lock_Stroke2_Corner0_Rounded as Lock} from '#/components/icons/Lock'
 import {Loader} from '#/components/Loader'
 import {Text} from '#/components/Typography'
@@ -169,7 +170,11 @@ export function SupportersAddForm({
               id: nanoid(),
               richtext,
               labels: [],
-              embed: {quote: undefined, media: undefined, link: undefined},
+              embed: {
+                quote: undefined,
+                media: undefined,
+                link: {type: 'link', uri: 'https://spkeasy.social/supporters'},
+              },
               realTalk: undefined,
               shortenedGraphemeLength: richtext.graphemeLength,
               audience,
@@ -470,6 +475,55 @@ export function SupportersAddForm({
               )}
             />
           </View>
+
+          {shareAsPost && (
+            <View
+              style={[
+                a.w_full,
+                a.rounded_md,
+                a.overflow_hidden,
+                a.border,
+                t.atoms.border_contrast_low,
+              ]}>
+              <View style={[a.flex_1, a.pt_sm, {gap: 3}]}>
+                <View style={[{gap: 3}, a.pb_xs, a.px_md]}>
+                  <Text
+                    numberOfLines={3}
+                    style={[a.text_md, a.font_bold, a.leading_snug]}>
+                    <Trans>Supporters | Speakeasy</Trans>
+                  </Text>
+                  <Text numberOfLines={4} style={[a.text_sm, a.leading_snug]}>
+                    <Trans>
+                      These are the humans that are building a cooperatively
+                      owned social media designed to help people thrive.
+                    </Trans>
+                  </Text>
+                </View>
+                <View style={[a.px_md]}>
+                  <Divider />
+                  <View
+                    style={[
+                      a.flex_row,
+                      a.align_center,
+                      a.gap_2xs,
+                      a.pb_sm,
+                      {paddingTop: 6},
+                    ]}>
+                    <Globe size="xs" style={[t.atoms.text_contrast_low]} />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        a.text_xs,
+                        a.leading_snug,
+                        t.atoms.text_contrast_medium,
+                      ]}>
+                      spkeasy.social
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
 
           <CharProgress
             count={graphemeLength}
