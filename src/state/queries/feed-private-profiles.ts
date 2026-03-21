@@ -18,6 +18,9 @@ export function extractDidsFromFeed(pages: FeedPageUnselected[]): Set<string> {
 
   for (const page of pages) {
     for (const item of page.feed) {
+      // Skip malformed feed items (e.g. reposts where the original post wasn't found)
+      if (!item.post) continue
+
       // Post author
       if (shouldCheckPrivateProfile(item.post.author)) {
         dids.add(item.post.author.did)
@@ -61,6 +64,9 @@ export function mergeFeedItemWithPrivateProfiles(
     did: string,
   ) => AppBskyActorDefs.ProfileViewBasic | undefined,
 ): AppBskyFeedDefs.FeedViewPost {
+  // Skip malformed feed items (e.g. reposts where the original post wasn't found)
+  if (!item.post) return item
+
   let modified = false
   let newPost = item.post
   let newReply = item.reply

@@ -342,13 +342,15 @@ export function usePostFeedQuery(
               fetchedAt: page.fetchedAt,
               slices: tuner
                 .tune(
-                  page.feed.map(item =>
-                    mergeFeedItemWithPrivateProfiles(
-                      item,
-                      getCachedPrivateProfile,
-                      getPublicProfile,
+                  page.feed
+                    .filter(item => item.post)
+                    .map(item =>
+                      mergeFeedItemWithPrivateProfiles(
+                        item,
+                        getCachedPrivateProfile,
+                        getPublicProfile,
+                      ),
                     ),
-                  ),
                 )
                 .map(slice => {
                   const moderations = slice.items.map(item =>
