@@ -10,6 +10,7 @@ export type CommonNavigatorParams = {
   Lists: undefined
   Donate: undefined
   DonateThanks: undefined
+  Supporters: undefined
   Moderation: undefined
   ModerationModlists: undefined
   ModerationMutedAccounts: undefined

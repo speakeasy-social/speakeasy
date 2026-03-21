@@ -21,6 +21,7 @@ import {Menus} from './Menus'
 import {Settings} from './Settings'
 import {Shadows} from './Shadows'
 import {Spacing} from './Spacing'
+import {Tags} from './Tags'
 import {Theming} from './Theming'
 import {Typography} from './Typography'
 
@@ -117,6 +118,7 @@ function StorybookInner() {
             <Forms />
             <Buttons />
             <Typography />
+            <Tags />
             <Spacing />
             <Shadows />
             <Buttons />
