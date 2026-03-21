@@ -628,6 +628,7 @@ export function* findAllPostsInQueryData(
     }
     for (const page of queryData?.pages) {
       for (const item of page.feed) {
+        if (!item.post) continue
         if (didOrHandleUriMatches(atUri, item.post)) {
           yield item.post
         }
@@ -681,6 +682,7 @@ export function* findAllProfilesInQueryData(
     }
     for (const page of queryData?.pages) {
       for (const item of page.feed) {
+        if (!item.post) continue
         if (item.post.author.did === did) {
           yield item.post.author
         }

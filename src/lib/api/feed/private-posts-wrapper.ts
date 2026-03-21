@@ -252,6 +252,7 @@ export class PrivatePostsWrapper implements FeedAPI {
  * @returns {number} The timestamp in milliseconds
  */
 function postDate(post: AppBskyFeedDefs.FeedViewPost) {
+  if (!post.post) return 0
   return new Date(
     (post.post.indexedAt || post.post.createdAt) as string,
   ).getTime()
