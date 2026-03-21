@@ -246,6 +246,7 @@ func serve(cctx *cli.Context) error {
 	e.GET("/feeds", server.WebGeneric)
 	e.GET("/donate", server.WebGeneric)
 	e.GET("/donate/thanks", server.WebGeneric)
+	e.GET("/supporters", server.WebGeneric)
 	e.GET("/notifications", server.WebGeneric)
 	e.GET("/notifications/settings", server.WebGeneric)
 	e.GET("/lists", server.WebGeneric)
