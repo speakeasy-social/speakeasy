@@ -22,8 +22,10 @@ import {
   isReasonPrivateRepost,
   ReasonFeedSource,
 } from '#/lib/api/feed/types'
+import {isNotFoundPostView} from '#/lib/api/speakeasy'
 import {MAX_POST_LINES} from '#/lib/constants'
 import {usePalette} from '#/lib/hooks/usePalette'
+import {InfoCircleIcon} from '#/lib/icons'
 import {makeProfileLink} from '#/lib/routes/links'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {sanitizeHandle} from '#/lib/strings/handles'
@@ -255,6 +257,54 @@ let FeedItemInner = ({
 
   const isPrivatePost =
     post.$type === 'social.spkeasy.feed.defs#privatePostView'
+
+  if (isNotFoundPostView(post)) {
+    return (
+      <View
+        style={[
+          styles.outer,
+          {
+            borderColor: pal.colors.border,
+            paddingBottom: 8,
+            borderTopWidth: hideTopBorder ? 0 : StyleSheet.hairlineWidth,
+          },
+        ]}>
+        {(AppBskyFeedDefs.isReasonRepost(reason) || isPrivateRepost) && (
+          <View style={{flexDirection: 'row', gap: 10, paddingLeft: 8}}>
+            <View style={{width: 42}} />
+            <View style={{paddingTop: 12, flexShrink: 1}}>
+              <View style={styles.includeReason}>
+                <RepostIcon
+                  style={{color: pal.colors.textLight, marginRight: 3}}
+                  width={13}
+                  height={13}
+                />
+                <Text
+                  type="sm-bold"
+                  style={pal.textLight}
+                  lineHeight={1.2}
+                  numberOfLines={1}>
+                  <Trans>
+                    {repostText} by{' '}
+                    {sanitizeDisplayName(
+                      reason.by.displayName || sanitizeHandle(reason.by.handle),
+                    )}
+                  </Trans>
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+        <View
+          style={[styles.notFoundContainer, {borderColor: pal.colors.border}]}>
+          <InfoCircleIcon size={18} style={pal.text} />
+          <Text type="lg" style={pal.text}>
+            <Trans>Post not found</Trans>
+          </Text>
+        </View>
+      </View>
+    )
+  }
 
   return (
     <Link
@@ -704,5 +754,17 @@ const styles = StyleSheet.create({
   coverTextContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 8,
+  },
+  notFoundContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginHorizontal: 18,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 })

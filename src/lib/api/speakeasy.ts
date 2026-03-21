@@ -152,11 +152,19 @@ export async function getFeatures(agent: BskyAgent): Promise<Feature[]> {
 }
 
 export function isAnyPostView(v: any): v is AppBskyFeedDefs.PostView {
-  return AppBskyFeedDefs.isPostView(v) || isPrivatePostView(v)
+  return (
+    AppBskyFeedDefs.isPostView(v) ||
+    isPrivatePostView(v) ||
+    isNotFoundPostView(v)
+  )
 }
 
 export function isPrivatePostView(v: any): v is AppBskyFeedDefs.PostView {
   return v?.$type === 'social.spkeasy.feed.defs#privatePostView'
+}
+
+export function isNotFoundPostView(v: any): boolean {
+  return v?.$type === 'social.spkeasy.feed.defs#notFoundPostView'
 }
 
 /**
