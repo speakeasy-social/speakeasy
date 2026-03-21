@@ -695,45 +695,52 @@ async function formatPostsForFeed(
   const posts = decryptedPosts.filter(post => !!post)
 
   // Convert private posts to FeedViewPost format
-  const feed = posts.map((post: any) => {
-    if (post.$type === 'social.spkeasy.feed.repost') {
-      const postView: FeedViewPost = {
-        post: postMap.get(post.embed?.record?.uri)!,
-        reason: {
-          $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
-          by: authorProfileMap.get(post.authorDid)!,
-          indexedAt: post.createdAt,
-        },
+  const feed = posts
+    .map((post: any) => {
+      if (post.$type === 'social.spkeasy.feed.repost') {
+        const repostedPost = postMap.get(post.embed?.record?.uri)
+        const repostAuthor = authorProfileMap.get(post.authorDid)
+        if (!repostedPost || !repostAuthor) {
+          return null
+        }
+        const postView: FeedViewPost = {
+          post: repostedPost,
+          reason: {
+            $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
+            by: repostAuthor,
+            indexedAt: post.createdAt,
+          },
+        }
+        return postView
       }
+
+      const authorProfile = authorProfileMap.get(post.authorDid)
+      const quotedPost = postMap.get(post.embed?.record?.uri)
+      const dek = dekMap.get(post.sessionId) || ''
+
+      const postView: FeedViewPost = {
+        $type: 'social.spkeasy.feed.defs#privatePostView',
+
+        post: formatPostView(post, authorProfile, baseUrl, dek, quotedPost),
+        reply: post.reply
+          ? {
+              root: postMap.get(post.reply.root?.uri) || {
+                $type: 'app.bsky.feed.defs#notFoundPost',
+                uri: post.reply.root?.uri || '',
+                notFound: true,
+              },
+              parent: postMap.get(post.reply.parent?.uri) || {
+                $type: 'app.bsky.feed.defs#notFoundPost',
+                uri: post.reply.parent?.uri || '',
+                notFound: true,
+              },
+            }
+          : undefined,
+      }
+
       return postView
-    }
-
-    const authorProfile = authorProfileMap.get(post.authorDid)
-    const quotedPost = postMap.get(post.embed?.record?.uri)
-    const dek = dekMap.get(post.sessionId) || ''
-
-    const postView: FeedViewPost = {
-      $type: 'social.spkeasy.feed.defs#privatePostView',
-
-      post: formatPostView(post, authorProfile, baseUrl, dek, quotedPost),
-      reply: post.reply
-        ? {
-            root: postMap.get(post.reply.root?.uri) || {
-              $type: 'app.bsky.feed.defs#notFoundPost',
-              uri: post.reply.root?.uri || '',
-              notFound: true,
-            },
-            parent: postMap.get(post.reply.parent?.uri) || {
-              $type: 'app.bsky.feed.defs#notFoundPost',
-              uri: post.reply.parent?.uri || '',
-              notFound: true,
-            },
-          }
-        : undefined,
-    }
-
-    return postView
-  })
+    })
+    .filter(Boolean) as AppBskyFeedDefs.FeedViewPost[]
 
   return feed
 }
