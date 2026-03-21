@@ -234,6 +234,10 @@ const styles = StyleSheet.create({
     maxWidth: `calc(min(400px, 100vw))`,
     // @ts-ignore web-only
     maxHeight: `calc(min(400px, 100vh))`,
+    // @ts-ignore web-only
+    aspectRatio: '1/1',
+    // @ts-ignore web-only
+    objectFit: 'cover',
     padding: 16,
     boxSizing: 'border-box',
   },

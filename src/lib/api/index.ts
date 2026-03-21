@@ -26,6 +26,7 @@ import {CID} from 'multiformats/cid'
 import * as Hasher from 'multiformats/hashes/hasher'
 
 import {encryptContent, encryptMediaStream} from '#/lib/encryption'
+import {stripExifFromBlob} from '#/lib/media/exif'
 import {isNetworkError} from '#/lib/strings/errors'
 import {shortenLinks, stripInvalidMentions} from '#/lib/strings/rich-text-manip'
 import {logger} from '#/logger'
@@ -879,6 +880,7 @@ async function uploadBlobToSpeakeasy(
     }
 
     if (sessionKey) {
+      blob = await stripExifFromBlob(blob)
       const encryptedStream = await encryptMediaStream(
         blob.stream(),
         sessionKey,

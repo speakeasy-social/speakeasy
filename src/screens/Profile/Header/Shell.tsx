@@ -8,6 +8,7 @@ import {useLingui} from '@lingui/react'
 import {useNavigation} from '@react-navigation/native'
 
 import {BACK_HITSLOP} from '#/lib/constants'
+import {useDecryptedImageUrl} from '#/lib/hooks/useDecryptedImageUrl'
 import {measureHandle, useHandleRef} from '#/lib/hooks/useHandleRef'
 import {NavigationProp} from '#/lib/routes/types'
 import {isIOS} from '#/platform/detection'
@@ -49,6 +50,10 @@ let ProfileHeaderShell = ({
   const {top: topInset} = useSafeAreaInsets()
 
   const aviRef = useHandleRef()
+  const decryptedAvatarUri = useDecryptedImageUrl(
+    profile.avatar || undefined,
+    dek,
+  )
 
   const onPressBack = React.useCallback(() => {
     if (navigation.canGoBack()) {
@@ -83,7 +88,7 @@ let ProfileHeaderShell = ({
 
   const onPressAvi = React.useCallback(() => {
     const modui = moderation.ui('avatar')
-    const avatar = profile.avatar
+    const avatar = decryptedAvatarUri ?? profile.avatar
     if (avatar && !(modui.blur && modui.noOverride)) {
       const aviHandle = aviRef.current
       runOnUI(() => {
@@ -92,7 +97,7 @@ let ProfileHeaderShell = ({
         runOnJS(_openLightbox)(avatar, rect)
       })()
     }
-  }, [profile, moderation, _openLightbox, aviRef])
+  }, [profile, moderation, _openLightbox, aviRef, decryptedAvatarUri])
 
   const isMe = React.useMemo(
     () => currentAccount?.did === profile.did,

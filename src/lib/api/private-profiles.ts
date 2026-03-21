@@ -15,6 +15,7 @@ import {
   encryptContent,
   encryptMediaStream,
 } from '#/lib/encryption'
+import {stripExifFromBlob} from '#/lib/media/exif'
 import {compressBlobIfNeeded} from '#/lib/media/manip'
 import {logger} from '#/logger'
 import {isWeb} from '#/platform/detection'
@@ -753,6 +754,7 @@ export async function migrateMediaToSpeakeasy(
   }
 
   blob = await compressBlobIfNeeded(blob, 1_900_000)
+  blob = await stripExifFromBlob(blob)
   const mimeType = blob.type || 'image/jpeg'
   const encryptedStream = await encryptMediaStream(
     blob.stream(),
@@ -830,7 +832,8 @@ export async function resolvePrivateProfileMedia(
   const resolveAvatar = async (): Promise<string | undefined> => {
     if (newAvatar === null) return undefined
     if (newAvatar) {
-      const blob = await pathToBlob(newAvatar.path)
+      let blob = await pathToBlob(newAvatar.path)
+      blob = await stripExifFromBlob(blob)
       const mimeType = blob.type || newAvatar.mime
       const encryptedStream = await encryptMediaStream(
         blob.stream(),
@@ -862,7 +865,8 @@ export async function resolvePrivateProfileMedia(
   const resolveBanner = async (): Promise<string | undefined> => {
     if (newBanner === null) return undefined
     if (newBanner) {
-      const blob = await pathToBlob(newBanner.path)
+      let blob = await pathToBlob(newBanner.path)
+      blob = await stripExifFromBlob(blob)
       const mimeType = blob.type || newBanner.mime
       const encryptedStream = await encryptMediaStream(
         blob.stream(),
