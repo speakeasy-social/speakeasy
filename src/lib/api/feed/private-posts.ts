@@ -699,12 +699,24 @@ async function formatPostsForFeed(
     .map((post: any) => {
       if (post.$type === 'social.spkeasy.feed.repost') {
         const repostedPost = postMap.get(post.embed?.record?.uri)
-        const repostAuthor = authorProfileMap.get(post.authorDid)
-        if (!repostedPost || !repostAuthor) {
-          return null
-        }
+        const repostAuthor =
+          authorProfileMap.get(post.authorDid) ||
+          profileToAuthorView(post.authorDid)
+
         const postView: FeedViewPost = {
-          post: repostedPost,
+          post: repostedPost || {
+            $type: 'social.spkeasy.feed.defs#notFoundPostView',
+            uri: post.embed?.record?.uri || '',
+            cid: post.embed?.record?.cid || '',
+            author: profileToAuthorView(post.authorDid),
+            record: {
+              $type: 'app.bsky.feed.post',
+              text: '',
+              createdAt: post.createdAt,
+            },
+            indexedAt: post.createdAt,
+            labels: [],
+          },
           reason: {
             $type: 'social.spkeasy.feed.defs#reasonPrivateRepost',
             by: repostAuthor,
