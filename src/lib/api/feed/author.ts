@@ -80,6 +80,7 @@ function isAuthorReplyChain(
   post: AppBskyFeedDefs.FeedViewPost,
   posts: AppBskyFeedDefs.FeedViewPost[],
 ): boolean {
+  if (!post.post) return false
   // current post is by a different user (shouldn't happen)
   if (post.post.author.did !== actor) return false
 
@@ -90,7 +91,7 @@ function isAuthorReplyChain(
     if (replyParent.author.did !== actor) return false
 
     // A top-level post that matches the parent of the current post.
-    const parentPost = posts.find(p => p.post.uri === replyParent.uri)
+    const parentPost = posts.find(p => p.post?.uri === replyParent.uri)
 
     /*
      * Either we haven't fetched the parent at the top level, or the only

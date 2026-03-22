@@ -52,12 +52,15 @@ export class FeedViewPostsSlice {
     this.isIncompleteThread = false
     this.isFallbackMarker = false
     this.isOrphan = false
+    this._feedPost = feedPost
+    this._reactKey = ''
+    this.rootUri = ''
+    if (!post) return
     if (isAnyPostView(reply?.root)) {
       this.rootUri = reply.root.uri
     } else {
       this.rootUri = post.uri
     }
-    this._feedPost = feedPost
     this._reactKey = `slice-${post.uri}-${
       feedPost.reason?.indexedAt || post.indexedAt
     }`
