@@ -764,6 +764,7 @@ function assertSomePostsPassModeration(feed: AppBskyFeedDefs.FeedViewPost[]) {
   let somePostsPassModeration = false
 
   for (const item of feed) {
+    if (!item.post) continue
     const moderation = moderatePost(item.post, {
       userDid: undefined,
       prefs: DEFAULT_LOGGED_OUT_PREFERENCES.moderationPrefs,
