@@ -1,10 +1,15 @@
 import React from 'react'
 import {View} from 'react-native'
-import {Plural} from '@lingui/macro'
-import {useFocusEffect} from '@react-navigation/native'
+import {msg, Plural} from '@lingui/macro'
+import {useLingui} from '@lingui/react'
+import {useFocusEffect, useNavigation} from '@react-navigation/native'
 
 import {usePalette} from '#/lib/hooks/usePalette'
-import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
+import {
+  CommonNavigatorParams,
+  NativeStackScreenProps,
+  NavigationProp,
+} from '#/lib/routes/types'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {useProfileQuery} from '#/state/queries/profile'
 import {useResolveDidQuery} from '#/state/queries/resolve-uri'
@@ -12,6 +17,7 @@ import {useAgent} from '#/state/session'
 import {useSetMinimalShellMode} from '#/state/shell'
 import {ProfileFollows as ProfileFollowsComponent} from '#/view/com/profile/ProfileFollows'
 import {atoms as a} from '#/alf'
+import {Button, ButtonText} from '#/components/Button'
 import * as Layout from '#/components/Layout'
 import {TrustActions} from '#/components/TrustActions'
 
@@ -19,8 +25,10 @@ const PAGE_SIZE = 100
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'ProfileFollows'>
 export const ProfileFollowsScreen = ({route}: Props) => {
+  const {_} = useLingui()
   const {name} = route.params
   const pal = usePalette('default')
+  const navigation = useNavigation<NavigationProp>()
   const setMinimalShellMode = useSetMinimalShellMode()
   const agent = useAgent()
 
@@ -93,6 +101,14 @@ export const ProfileFollowsScreen = ({route}: Props) => {
               maxWidth: 600,
             },
           ]}>
+          <Button
+            variant="solid"
+            color="primary"
+            size="small"
+            label={_(msg`Invite Friends`)}
+            onPress={() => navigation.navigate('InvitesSettings')}>
+            <ButtonText>{_(msg`Invite to Speakeasy`)}</ButtonText>
+          </Button>
           <TrustActions loadAllProfiles={loadAllProfiles} />
         </View>
         <ProfileFollowsComponent name={name} />
