@@ -10,9 +10,13 @@ import {nanoid} from 'nanoid/non-secure'
 import * as apilib from '#/lib/api/index'
 // import {usePrivateSession} from '#/lib/api/private-sessions'
 // import {callSpeakeasyApiWithAgent} from '#/lib/api/speakeasy'
+import {SUPPORTERS_SOCIAL_CARD_URI} from '#/lib/assets'
+import {blobToDataUri} from '#/lib/media/util'
 import {NavigationProp} from '#/lib/routes/types'
 import {logger} from '#/logger'
+import {ComposerImage} from '#/state/gallery'
 import {createPostgateRecord} from '#/state/queries/postgate/util'
+import {precacheResolveLinkQuery} from '#/state/queries/resolve-link'
 import {
   useCheckContributionQuery,
   useCreateTestimonialMutation,
@@ -35,6 +39,13 @@ import {getCurrencySymbol} from '../donate/util'
 import * as Toast from '../util/Toast'
 
 const MAX_TESTIMONIAL_LENGTH = 300
+
+const SUPPORTERS_URL = 'https://spkeasy.social/supporters'
+const SUPPORTERS_TITLE = 'Contributors | Speakeasy'
+const SUPPORTERS_DESCRIPTION =
+  'These are the people that are building a cooperative social media by humans, for humans.'
+const SUPPORTERS_IMAGE_WIDTH = 1200
+const SUPPORTERS_IMAGE_HEIGHT = 630
 
 const CONTRIBUTION_LABELS: Record<string, string> = {
   engineer: 'code',
@@ -183,6 +194,29 @@ export function SupportersAddForm({
           postgate: createPostgateRecord({post: ''}),
           threadgate: [],
         }
+
+        // Pre-cache the supporters link embed with bundled image
+        // so resolveEmbed uses our metadata directly (no Cardyb fetch)
+        const imageUri = SUPPORTERS_SOCIAL_CARD_URI
+        const imageBlob = await fetch(imageUri).then(r => r.blob())
+        const dataUri = await blobToDataUri(imageBlob)
+        const thumb: ComposerImage = {
+          alt: '',
+          source: {
+            id: nanoid(),
+            path: dataUri,
+            width: SUPPORTERS_IMAGE_WIDTH,
+            height: SUPPORTERS_IMAGE_HEIGHT,
+            mime: 'image/png',
+          },
+        }
+        precacheResolveLinkQuery(queryClient, SUPPORTERS_URL, {
+          type: 'external',
+          uri: SUPPORTERS_URL,
+          title: SUPPORTERS_TITLE,
+          description: SUPPORTERS_DESCRIPTION,
+          thumb,
+        })
 
         // TODO: Re-enable when private testimonies are implemented
         // if (audience === 'trusted') {
