@@ -46,7 +46,7 @@ export function DesktopRightNav({routeName}: {routeName: string}) {
   const showTrending = !isSearchScreen || (isSearchScreen && !!searchQuery)
   const isIntentScreen = routeName === 'Intent'
   const isDonationScreen =
-    routeName === 'Donate' || routeName === 'DonateThanks'
+    routeName === 'Donate' || routeName === 'SupportersAdd'
 
   const {isTablet} = useWebMediaQueries()
   if (isTablet) {
