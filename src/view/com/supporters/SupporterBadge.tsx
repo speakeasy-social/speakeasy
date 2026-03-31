@@ -1,61 +1,51 @@
-import {capitalize} from '#/lib/strings/capitalize'
-import {Tag, TagVariant} from '#/components/Tag'
+import React from 'react'
+import {View} from 'react-native'
 
-/**
- * Maps (contribution, recognition, isRegularGift) to display variant and label
- */
-function getBadgeStyle(
+import {capitalize} from '#/lib/strings/capitalize'
+import {atoms as a, tokens, useTheme} from '#/alf'
+import {Props as IconProps} from '#/components/icons/common'
+import {DonorDark_Stroke2_Corner0_Rounded as DonorDarkIcon} from '#/components/icons/DonorDark'
+import {Volunteer_Stroke2_Corner0_Rounded as VolunteerIcon} from '#/components/icons/Volunteer'
+import {Text} from '#/components/Typography'
+
+type IconComponent = React.ComponentType<IconProps>
+
+type BadgeInfo = {
+  icon: IconComponent
+  label: string
+  gradient?: keyof typeof tokens.gradients
+}
+
+function getBadgeInfo(
   contribution: string,
   recognition?: string | null,
   isRegularGift?: boolean,
-): {variant: TagVariant; label: string} {
-  // Special case: donor with "Founding Donor" recognition
+): BadgeInfo {
   if (contribution === 'donor' && recognition === 'Founding Donor') {
-    return {
-      variant: 'gold',
-      label: '✊ Founding Donor',
-    }
+    return {icon: DonorDarkIcon, label: 'Founding Donor', gradient: 'sunset'}
   }
 
-  // Regular (recurring) donor: use a distinct colour
   if (contribution === 'donor' && isRegularGift) {
-    return {
-      variant: 'gradient_nordic',
-      label: '☀️ Donor',
-    }
+    return {icon: DonorDarkIcon, label: 'Frequent Donor', gradient: 'sunrise'}
   }
 
-  // Map contribution strings to badge styles
-  const contributionMap: Record<string, {variant: TagVariant; label: string}> =
-    {
-      donor: {
-        variant: 'silver',
-        label: '☀️ Donor',
-      },
-      contributor: {
-        variant: 'bronze',
-        label: '⚒️ Contributor',
-      },
-      designer: {
-        variant: 'violet',
-        label: '🎨 Design',
-      },
-      engineer: {
-        variant: 'blue',
-        label: '🔨 Code',
-      },
-      testing: {
-        variant: 'emerald',
-        label: '👷 Testing & QA',
-      },
-    }
+  if (contribution === 'donor') {
+    return {icon: DonorDarkIcon, label: 'Donor'}
+  }
 
-  return (
-    contributionMap[contribution] ?? {
-      variant: 'silver',
-      label: capitalize(contribution.replace(/_/g, ' ')),
-    }
-  )
+  const labelMap: Record<string, string> = {
+    contributor: 'Contributor',
+    designer: 'UX & Design',
+    engineer: 'Software Development',
+    testing: 'Testing & QA',
+    community: 'Community Building',
+  }
+
+  return {
+    icon: VolunteerIcon,
+    label:
+      labelMap[contribution] ?? capitalize(contribution.replace(/_/g, ' ')),
+  }
 }
 
 export function SupporterBadge({
@@ -67,6 +57,18 @@ export function SupporterBadge({
   recognition?: string | null
   isRegularGift?: boolean
 }) {
-  const style = getBadgeStyle(contribution, recognition, isRegularGift)
-  return <Tag variant={style.variant} label={style.label} />
+  const t = useTheme()
+  const {
+    icon: Icon,
+    label,
+    gradient,
+  } = getBadgeInfo(contribution, recognition, isRegularGift)
+  const color = t.atoms.text_contrast_medium.color
+
+  return (
+    <View style={[a.flex_row, a.align_center, {gap: 4}]}>
+      <Icon size="sm" fill={color} gradient={gradient} />
+      <Text style={[a.text_md, a.font_bold, {color}]}>{label}</Text>
+    </View>
+  )
 }
