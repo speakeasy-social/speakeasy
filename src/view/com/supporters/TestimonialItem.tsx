@@ -11,7 +11,7 @@ import {Link} from '#/components/Link'
 import {ProfileHoverCard} from '#/components/ProfileHoverCard'
 import {Text} from '#/components/Typography'
 import {SupporterBadge} from './SupporterBadge'
-import {Testimonial} from './types'
+import {deduplicateContributions, Testimonial} from './types'
 
 interface TestimonialItemProps {
   testimonial: Testimonial
@@ -33,16 +33,7 @@ export const TestimonialItem = memo(function TestimonialItem({
     ? sanitizeDisplayName(author.displayName)
     : sanitizeHandle(author.handle)
 
-  // Dedupe contributions by (contribution, recognition) pair
-  const seen = new Set<string>()
-  const uniqueContributions = contributions.filter(c => {
-    const key = `${c.contribution}:${c.public?.recognition ?? ''}`
-    if (seen.has(key)) {
-      return false
-    }
-    seen.add(key)
-    return true
-  })
+  const uniqueContributions = deduplicateContributions(contributions)
 
   return (
     <View
@@ -86,24 +77,35 @@ export const TestimonialItem = memo(function TestimonialItem({
               </Link>
             </ProfileHoverCard>
 
-            {uniqueContributions.length > 0 && (
-              <View style={styles.badges}>
-                {uniqueContributions.map((c, idx) => (
-                  <SupporterBadge
-                    key={`${c.contribution}:${
-                      c.public?.recognition ?? ''
-                    }:${idx}`}
-                    contribution={c.contribution}
-                    recognition={c.public?.recognition}
-                    isRegularGift={c.public?.isRegularGift}
-                  />
-                ))}
+            {uniqueContributions.map((c, idx) => (
+              <View
+                key={`${c.contribution}:${c.public?.recognition ?? ''}:${idx}`}
+                style={styles.badges}>
+                <Text
+                  style={[
+                    a.text_md,
+                    a.font_bold,
+                    t.atoms.text_contrast_medium,
+                  ]}>
+                  {' · '}
+                </Text>
+                <SupporterBadge
+                  contribution={c.contribution}
+                  recognition={c.public?.recognition}
+                  isRegularGift={c.public?.isRegularGift}
+                />
               </View>
-            )}
+            ))}
           </View>
 
           <View style={styles.messageContainer}>
-            <Text style={[a.text_md, a.leading_snug, t.atoms.text]}>
+            <Text
+              style={[
+                a.text_md,
+                a.leading_snug,
+                t.atoms.text,
+                {fontStyle: 'italic'},
+              ]}>
               {message}
             </Text>
           </View>
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
   },
   badges: {
     flexDirection: 'row',
-    gap: 4,
+    alignItems: 'center',
   },
   messageContainer: {
     marginTop: 4,

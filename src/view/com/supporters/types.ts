@@ -34,3 +34,41 @@ export interface Testimonial {
   contributions: TestimonialContribution[]
   relationship: RelationshipPriority
 }
+
+/**
+ * Deduplicates contributions by (contribution, recognition) pair,
+ * then removes plain "Donor" if a more specific donor badge exists
+ * (Founding Donor or Frequent Donor).
+ */
+export function deduplicateContributions(
+  contributions: TestimonialContribution[],
+): TestimonialContribution[] {
+  // Step 1: dedupe by (contribution, recognition) pair
+  const seen = new Set<string>()
+  const unique = contributions.filter(c => {
+    const key = `${c.contribution}:${c.public?.recognition ?? ''}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+
+  // Step 2: remove plain "Donor" if a specific donor badge exists
+  const hasSpecificDonor = unique.some(
+    c =>
+      c.contribution === 'donor' &&
+      (c.public?.recognition === 'Founding Donor' || c.public?.isRegularGift),
+  )
+
+  if (!hasSpecificDonor) {
+    return unique
+  }
+
+  return unique.filter(
+    c =>
+      c.contribution !== 'donor' ||
+      c.public?.recognition === 'Founding Donor' ||
+      c.public?.isRegularGift,
+  )
+}
