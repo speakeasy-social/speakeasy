@@ -105,8 +105,8 @@ import {SettingsScreen} from './screens/Settings/Settings'
 import {ThreadPreferencesScreen} from './screens/Settings/ThreadPreferences'
 import TopicScreen from './screens/Topic'
 import {DonateScreen} from './view/screens/Donate'
-import {SupportersAddScreen} from './view/screens/SupportersAdd'
 import {SupportersScreen} from './view/screens/Supporters'
+import {SupportersAddScreen} from './view/screens/SupportersAdd'
 
 const navigationRef = createNavigationContainerRef<AllNavigatorParams>()
 
