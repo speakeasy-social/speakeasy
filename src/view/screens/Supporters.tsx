@@ -1,6 +1,6 @@
 import React from 'react'
 import {ListRenderItemInfo, View} from 'react-native'
-import {useFocusEffect, useLinkProps} from '@react-navigation/native'
+import {useFocusEffect} from '@react-navigation/native'
 
 import {useOpenLink} from '#/lib/hooks/useOpenLink'
 import {CommonNavigatorParams, NativeStackScreenProps} from '#/lib/routes/types'
@@ -11,7 +11,7 @@ import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as Layout from '#/components/Layout'
 import {ListMaybePlaceholder} from '#/components/Lists'
-import {Text} from '#/components/Typography'
+import {H1, Text} from '#/components/Typography'
 import {TestimonialItem} from '../com/supporters/TestimonialItem'
 import {Testimonial} from '../com/supporters/types'
 import {List} from '../com/util/List'
@@ -22,9 +22,9 @@ export function SupportersScreen(_props: Props) {
   const setMinimalShellMode = useSetMinimalShellMode()
   const t = useTheme()
   const {currentAccount} = useSession()
-  const {onPress: onDonatePress} = useLinkProps({to: '/donate'})
   const openLink = useOpenLink()
   const volunteerUrl = 'https://about.spkeasy.social/volunteer'
+  const donateUrl = 'https://about.spkeasy.social/donate'
 
   const {
     data: testimonials,
@@ -52,31 +52,36 @@ export function SupportersScreen(_props: Props) {
   const ListHeader = React.useMemo(
     () => (
       <View style={[a.px_lg, a.py_lg, a.border_b, t.atoms.border_contrast_low]}>
-        <Text style={[a.text_xl, a.font_bold, a.leading_snug, a.text_center]}>
-          Speakeasy's vision of social media is made possible by the generous
-          support of our community
+        <H1 style={[a.text_4xl, a.font_bold, a.leading_tight]}>
+          Our supporters
+        </H1>
+        <Text style={[a.text_md, a.leading_snug, a.mt_sm]}>
+          Speakeasy's vision of social media is possible by the generous support
+          of our community.
         </Text>
-        <View style={[a.flex_row, a.gap_sm, a.mt_md, a.justify_center]}>
+        <View style={[a.flex_row, a.gap_sm, a.mt_md]}>
           <Button
-            size="small"
-            variant="outline"
+            size="large"
+            variant="solid"
             color="primary"
-            label="Donate"
-            onPress={onDonatePress}>
-            <ButtonText>Donate</ButtonText>
+            label="Donate now"
+            style={[a.rounded_full]}
+            onPress={() => openLink(donateUrl)}>
+            <ButtonText>Donate now</ButtonText>
           </Button>
           <Button
-            size="small"
+            size="large"
             variant="outline"
             color="primary"
-            label="Volunteer"
+            label="Become a volunteer"
+            style={[a.rounded_full]}
             onPress={() => openLink(volunteerUrl)}>
-            <ButtonText>Volunteer</ButtonText>
+            <ButtonText>Become a volunteer</ButtonText>
           </Button>
         </View>
       </View>
     ),
-    [t.atoms.border_contrast_low, onDonatePress, openLink, volunteerUrl],
+    [t.atoms.border_contrast_low, openLink, volunteerUrl, donateUrl],
   )
 
   const onRefresh = React.useCallback(async () => {
@@ -87,13 +92,6 @@ export function SupportersScreen(_props: Props) {
 
   return (
     <Layout.Screen testID="supportersScreen">
-      <Layout.Header.Outer>
-        <Layout.Header.BackButton />
-        <Layout.Header.Content align="left">
-          <Layout.Header.TitleText>Supporters</Layout.Header.TitleText>
-        </Layout.Header.Content>
-      </Layout.Header.Outer>
-
       {showPlaceholder ? (
         <ListMaybePlaceholder
           isLoading={isLoading}
