@@ -23,6 +23,8 @@ import {CodeLines_Stroke2_Corner2_Rounded as CodeLines} from '#/components/icons
 import {Coffee_Stroke2_Corner0_Rounded as Coffee} from '#/components/icons/Coffee'
 import {ColorPalette_Stroke2_Corner0_Rounded as ColorPalette} from '#/components/icons/ColorPalette'
 import {Crop_Stroke2_Corner0_Rounded as Crop} from '#/components/icons/Crop'
+import {Donate_Stroke2_Corner0_Rounded as Donate} from '#/components/icons/Donate'
+import {DonorDark_Stroke2_Corner0_Rounded as DonorDark} from '#/components/icons/DonorDark'
 import {DotGrid_Stroke2_Corner0_Rounded as DotGrid} from '#/components/icons/DotGrid'
 import {Download_Stroke2_Corner0_Rounded as Download} from '#/components/icons/Download'
 import {EditBig_Stroke2_Corner0_Rounded as EditBig} from '#/components/icons/EditBig'
@@ -105,6 +107,8 @@ import {SquareBehindSquare4_Stroke2_Corner0_Rounded as SquareBehindSquare} from 
 import {Star_Stroke2_Corner0_Rounded as Star} from '#/components/icons/Star'
 import {StarterPack} from '#/components/icons/StarterPack'
 import {StreamingLive_Stroke2_Corner0_Rounded as StreamingLive} from '#/components/icons/StreamingLive'
+import {Supporters_Stroke2_Corner0_Rounded as Supporters} from '#/components/icons/Supporters'
+import {SupportersFilled_Stroke2_Corner0_Rounded as SupportersFilled} from '#/components/icons/SupportersFilled'
 import {TextSize_Stroke2_Corner0_Rounded as TextSize} from '#/components/icons/TextSize'
 import {Ticket_Stroke2_Corner0_Rounded as Ticket} from '#/components/icons/Ticket'
 import {TimesLarge_Stroke2_Corner0_Rounded as Times} from '#/components/icons/Times'
@@ -115,6 +119,7 @@ import {UFO_Stroke2_Corner0_Rounded as UFO} from '#/components/icons/UFO'
 import {UserCircle_Stroke2_Corner0_Rounded as UserCircle} from '#/components/icons/UserCircle'
 import {Verified_Stroke2_Corner2_Rounded as Verified} from '#/components/icons/Verified'
 import {VideoClip_Stroke2_Corner0_Rounded as VideoClip} from '#/components/icons/VideoClip'
+import {Volunteer_Stroke2_Corner0_Rounded as Volunteer} from '#/components/icons/Volunteer'
 import {Warning_Stroke2_Corner0_Rounded as Warning} from '#/components/icons/Warning'
 import {Window_Stroke2_Corner2_Rounded as Window} from '#/components/icons/Window'
 import {Wrench_Stroke2_Corner2_Rounded as Wrench} from '#/components/icons/Wrench'
@@ -142,6 +147,8 @@ const allIcons = [
   {name: 'Coffee', component: Coffee},
   {name: 'ColorPalette', component: ColorPalette},
   {name: 'Crop', component: Crop},
+  {name: 'Donate', component: Donate},
+  {name: 'DonorDark', component: DonorDark},
   {name: 'DotGrid', component: DotGrid},
   {name: 'Download', component: Download},
   {name: 'Earth', component: Earth},
@@ -221,6 +228,8 @@ const allIcons = [
   {name: 'Star', component: Star},
   {name: 'StarterPack', component: StarterPack},
   {name: 'StreamingLive', component: StreamingLive},
+  {name: 'Supporters', component: Supporters},
+  {name: 'SupportersFilled', component: SupportersFilled},
   {name: 'TextSize', component: TextSize},
   {name: 'Ticket', component: Ticket},
   {name: 'Times', component: Times},
@@ -231,6 +240,7 @@ const allIcons = [
   {name: 'UserCircle', component: UserCircle},
   {name: 'Verified', component: Verified},
   {name: 'VideoClip', component: VideoClip},
+  {name: 'Volunteer', component: Volunteer},
   {name: 'Warning', component: Warning},
   {name: 'Window', component: Window},
   {name: 'Wrench', component: Wrench},

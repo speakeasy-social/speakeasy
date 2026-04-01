@@ -21,6 +21,7 @@ import {
 import {useSession} from '#/state/session'
 import {ProfileMenu} from '#/view/com/profile/ProfileMenu'
 import {TrustButton} from '#/view/com/profile/TrustButton'
+import {SupporterBadges} from '#/view/com/supporters/SupporterBadges'
 import {PrivateProfileIndicator} from '#/view/com/util/PrivateProfileIndicator'
 import * as Toast from '#/view/com/util/Toast'
 import {atoms as a} from '#/alf'
@@ -231,6 +232,7 @@ let ProfileHeaderStandard = ({
         {!isPlaceholderProfile && !isBlockedUser && (
           <View style={a.gap_md}>
             <ProfileHeaderMetrics profile={profile} />
+            <SupporterBadges did={profile.did} />
             {descriptionRT && !moderation.ui('profileView').blur ? (
               <View pointerEvents="auto">
                 <RichText

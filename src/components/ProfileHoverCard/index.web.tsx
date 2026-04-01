@@ -16,6 +16,7 @@ import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {usePrefetchProfileQuery, useProfileQuery} from '#/state/queries/profile'
 import {useSession} from '#/state/session'
 import {TrustButton} from '#/view/com/profile/TrustButton'
+import {SupporterBadges} from '#/view/com/supporters/SupporterBadges'
 import {formatCount} from '#/view/com/util/numeric/format'
 import {PrivateProfileIndicator} from '#/view/com/util/PrivateProfileIndicator'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
@@ -526,6 +527,8 @@ function Inner({
               </Text>
             </InlineLinkText>
           </View>
+
+          <SupporterBadges did={profile.did} style={[a.pt_sm]} />
 
           {profile.description?.trim() && !moderation.ui('profileView').blur ? (
             <View style={[a.pt_md]}>

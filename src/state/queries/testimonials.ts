@@ -21,6 +21,7 @@ import {
 } from '#/state/cache/private-profile-cache'
 import {useAgent, useSession} from '#/state/session'
 import {
+  deduplicateContributions,
   RelationshipPriority,
   Testimonial,
   TestimonialContribution,
@@ -128,6 +129,7 @@ async function fetchAllTestimonials(
     api: string
     query?: Record<string, unknown>
   }) => Promise<ListTestimonialsResponse>,
+  options?: {dids?: string},
 ): Promise<ApiTestimonial[]> {
   const allTestimonials: ApiTestimonial[] = []
   let cursor: string | undefined
@@ -138,6 +140,7 @@ async function fetchAllTestimonials(
       query: {
         limit: 100,
         ...(cursor && {cursor}),
+        ...(options?.dids && {dids: options.dids}),
       },
     })
 
@@ -158,6 +161,33 @@ export function useTestimonialsQuery() {
     staleTime: STALE.MINUTES.FIVE,
     queryKey: RQKEY(),
     queryFn: () => fetchAllTestimonials(speakeasyApi),
+  })
+}
+
+/**
+ * Hook to fetch contributions for a specific user by DID.
+ * Calls listTestimonials with dids filter and deduplicates by (contribution, recognition).
+ */
+export function useUserContributionsQuery(did: string | undefined) {
+  const {call: speakeasyApi} = useSpeakeasyApi()
+
+  return useQuery({
+    enabled: !!did,
+    staleTime: STALE.MINUTES.FIVE,
+    queryKey: [RQKEY_ROOT, 'contributions', did],
+    queryFn: async () => {
+      const testimonials = await fetchAllTestimonials(speakeasyApi, {dids: did})
+
+      const allContributions: TestimonialContribution[] = testimonials.flatMap(
+        t =>
+          t.contributions.map(c => ({
+            contribution: c.contribution,
+            public: c.public,
+          })),
+      )
+
+      return deduplicateContributions(allContributions)
+    },
   })
 }
 
