@@ -129,7 +129,7 @@ jobs:
             docker rm speakeasy-client || true
             gunzip -f /home/speakeasy/speakeasy-client.tar.gz &&
             docker load --input /home/speakeasy/speakeasy-client.tar &&
-            docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
+            docker run -d -p 127.0.0.1:8100:8100 --restart=unless-stopped --name speakeasy-client -e ATP_APPVIEW_HOST=https://public.api.bsky.app speakeasy-client-image:latest /usr/bin/bskyweb serve
 
       - name: Cleanup Old Docker Images
         uses: appleboy/ssh-action@master
