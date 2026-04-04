@@ -9,7 +9,7 @@ import {useCloseAllActiveElements} from '#/state/util'
 import {useIntentDialogs} from '#/components/intents/IntentDialogs'
 import {Referrer} from '../../../modules/expo-bluesky-swiss-army'
 
-type IntentType = 'compose' | 'verify-email'
+type IntentType = 'compose' | 'verify-email' | 'invite'
 
 const VALID_IMAGE_REGEX = /^[\w.:\-_/]+\|\d+(\.\d+)?\|\d+(\.\d+)?$/
 
@@ -20,6 +20,7 @@ export function useIntentHandler() {
   const incomingUrl = Linking.useURL()
   const composeIntent = useComposeIntent()
   const verifyEmailIntent = useVerifyEmailIntent()
+  const inviteIntent = useInviteIntent()
 
   React.useEffect(() => {
     const handleIncomingURL = (url: string) => {
@@ -71,6 +72,12 @@ export function useIntentHandler() {
           verifyEmailIntent(code)
           return
         }
+        case 'invite': {
+          const code = params.get('code')
+          if (!code) return
+          inviteIntent(code)
+          return
+        }
         default: {
           return
         }
@@ -84,7 +91,7 @@ export function useIntentHandler() {
       handleIncomingURL(incomingUrl)
       previousIntentUrl = incomingUrl
     }
-  }, [incomingUrl, composeIntent, verifyEmailIntent])
+  }, [incomingUrl, composeIntent, verifyEmailIntent, inviteIntent])
 }
 
 export function useComposeIntent() {
@@ -155,6 +162,24 @@ export function useComposeIntent() {
 function useVerifyEmailIntent() {
   const closeAllActiveElements = useCloseAllActiveElements()
   const {verifyEmailDialogControl: control, setVerifyEmailState: setState} =
+    useIntentDialogs()
+  return React.useCallback(
+    (code: string) => {
+      closeAllActiveElements()
+      setState({
+        code,
+      })
+      setTimeout(() => {
+        control.open()
+      }, 1000)
+    },
+    [closeAllActiveElements, control, setState],
+  )
+}
+
+function useInviteIntent() {
+  const closeAllActiveElements = useCloseAllActiveElements()
+  const {inviteDialogControl: control, setInviteState: setState} =
     useIntentDialogs()
   return React.useCallback(
     (code: string) => {
