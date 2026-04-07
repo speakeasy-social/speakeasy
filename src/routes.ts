@@ -55,6 +55,7 @@ export const router = new Router({
   PrivacyAndSecuritySettings: '/settings/privacy-and-security',
   ContentAndMediaSettings: '/settings/content-and-media',
   AboutSettings: '/settings/about',
+  InvitesSettings: '/settings/invites',
   AppIconSettings: '/settings/app-icon',
   // support
   Support: '/support',
